@@ -133,15 +133,13 @@ struct ContentView: View {
     private var inputBar: some View {
         HStack {
             Button {
-                let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
                 if voiceManager.isListening {
-                    voiceManager.stopListeningAndTranscribe(groqAPIKey: groqKey) { text in
-                        viewModel.inputText = text
+                    voiceManager.stopListening()
+                    if !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         viewModel.send()
                     }
                 } else {
                     voiceManager.startListening(
-                        groqAPIKey: groqKey,
                         onPartialResult: { viewModel.inputText = $0 },
                         onFinish: { text in
                             viewModel.inputText = text
