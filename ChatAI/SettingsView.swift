@@ -21,7 +21,6 @@ struct SettingsView: View {
             Form {
                 Section("Giọng nói") {
                     Toggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies)
-                        @AppStorage("autoMemory") var autoMemory: Bool = true
                     Picker("Giọng đọc", selection: $voiceGenderRaw) {
                         ForEach(VoiceGender.allCases) { g in Text(g.rawValue).tag(g.rawValue) }
                     }
