@@ -133,20 +133,15 @@ struct ContentView: View {
     private var inputBar: some View {
         HStack {
             Button {
-                if voiceManager.isListening {
-                    voiceManager.stopListening()
-                    if !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
+                voiceManager.startListening(
+                    groqAPIKey: groqKey,
+                    onPartialResult: { viewModel.inputText = $0 },
+                    onFinish: { text in
+                        viewModel.inputText = text
                         viewModel.send()
                     }
-                } else {
-                    voiceManager.startListening(
-                        onPartialResult: { viewModel.inputText = $0 },
-                        onFinish: { text in
-                            viewModel.inputText = text
-                            viewModel.send()
-                        }
-                    )
-                }
+                )
             } label: {
                 Image(systemName: voiceManager.isListening ? "mic.fill" : "mic")
                     .foregroundColor(voiceManager.isListening ? .red : .accentColor)
