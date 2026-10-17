@@ -58,14 +58,14 @@ jobs:
           NAME="TPIOS-BACKUP-${DATE}-${SHORT_SHA}"
           ZIP="${NAME}.zip"
 
-          # Archive all committed files, preserving their original paths.
+          # Archive every committed file with its original repository path.
           git archive --format=zip --output="$ZIP" HEAD
 
-          # Explicitly add every workflow file at its ORIGINAL path.
-          # This updates the ZIP entries without creating a renamed folder.
-          while IFS= read -r -d '' FILE; do
-            zip -q "$ZIP" "$FILE"
-          done < <(git ls-tree -r -z --name-only HEAD -- .github/workflows/)
+          # Also add a phone-visible copy because iOS Files may hide .github.
+          # The original .github/workflows paths remain in the ZIP unchanged.
+          mkdir -p workflows
+          cp .github/workflows/*.yml workflows/
+          zip -qr "$ZIP" workflows/
 
           {
             echo "TPIOS Repository Backup"
@@ -73,27 +73,27 @@ jobs:
             echo "Commit: ${GITHUB_SHA}"
             echo "Repository: ${GITHUB_REPOSITORY}"
             echo "Build: verified successful"
+            echo "Note: workflows/ is a visible copy; originals remain under .github/workflows/."
           } > TPIOS-BACKUP-INFO.txt
 
           zip -q "$ZIP" TPIOS-BACKUP-INFO.txt
 
-          # Check every workflow file tracked by Git exists in the ZIP.
-          WORKFLOW_COUNT=0
-          while IFS= read -r -d '' FILE; do
+          # Validate originals and the visible copies explicitly.
+          for FILE in .github/workflows/build.yml .github/workflows/backup-release.yml; do
+            test -f "$FILE" || { echo "Missing source file: $FILE"; exit 1; }
             unzip -Z1 "$ZIP" | grep -Fxq "$FILE" || {
-              echo "Missing workflow file in backup ZIP: $FILE"
+              echo "Missing original workflow path in ZIP: $FILE"
               exit 1
             }
-            WORKFLOW_COUNT=$((WORKFLOW_COUNT + 1))
-          done < <(git ls-tree -r -z --name-only HEAD -- .github/workflows/)
-
-          if [ "$WORKFLOW_COUNT" -eq 0 ]; then
-            echo "No committed workflow files found; refusing to create backup."
-            exit 1
-          fi
+            VISIBLE="workflows/${FILE##*/}"
+            unzip -Z1 "$ZIP" | grep -Fxq "$VISIBLE" || {
+              echo "Missing phone-visible workflow copy in ZIP: $VISIBLE"
+              exit 1
+            }
+          done
 
           unzip -Z1 "$ZIP" | grep -Fxq "TPIOS-BACKUP-INFO.txt"
-          echo "Validated all ${WORKFLOW_COUNT} committed workflow files in the ZIP."
+          echo "Validated both workflow files in original and phone-visible paths."
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
@@ -111,4 +111,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$RELEASE_NAME" \
             --generate-notes \
-            --notes "Full backup of all committed repository files preserving original paths. Validates every committed workflow file before release."
+            --notes "Full repository backup. Original workflow paths are preserved, and a visible workflows/ copy is included for iPhone browsing."
