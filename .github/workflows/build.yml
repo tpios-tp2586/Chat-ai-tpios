@@ -1,0 +1,72 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate app icon from repo file
+        run: |
+          ICON_DIR="ChatAI/Assets.xcassets/AppIcon.appiconset"
+          mkdir -p "$ICON_DIR"
+          sips -s format png --resampleHeightWidth 1024 1024 IMG_0290.png --out "$ICON_DIR/icon-1024.png"
+          sips -z 40 40   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-20@2x.png"
+          sips -z 60 60   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-20@3x.png"
+          sips -z 58 58   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@2x.png"
+          sips -z 87 87   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@3x.png"
+          sips -z 80 80   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@2x.png"
+          sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@3x.png"
+          sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
+          sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build app (unsigned)
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          xcodebuild \
+            -project ChatAI.xcodeproj \
+            -scheme ChatAI \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CURRENT_PROJECT_VERSION=$BUILD_NUMBER \
+            MARKETING_VERSION=1.0.$BUILD_NUMBER \
+            build
+
+      - name: Package .ipa
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          IPA_NAME="chat-ai-tpios-${BUILD_NUMBER}.ipa"
+          zip -r "$IPA_NAME" Payload
+          echo "IPA_NAME=$IPA_NAME" >> "$GITHUB_ENV"
+
+      - name: Publish .ipa as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: chat-ai-tpios-${{ github.run_number }}
+          files: ${{ env.IPA_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
