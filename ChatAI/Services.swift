@@ -102,6 +102,78 @@ enum GeminiModelFetcher {
         }.sorted()
     }
 }
+enum OpenAIModelFetcher {
+    static func fetchModels(apiKey: String) async throws -> [String] {
+        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
+        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/models")!)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AIProviderError.server(String(data: data, encoding: .utf8) ?? "unknown error")
+        }
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = json["data"] as? [[String: Any]]
+        else { throw AIProviderError.invalidResponse }
+        // Chỉ lấy model chat (gpt-*)
+        return list
+            .compactMap { $0["id"] as? String }
+            .filter { $0.hasPrefix("gpt-") || $0.hasPrefix("o1") || $0.hasPrefix("o3") }
+            .sorted()
+    }
+}
+
+enum AnthropicModelFetcher {
+    static func fetchModels(apiKey: String) async throws -> [String] {
+        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
+        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models")!)
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AIProviderError.server(String(data: data, encoding: .utf8) ?? "unknown error")
+        }
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = json["data"] as? [[String: Any]]
+        else { throw AIProviderError.invalidResponse }
+        return list.compactMap { $0["id"] as? String }.sorted()
+    }
+}
+
+enum GrokModelFetcher {
+    static func fetchModels(apiKey: String) async throws -> [String] {
+        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
+        var request = URLRequest(url: URL(string: "https://api.x.ai/v1/models")!)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AIProviderError.server(String(data: data, encoding: .utf8) ?? "unknown error")
+        }
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = json["data"] as? [[String: Any]]
+        else { throw AIProviderError.invalidResponse }
+        return list.compactMap { $0["id"] as? String }.sorted()
+    }
+}
+
+enum DeepSeekModelFetcher {
+    static func fetchModels(apiKey: String) async throws -> [String] {
+        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
+        var request = URLRequest(url: URL(string: "https://api.deepseek.com/models")!)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw AIProviderError.server(String(data: data, encoding: .utf8) ?? "unknown error")
+        }
+        guard
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let list = json["data"] as? [[String: Any]]
+        else { throw AIProviderError.invalidResponse }
+        return list.compactMap { $0["id"] as? String }.sorted()
+    }
+}
 
 enum KeychainHelper {
     static func save(_ value: String, forKey key: String) {
