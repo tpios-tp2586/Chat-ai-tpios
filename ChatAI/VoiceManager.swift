@@ -133,16 +133,7 @@ final class VoiceManager: NSObject, ObservableObject {
             voiceErrorMessage = "Lỗi audio session: \(error.localizedDescription)"
             return
         }
-        do {
-            audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
-            audioRecorder?.record()
-            isListening = true
-            onPartialResult("🎙 Đang nghe... Bấm mic lần nữa để dừng")
-        } catch {
-            voiceErrorMessage = "Lỗi recorder: \(error.localizedDescription)"
-        }
-
-
+        
         let tempDir = FileManager.default.temporaryDirectory
         let fileURL = tempDir.appendingPathComponent("voice_\(UUID().uuidString).m4a")
         recordingURL = fileURL
