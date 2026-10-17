@@ -125,14 +125,23 @@ final class VoiceManager: NSObject, ObservableObject {
     ) {
         voiceErrorMessage = nil
 
-        do {
+                do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try session.setCategory(.record, mode: .default, options: [])
             try session.setActive(true)
         } catch {
-            voiceErrorMessage = "Lỗi khởi tạo micro: \(error.localizedDescription)"
+            voiceErrorMessage = "Lỗi audio session: \(error.localizedDescription)"
             return
         }
+        do {
+            audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
+            audioRecorder?.record()
+            isListening = true
+            onPartialResult("🎙 Đang nghe... Bấm mic lần nữa để dừng")
+        } catch {
+            voiceErrorMessage = "Lỗi recorder: \(error.localizedDescription)"
+        }
+
 
         let tempDir = FileManager.default.temporaryDirectory
         let fileURL = tempDir.appendingPathComponent("voice_\(UUID().uuidString).m4a")
