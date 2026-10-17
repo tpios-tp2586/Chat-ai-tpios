@@ -53,43 +53,40 @@ jobs:
           set -euo pipefail
 
           export TZ=Asia/Ho_Chi_Minh
-          DATE=$(date +%Y-%m-%d)
+          DATE=$(date +%Y-%m-%d_%H-%M-%S)
           SHORT_SHA=$(git rev-parse --short=7 HEAD)
           NAME="TPIOS-BACKUP-${DATE}-${SHORT_SHA}"
           ZIP="${NAME}.zip"
 
-          # Dùng git archive thay vì tự tar/copy/loại trừ tay — git archive
-          # xuất CHÍNH XÁC những gì đã commit ở HEAD, đọc thẳng từ git index
-          # chứ không qua thư mục làm việc, nên không có chuyện lệch pattern
-          # exclude làm rớt file như cách cũ (đó là lý do build.yml bị thiếu).
+          # Include every file committed at this exact repository state,
+          # preserving the original directory structure, including hidden files.
           git archive --format=zip --output="$ZIP" HEAD
 
           {
             echo "TPIOS Repository Backup"
-            echo "Date: ${DATE}"
+            echo "Date: ${DATE} (Asia/Ho_Chi_Minh)"
             echo "Commit: ${GITHUB_SHA}"
             echo "Repository: ${GITHUB_REPOSITORY}"
             echo "Build: verified successful"
           } > TPIOS-BACKUP-INFO.txt
 
-          # Thêm file info vào đúng zip vừa tạo bằng git archive ở trên.
           zip -q "$ZIP" TPIOS-BACKUP-INFO.txt
 
-          # Thư mục .github bị ẩn trên iPhone/Files. Thêm 1 bản sao hiển thị
-          # bình thường để dễ kiểm tra và khôi phục.
+          # Add a visible copy of workflows for easier browsing on iPhone.
           mkdir -p WORKFLOWS-COPY
           cp .github/workflows/*.yml WORKFLOWS-COPY/
           zip -qr "$ZIP" WORKFLOWS-COPY
 
-          # Mandatory validation before any Release is created.
+          # Validate the ZIP includes the project and both workflow files.
           unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/build.yml"
           unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/backup-release.yml"
+          unzip -Z1 "$ZIP" | grep -Fxq "TPIOS-BACKUP-INFO.txt"
 
-          echo "Validated .github/workflows/build.yml in ZIP."
+          echo "Validated full repository ZIP."
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release with full backup
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NAME: ${{ steps.package.outputs.name }}
@@ -103,21 +100,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$RELEASE_NAME" \
             --generate-notes \
-            --notes "Complete repository backup. ZIP was validated to contain .github/workflows/build.yml."
-
-      - name: Push verified backup to GitLab
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-          RELEASE_NAME: ${{ steps.package.outputs.name }}
-        run: |
-          set -euo pipefail
-
-          TAG="${GITHUB_REPOSITORY#*/}-backup-${RELEASE_NAME#TPIOS-BACKUP-}"
-
-          git remote add backup "https://oauth2:${GITLAB_TOKEN}@gitlab.com/tpios-group1/truongpink-tpios.git"
-
-          # Nhánh stable/<tên repo> = bản đã xác nhận build thành công, không bị ghi đè
-          # bởi các lần push code chưa kiểm tra (auto/<tên repo> bên GitLab do build.yml lo).
-          git tag -f "$TAG" "$GITHUB_SHA"
-          git push backup "${GITHUB_SHA}:refs/heads/stable/${GITHUB_REPOSITORY#*/}" --force
-          git push backup "refs/tags/${TAG}" --force
+            --notes "Full backup of all committed repository files at this commit. ZIP validated to include the project and workflow files."
