@@ -58,8 +58,8 @@ jobs:
           NAME="TPIOS-BACKUP-${DATE}-${SHORT_SHA}"
           ZIP="${NAME}.zip"
 
-          # Include every file committed at this exact repository state,
-          # preserving the original directory structure, including hidden files.
+          # Archive all files committed at HEAD, preserving their original paths,
+          # including hidden folders such as .github/workflows.
           git archive --format=zip --output="$ZIP" HEAD
 
           {
@@ -72,17 +72,12 @@ jobs:
 
           zip -q "$ZIP" TPIOS-BACKUP-INFO.txt
 
-          # Add a visible copy of workflows for easier browsing on iPhone.
-          mkdir -p WORKFLOWS-COPY
-          cp .github/workflows/*.yml WORKFLOWS-COPY/
-          zip -qr "$ZIP" WORKFLOWS-COPY
-
-          # Validate the ZIP includes the project and both workflow files.
+          # Validate that the original workflow paths and backup info are present.
           unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/build.yml"
           unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/backup-release.yml"
           unzip -Z1 "$ZIP" | grep -Fxq "TPIOS-BACKUP-INFO.txt"
 
-          echo "Validated full repository ZIP."
+          echo "Validated full repository ZIP with original directory structure."
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
@@ -100,4 +95,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$RELEASE_NAME" \
             --generate-notes \
-            --notes "Full backup of all committed repository files at this commit. ZIP validated to include the project and workflow files."
+            --notes "Full backup of all committed repository files at this commit, preserving original paths. ZIP validated to include the workflow files."
