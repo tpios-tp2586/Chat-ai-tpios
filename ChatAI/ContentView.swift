@@ -113,15 +113,23 @@ struct ContentView: View {
         }.padding(.vertical, 10)
     }
 
-    private var inputBar: some View {
+        private var inputBar: some View {
         HStack {
             Button {
+                let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
                 if voiceManager.isListening {
-                    voiceManager.stopListening()
+                    voiceManager.stopListeningAndTranscribe(groqAPIKey: groqKey) { text in
+                        viewModel.inputText = text
+                        viewModel.send()
+                    }
                 } else {
                     voiceManager.startListening(
+                        groqAPIKey: groqKey,
                         onPartialResult: { viewModel.inputText = $0 },
-                        onFinish: { text in viewModel.inputText = text; viewModel.send() }
+                        onFinish: { text in
+                            viewModel.inputText = text
+                            viewModel.send()
+                        }
                     )
                 }
             } label: {
