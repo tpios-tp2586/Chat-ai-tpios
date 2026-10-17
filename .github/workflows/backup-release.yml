@@ -58,9 +58,14 @@ jobs:
           NAME="TPIOS-BACKUP-${DATE}-${SHORT_SHA}"
           ZIP="${NAME}.zip"
 
-          # Archive all files committed at HEAD, preserving their original paths,
-          # including hidden folders such as .github/workflows.
+          # Archive all committed files, preserving their original paths.
           git archive --format=zip --output="$ZIP" HEAD
+
+          # Explicitly add every workflow file at its ORIGINAL path.
+          # This updates the ZIP entries without creating a renamed folder.
+          while IFS= read -r -d '' FILE; do
+            zip -q "$ZIP" "$FILE"
+          done < <(git ls-tree -r -z --name-only HEAD -- .github/workflows/)
 
           {
             echo "TPIOS Repository Backup"
@@ -72,12 +77,23 @@ jobs:
 
           zip -q "$ZIP" TPIOS-BACKUP-INFO.txt
 
-          # Validate that the original workflow paths and backup info are present.
-          unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/build.yml"
-          unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/backup-release.yml"
-          unzip -Z1 "$ZIP" | grep -Fxq "TPIOS-BACKUP-INFO.txt"
+          # Check every workflow file tracked by Git exists in the ZIP.
+          WORKFLOW_COUNT=0
+          while IFS= read -r -d '' FILE; do
+            unzip -Z1 "$ZIP" | grep -Fxq "$FILE" || {
+              echo "Missing workflow file in backup ZIP: $FILE"
+              exit 1
+            }
+            WORKFLOW_COUNT=$((WORKFLOW_COUNT + 1))
+          done < <(git ls-tree -r -z --name-only HEAD -- .github/workflows/)
 
-          echo "Validated full repository ZIP with original directory structure."
+          if [ "$WORKFLOW_COUNT" -eq 0 ]; then
+            echo "No committed workflow files found; refusing to create backup."
+            exit 1
+          fi
+
+          unzip -Z1 "$ZIP" | grep -Fxq "TPIOS-BACKUP-INFO.txt"
+          echo "Validated all ${WORKFLOW_COUNT} committed workflow files in the ZIP."
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
@@ -95,4 +111,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$RELEASE_NAME" \
             --generate-notes \
-            --notes "Full backup of all committed repository files at this commit, preserving original paths. ZIP validated to include the workflow files."
+            --notes "Full backup of all committed repository files preserving original paths. Validates every committed workflow file before release."
