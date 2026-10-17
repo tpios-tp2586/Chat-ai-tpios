@@ -1,0 +1,123 @@
+name: Backup TPIOS Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify successful build for this state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          RUNS=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=1")
+          COUNT=$(printf '%s' "$RUNS" | jq '.total_count')
+
+          if [ "$COUNT" -ge 1 ]; then
+            echo "Verified successful build for ${GITHUB_SHA}."
+            exit 0
+          fi
+
+          PARENT_SHA=$(git rev-parse HEAD^)
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+          if printf '%s\n' "$CHANGED_FILES" | grep -Ev '^\.github/workflows/backup-release\.yml$' | grep -q .; then
+            echo "No successful build found and non-backup changes are present."
+            exit 1
+          fi
+
+          PARENT_RUNS=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?head_sha=${PARENT_SHA}&status=success&per_page=1")
+          PARENT_COUNT=$(printf '%s' "$PARENT_RUNS" | jq '.total_count')
+
+          if [ "$PARENT_COUNT" -lt 1 ]; then
+            echo "No successful build found for current or parent commit."
+            exit 1
+          fi
+
+      - name: Create complete repository ZIP
+        id: package
+        run: |
+          set -euo pipefail
+
+          export TZ=Asia/Ho_Chi_Minh
+          DATE=$(date +%Y-%m-%d)
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          NAME="TPIOS-BACKUP-${DATE}-${SHORT_SHA}"
+          ZIP="${NAME}.zip"
+
+          # Dùng git archive thay vì tự tar/copy/loại trừ tay — git archive
+          # xuất CHÍNH XÁC những gì đã commit ở HEAD, đọc thẳng từ git index
+          # chứ không qua thư mục làm việc, nên không có chuyện lệch pattern
+          # exclude làm rớt file như cách cũ (đó là lý do build.yml bị thiếu).
+          git archive --format=zip --output="$ZIP" HEAD
+
+          {
+            echo "TPIOS Repository Backup"
+            echo "Date: ${DATE}"
+            echo "Commit: ${GITHUB_SHA}"
+            echo "Repository: ${GITHUB_REPOSITORY}"
+            echo "Build: verified successful"
+          } > TPIOS-BACKUP-INFO.txt
+
+          # Thêm file info vào đúng zip vừa tạo bằng git archive ở trên.
+          zip -q "$ZIP" TPIOS-BACKUP-INFO.txt
+
+          # Thư mục .github bị ẩn trên iPhone/Files. Thêm 1 bản sao hiển thị
+          # bình thường để dễ kiểm tra và khôi phục.
+          mkdir -p WORKFLOWS-COPY
+          cp .github/workflows/*.yml WORKFLOWS-COPY/
+          zip -qr "$ZIP" WORKFLOWS-COPY
+
+          # Mandatory validation before any Release is created.
+          unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/build.yml"
+          unzip -Z1 "$ZIP" | grep -Fxq ".github/workflows/backup-release.yml"
+
+          echo "Validated .github/workflows/build.yml in ZIP."
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NAME: ${{ steps.package.outputs.name }}
+          ZIP_FILE: ${{ steps.package.outputs.zip }}
+        run: |
+          set -euo pipefail
+          gh release create "backup-${RELEASE_NAME#TPIOS-BACKUP-}" \
+            "$ZIP_FILE" \
+            .github/workflows/build.yml \
+            .github/workflows/backup-release.yml \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_NAME" \
+            --generate-notes \
+            --notes "Complete repository backup. ZIP was validated to contain .github/workflows/build.yml."
+
+      - name: Push verified backup to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          RELEASE_NAME: ${{ steps.package.outputs.name }}
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REPOSITORY#*/}-backup-${RELEASE_NAME#TPIOS-BACKUP-}"
+
+          git remote add backup "https://oauth2:${GITLAB_TOKEN}@gitlab.com/tpios-group1/truongpink-tpios.git"
+
+          # Nhánh stable/<tên repo> = bản đã xác nhận build thành công, không bị ghi đè
+          # bởi các lần push code chưa kiểm tra (auto/<tên repo> bên GitLab do build.yml lo).
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push backup "${GITHUB_SHA}:refs/heads/stable/${GITHUB_REPOSITORY#*/}" --force
+          git push backup "refs/tags/${TAG}" --force
