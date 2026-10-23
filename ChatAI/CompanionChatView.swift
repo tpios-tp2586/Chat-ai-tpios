@@ -318,18 +318,24 @@ private struct CompanionRealityView: UIViewRepresentable {
     func updateUIView(_ view: ARView, context: Context) {
         view.environment.background = .color(isNight ? UIColor(red: 0.045, green: 0.07, blue: 0.18, alpha: 1) : UIColor(red: 0.27, green: 0.32, blue: 0.43, alpha: 1))
         if let avatar = context.coordinator.avatarAnchor?.children.first {
+            let yaw: Float
             switch emotion {
-            case .idle:
-                avatar.transform.rotation = simd_quatf(angle: 0, axis: [0, 1, 0])
-            case .happy:
-                avatar.transform.rotation = simd_quatf(angle: 0.08, axis: [0, 1, 0])
-            case .thinking:
-                avatar.transform.rotation = simd_quatf(angle: -0.18, axis: [0, 1, 0])
-            case .shy:
-                avatar.transform.rotation = simd_quatf(angle: 0.2, axis: [0, 1, 0])
-            case .surprised:
-                avatar.transform.rotation = simd_quatf(angle: -0.08, axis: [1, 0, 0])
+            case .idle: yaw = 0
+            case .happy: yaw = 0.08
+            case .thinking: yaw = -0.18
+            case .shy: yaw = 0.2
+            case .surprised: yaw = -0.08
             }
+            avatar.transform.rotation = simd_quatf(angle: yaw, axis: [0, 1, 0])
+            let leftArm = avatar.findEntity(named: "leftArmPivot")
+            let rightArm = avatar.findEntity(named: "rightArmPivot")
+            let leftLeg = avatar.findEntity(named: "leftLegPivot")
+            let rightLeg = avatar.findEntity(named: "rightLegPivot")
+            let armSwing: Float = isSpeaking ? 0.18 : 0.035
+            leftArm?.transform.rotation = simd_quatf(angle: emotion == .shy ? -0.38 : armSwing, axis: [0, 0, 1])
+            rightArm?.transform.rotation = simd_quatf(angle: emotion == .happy ? -0.42 : -armSwing, axis: [0, 0, 1])
+            leftLeg?.transform.rotation = simd_quatf(angle: emotion == .surprised ? -0.12 : 0, axis: [1, 0, 0])
+            rightLeg?.transform.rotation = simd_quatf(angle: emotion == .surprised ? 0.12 : 0, axis: [1, 0, 0])
         }
     }
 
@@ -348,49 +354,80 @@ private struct CompanionRealityView: UIViewRepresentable {
         let iris = SimpleMaterial(color: UIColor(red: 0.22, green: 0.12, blue: 0.08, alpha: 1), roughness: 0.2, isMetallic: false)
         let dark = SimpleMaterial(color: UIColor(red: 0.18, green: 0.09, blue: 0.10, alpha: 1), roughness: 0.4, isMetallic: false)
         let blush = SimpleMaterial(color: UIColor(red: 0.88, green: 0.36, blue: 0.39, alpha: 0.45), roughness: 0.6, isMetallic: false)
-
-        func ellipsoid(_ radius: Float, material: RealityKit.Material, position: SIMD3<Float>, scale: SIMD3<Float>) -> ModelEntity {
+        func part(_ radius: Float, _ material: RealityKit.Material, _ position: SIMD3<Float>, _ scale: SIMD3<Float>) -> ModelEntity {
             let e = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
             e.position = position
             e.scale = scale
             return e
         }
 
-        // Neck, shoulders and a fitted upper-body silhouette.
-        root.addChild(ellipsoid(0.105, material: skin, position: [0, -0.18, 0.01], scale: [0.78, 1.25, 0.8]))
-        root.addChild(ellipsoid(0.31, material: outfit, position: [0, -0.48, 0], scale: [1.28, 1.25, 0.72]))
-        for x: Float in [-0.31, 0.31] {
-            root.addChild(ellipsoid(0.13, material: outfit, position: [x, -0.35, 0], scale: [0.8, 1.5, 0.8]))
+        // Full-body silhouette, centered for the portrait camera.
+        let body = Entity()
+        body.name = "body"
+        body.position = [0, -0.52, 0]
+        root.addChild(body)
+        body.addChild(part(0.22, outfit, [0, 0.02, 0], [1.0, 1.35, 0.72])) // torso
+        body.addChild(part(0.19, outfit, [0, -0.28, 0], [1.15, 0.78, 0.8])) // skirt/hips
+        body.addChild(part(0.075, skin, [0, 0.29, 0.01], [0.85, 1.15, 0.85])) // neck
+
+        // Legs have separate thigh/shin groups, with pivots for animation.
+        for (x, prefix): (Float, String) in [(-0.105, "left"), (0.105, "right")] {
+            let legPivot = Entity()
+            legPivot.name = "\(prefix)LegPivot"
+            legPivot.position = [x, -0.30, 0]
+            body.addChild(legPivot)
+            legPivot.addChild(part(0.105, skin, [0, -0.12, 0], [0.72, 1.5, 0.78]))
+            let shin = Entity()
+            shin.position = [0, -0.27, 0]
+            legPivot.addChild(shin)
+            shin.addChild(part(0.078, skin, [0, -0.10, 0], [0.72, 1.65, 0.78]))
+            shin.addChild(part(0.095, outfit, [0, -0.27, 0.055], [1.0, 0.52, 1.35]))
+            shin.addChild(part(0.105, dark, [0, -0.34, 0.07], [1.0, 0.28, 1.55]))
         }
 
-        // More oval face, ears and layered hair instead of a round toy head.
-        root.addChild(ellipsoid(0.315, material: skin, position: [0, 0.20, 0.015], scale: [0.88, 1.12, 0.82]))
+        // Arms are articulated at the shoulder and have forearms and hands.
+        for (x, prefix): (Float, String) in [(-0.28, "left"), (0.28, "right")] {
+            let arm = Entity()
+            arm.name = "\(prefix)ArmPivot"
+            arm.position = [x, 0.16, 0]
+            body.addChild(arm)
+            arm.addChild(part(0.095, outfit, [0, -0.12, 0], [0.82, 1.55, 0.82]))
+            let forearm = Entity()
+            forearm.position = [0, -0.23, 0.015]
+            forearm.orientation = simd_quatf(angle: prefix == "left" ? -0.08 : 0.08, axis: [0, 0, 1])
+            arm.addChild(forearm)
+            forearm.addChild(part(0.072, skin, [0, -0.11, 0.01], [0.78, 1.6, 0.78]))
+            forearm.addChild(part(0.065, skin, [0, -0.23, 0.045], [0.92, 0.92, 0.82]))
+        }
+
+        // Head, ears, layered fringe, eyes, nose and cheeks.
+        let head = Entity()
+        head.name = "head"
+        head.position = [0, 0.22, 0.02]
+        root.addChild(head)
+        head.addChild(part(0.315, skin, [0, 0, 0], [0.88, 1.12, 0.82]))
         for x: Float in [-0.275, 0.275] {
-            root.addChild(ellipsoid(0.075, material: skin, position: [x, 0.19, 0.015], scale: [0.72, 1.0, 0.7]))
+            head.addChild(part(0.075, skin, [x, -0.01, 0], [0.72, 1.0, 0.7]))
         }
-        root.addChild(ellipsoid(0.335, material: hair, position: [0, 0.32, -0.045], scale: [0.94, 0.88, 0.88]))
-        root.addChild(ellipsoid(0.30, material: skin, position: [0, 0.13, 0.07], scale: [0.88, 0.91, 0.83]))
-
-        // Bangs and side locks frame the face.
+        head.addChild(part(0.335, hair, [0, 0.12, -0.06], [0.94, 0.88, 0.88]))
+        head.addChild(part(0.30, skin, [0, -0.07, 0.07], [0.88, 0.91, 0.83]))
         for x: Float in [-0.18, 0, 0.18] {
-            let bang = ellipsoid(0.15, material: hair, position: [x, 0.405, 0.20], scale: [0.82, 0.62, 0.42])
+            let bang = part(0.15, hair, [x, 0.205, 0.20], [0.82, 0.62, 0.42])
             bang.orientation = simd_quatf(angle: x * 0.8, axis: [0, 0, 1])
-            root.addChild(bang)
+            head.addChild(bang)
         }
         for x: Float in [-0.27, 0.27] {
-            root.addChild(ellipsoid(0.105, material: hair, position: [x, 0.10, 0.12], scale: [0.72, 1.55, 0.55]))
+            head.addChild(part(0.105, hair, [x, -0.10, 0.12], [0.72, 1.55, 0.55]))
         }
-
-        // Eyes with whites, irises and highlights.
         for x: Float in [-0.12, 0.12] {
-            root.addChild(ellipsoid(0.057, material: white, position: [x, 0.20, 0.279], scale: [0.82, 1.2, 0.42]))
-            root.addChild(ellipsoid(0.033, material: iris, position: [x, 0.195, 0.303], scale: [0.78, 1.25, 0.35]))
-            root.addChild(ellipsoid(0.012, material: white, position: [x - 0.009, 0.213, 0.315], scale: [1, 1, 0.5]))
+            head.addChild(part(0.057, white, [x, 0.00, 0.279], [0.82, 1.2, 0.42]))
+            head.addChild(part(0.033, iris, [x, -0.005, 0.303], [0.78, 1.25, 0.35]))
+            head.addChild(part(0.012, white, [x - 0.009, 0.013, 0.315], [1, 1, 0.5]))
         }
-        root.addChild(ellipsoid(0.025, material: skin, position: [0, 0.105, 0.305], scale: [0.8, 0.8, 0.55]))
-        root.addChild(ellipsoid(0.043, material: dark, position: [0, 0.035, 0.294], scale: [1.25, 0.42, 0.35]))
+        head.addChild(part(0.025, skin, [0, -0.095, 0.305], [0.8, 0.8, 0.55]))
+        head.addChild(part(0.043, dark, [0, -0.165, 0.294], [1.25, 0.42, 0.35]))
         for x: Float in [-0.19, 0.19] {
-            root.addChild(ellipsoid(0.048, material: blush, position: [x, 0.095, 0.274], scale: [1.2, 0.55, 0.25]))
+            head.addChild(part(0.048, blush, [x, -0.105, 0.274], [1.2, 0.55, 0.25]))
         }
         return root
     }
