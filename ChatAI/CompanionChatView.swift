@@ -2,8 +2,8 @@ import SwiftUI
 import RealityKit
 import UIKit
 
-/// First MVP shell for the 3D companion experience.
-/// The primitive avatar is a temporary stand-in until a rigged USDZ character is added.
+/// 3D companion screen. Loads the bundled rigged CompanionChibi.usdz when available.
+/// The procedural avatar remains only as a temporary fallback until the real asset is bundled.
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
@@ -282,8 +282,8 @@ private enum CompanionEmotion {
     case idle, happy, thinking, shy, surprised
 }
 
-/// Lightweight RealityKit stand-in. Replace this procedural avatar with a rigged USDZ model
-/// before claiming full facial expressions, touch hit-testing, or real lip-sync.
+/// RealityKit host for the rigged anime chibi asset. A bundled CompanionChibi.usdz takes priority;
+/// the procedural avatar below is only a fallback and does not provide real facial animation.
 private struct CompanionRealityView: UIViewRepresentable {
     let emotion: CompanionEmotion
     let isNight: Bool
@@ -307,7 +307,10 @@ private struct CompanionRealityView: UIViewRepresentable {
         lightAnchor.addChild(light)
         view.scene.addAnchor(lightAnchor)
 
-        let avatar = makePlaceholderAvatar()
+        // Prefer the real, rigged anime chibi asset. Add CompanionChibi.usdz to the app target's
+        // Copy Bundle Resources; keep the fallback so the screen remains usable during integration.
+        let avatar = (try? Entity.load(named: "CompanionChibi")) ?? makePlaceholderAvatar()
+        avatar.name = "companionAvatarRoot"
         let avatarAnchor = AnchorEntity(world: [0, -0.15, 0])
         avatarAnchor.addChild(avatar)
         view.scene.addAnchor(avatarAnchor)
