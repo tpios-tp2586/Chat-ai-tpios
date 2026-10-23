@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import SceneKit
 
-/// 2D anime companion screen. Keeps Gemini Live interactions while the dedicated sprite asset is prepared.
+/// Anime companion screen with a procedural SceneKit 3D stage and Gemini Live voice interaction.
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
@@ -395,11 +395,22 @@ private struct Companion3DStage: UIViewRepresentable {
         sphere("rightLock", 0.2, SCNVector3(0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
         sphere("hairShine", 0.07, SCNVector3(-0.34, 2.72, 0.69), hairLight, scale: SCNVector3(2.2, 0.5, 0.4))
 
-        for x: Float in [-0.31, 0.31] {
-            sphere("eyeWhite", 0.19, SCNVector3(x, 2.08, 0.69), white, scale: SCNVector3(0.82, 1.12, 0.3))
-            sphere("iris", 0.13, SCNVector3(x, 2.07, 0.755), iris, scale: SCNVector3(0.82, 1.15, 0.3))
-            sphere("pupil", 0.065, SCNVector3(x, 2.08, 0.79), black, scale: SCNVector3(0.8, 1.2, 0.3))
-            sphere("eyeSparkle", 0.035, SCNVector3(x - 0.035, 2.13, 0.81), white)
+        for (x, suffix): (Float, String) in [(-0.31, "L"), (0.31, "R")] {
+            let eyeWhite = sphere("eyeWhite" + suffix, 0.19, SCNVector3(x, 2.08, 0.69), white, scale: SCNVector3(0.82, 1.12, 0.3))
+            let eyeIris = sphere("iris" + suffix, 0.13, SCNVector3(x, 2.07, 0.755), iris, scale: SCNVector3(0.82, 1.15, 0.3))
+            sphere("pupil" + suffix, 0.065, SCNVector3(x, 2.08, 0.79), black, scale: SCNVector3(0.8, 1.2, 0.3))
+            sphere("eyeSparkle" + suffix, 0.035, SCNVector3(x - 0.035, 2.13, 0.81), white)
+            let blink = SCNAction.sequence([
+                .wait(duration: 2.7),
+                .scaleY(to: 0.08, duration: 0.07),
+                .scaleY(to: 1.12, duration: 0.09)
+            ])
+            eyeWhite.runAction(.repeatForever(blink), forKey: "blink")
+            eyeIris.runAction(.repeatForever(.sequence([
+                .wait(duration: 2.7),
+                .scaleY(to: 0.08, duration: 0.07),
+                .scaleY(to: 1.15, duration: 0.09)
+            ])), forKey: "blink")
         }
         sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
         sphere("blushR", 0.1, SCNVector3(0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
