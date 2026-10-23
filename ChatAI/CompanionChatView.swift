@@ -355,6 +355,31 @@ private struct Companion3DStage: UIViewRepresentable {
         fill.position = SCNVector3(3, 2, 2)
         scene.rootNode.addChildNode(fill)
 
+        // Prefer the converted real model when it is bundled in the app.
+        // The VRM source file itself is not loaded by SceneKit; convert it to
+        // CompanionChibi.usdz and add that USDZ to the ChatAI target resources.
+        if let modelURL = Bundle.main.url(forResource: "CompanionChibi", withExtension: "usdz"),
+           let importedScene = try? SCNScene(url: modelURL, options: nil) {
+            let importedRoot = SCNNode()
+            importedRoot.name = "companionRoot"
+            for child in importedScene.rootNode.childNodes {
+                importedRoot.addChildNode(child.clone())
+            }
+
+            var boundsMin = SCNVector3Zero
+            var boundsMax = SCNVector3Zero
+            if importedRoot.getBoundingBoxMin(&boundsMin, max: &boundsMax) {
+                let height = max(boundsMax.y - boundsMin.y, 0.001)
+                let targetHeight: Float = 2.8
+                let scale = targetHeight / height
+                importedRoot.scale = SCNVector3(scale, scale, scale)
+                importedRoot.position.y = -((boundsMin.y + boundsMax.y) * 0.5) * scale + 1.4
+            }
+
+            scene.rootNode.addChildNode(importedRoot)
+            return scene
+        }
+
         let root = SCNNode()
         root.name = "companionRoot"
         scene.rootNode.addChildNode(root)
