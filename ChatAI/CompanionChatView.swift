@@ -424,11 +424,11 @@ private struct Companion3DStage: UIViewRepresentable {
         sphere("body", 0.53, SCNVector3(0, 0.72, 0), dress, scale: SCNVector3(0.88, 1.25, 0.7))
         capsule("neck", radius: 0.13, height: 0.28, position: SCNVector3(0, 1.28, 0), mat: skin)
         let head = sphere("head", 0.82, SCNVector3(0, 2.02, 0), skin, scale: SCNVector3(0.92, 1.05, 0.78))
-        sphere("backHair", 0.86, SCNVector3(0, 2.12, -0.12), hair, scale: SCNVector3(1.05, 1.12, 0.88)).renderingOrder = -1
-        sphere("fringe", 0.55, SCNVector3(0, 2.52, 0.35), hair, scale: SCNVector3(1.3, 0.48, 0.55))
-        sphere("leftLock", 0.2, SCNVector3(-0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
-        sphere("rightLock", 0.2, SCNVector3(0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
-        sphere("hairShine", 0.07, SCNVector3(-0.34, 2.72, 0.69), hairLight, scale: SCNVector3(2.2, 0.5, 0.4))
+        _ = sphere("backHair", 0.86, SCNVector3(0, 2.12, -0.12), hair, scale: SCNVector3(1.05, 1.12, 0.88)).renderingOrder = -1
+        _ = sphere("fringe", 0.55, SCNVector3(0, 2.52, 0.35), hair, scale: SCNVector3(1.3, 0.48, 0.55))
+        _ = sphere("leftLock", 0.2, SCNVector3(-0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
+        _ = sphere("rightLock", 0.2, SCNVector3(0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
+        _ = sphere("hairShine", 0.07, SCNVector3(-0.34, 2.72, 0.69), hairLight, scale: SCNVector3(2.2, 0.5, 0.4))
 
         let eyePositions: [(x: Float, suffix: String)] = [(-0.31, "L"), (0.31, "R")]
         for (x, suffix) in eyePositions {
@@ -448,14 +448,14 @@ private struct Companion3DStage: UIViewRepresentable {
                 .scaleY(to: 1.15, duration: 0.09)
             ])), forKey: "blink")
         }
-        sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
-        sphere("blushR", 0.1, SCNVector3(0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
-        sphere("mouth", 0.055, SCNVector3(0, 1.83, 0.72), black, scale: SCNVector3(1.0, 0.65, 0.25))
+        _ = sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
+        _ = sphere("blushR", 0.1, SCNVector3(0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
+        _ = sphere("mouth", 0.055, SCNVector3(0, 1.83, 0.72), black, scale: SCNVector3(1.0, 0.65, 0.25))
 
         // Bow and dangling hair accessories.
-        sphere("bowL", 0.15, SCNVector3(0.59, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
-        sphere("bowR", 0.15, SCNVector3(0.81, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
-        sphere("bowKnot", 0.07, SCNVector3(0.70, 2.75, 0.17), white)
+        _ = sphere("bowL", 0.15, SCNVector3(0.59, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
+        _ = sphere("bowR", 0.15, SCNVector3(0.81, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
+        _ = sphere("bowKnot", 0.07, SCNVector3(0.70, 2.75, 0.17), white)
 
         let leftArm = capsule("leftArm", radius: 0.12, height: 0.72, position: SCNVector3(-0.56, 0.85, 0.02), mat: dress)
         leftArm.eulerAngles.z = -0.45
