@@ -1,41 +1,43 @@
 # Companion 3D asset integration
 
-## Runtime asset contract
+## Current app behavior
 
-The SwiftUI Companion screen attempts to load a RealityKit asset named `CompanionChibi` from the app bundle:
-
-```swift
-try? Entity.load(named: "CompanionChibi")
-```
-
-Bundle the converted model as:
+The companion stage in `ChatAI/CompanionChatView.swift` now checks the app bundle for:
 
 ```
 CompanionChibi.usdz
 ```
 
-Add the USDZ to the **ChatAI app target** and ensure it is included in **Copy Bundle Resources**. A model placed in the repository but not included in the app target will not be available at runtime.
+It attempts to load that USDZ with SceneKit and scale the imported scene to a consistent height. If the resource is missing or fails to load, the procedural placeholder remains as a fallback. The original `.vrm` file is a source asset and is **not** loaded directly by this implementation.
 
-## Source model
+## Required asset conversion and bundling
 
-Candidate source: [Anime Chibi Base Mesh (Fully Rigged)](https://kobanwanko.gumroad.com/l/ChibiBaseMesh)
+Current source uploaded to the repository:
 
-The publisher lists Blender, FBX and VRM versions and 52 ARKit facial blendshapes. The source is not itself a RealityKit-ready USDZ file. Convert and inspect it before bundling; confirm that materials, skeleton/skin, and any required facial blend shapes survive conversion.
+```
+ChatAI/Resources/Koban Chibi Base Mesh VRM export.vrm
+```
 
-## Important runtime limitations
+This source still needs to be converted to `CompanionChibi.usdz`. Conversion must be checked for preserved materials, textures, skeleton/skin, and facial blend shapes; USDZ conversion does not guarantee that all VRM features survive.
 
-- The current screen uses a procedural avatar only when the bundled model cannot load.
-- The procedural fallback does not have real anime mesh geometry or facial blend shapes.
-- The current arm movement looks for entities named `leftArmPivot`, `rightArmPivot`, `leftLegPivot`, and `rightLegPivot`. A third-party rig is unlikely to use these names, so rig-specific joint mapping is required for skeletal motion.
-- ARKit blend-shape names and support must be checked on the converted asset before implementing real lip-sync and expressions.
-- Touch reactions currently use screen regions, not mesh ray-cast hit testing.
+After conversion:
+
+1. Put `CompanionChibi.usdz` under the app's resource folder.
+2. Ensure the USDZ is included in the `ChatAI` app target and packaged in the app bundle (for a manually maintained Xcode project, verify the target's resource/build configuration).
+3. Run a Codemagic Release build and test the companion screen on an iPhone.
+
+## Animation limitations
+
+The existing procedural expressions, blinking, breathing, mouth scaling, and touch-region reactions were written for the placeholder's named nodes. The imported model will not automatically inherit those animations. Before wiring real expressions or lip-sync, inspect the converted model's hierarchy, skeleton/joint names, animation clips, and blend-shape support, then implement rig-specific mappings.
+
+Touch currently maps screen regions to head/cheek/body reactions; it is not mesh-based hit testing.
 
 ## Verification checklist
 
-- [ ] `CompanionChibi.usdz` is included in the app target's resources.
-- [ ] Model loads in RealityKit without falling back to the procedural avatar.
-- [ ] Textures and materials render correctly on an iPhone.
-- [ ] Rig hierarchy and animation clips are inspected and mapped.
-- [ ] Facial blend shapes are inspected and mapped to voice/expression state.
-- [ ] Touch hit-testing is tested against the actual model.
-- [ ] Codemagic Release build succeeds and the app is tested on device.
+- [ ] Convert the uploaded VRM into `CompanionChibi.usdz`.
+- [ ] Verify the converted model's materials and textures.
+- [ ] Verify skeleton, animation, and facial blend shapes survived conversion.
+- [ ] Include USDZ in the ChatAI app bundle.
+- [ ] Confirm the app loads the real model rather than the procedural fallback.
+- [ ] Map the actual rig and facial blend shapes to emotion and voice states.
+- [ ] Test the Codemagic Release build and touch behavior on device.
