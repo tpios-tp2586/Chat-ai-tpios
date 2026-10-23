@@ -349,7 +349,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         let dark = SimpleMaterial(color: UIColor(red: 0.18, green: 0.09, blue: 0.10, alpha: 1), roughness: 0.4, isMetallic: false)
         let blush = SimpleMaterial(color: UIColor(red: 0.88, green: 0.36, blue: 0.39, alpha: 0.45), roughness: 0.6, isMetallic: false)
 
-        func ellipsoid(_ radius: Float, material: Material, position: SIMD3<Float>, scale: SIMD3<Float>) -> ModelEntity {
+        func ellipsoid(_ radius: Float, material: RealityKit.Material, position: SIMD3<Float>, scale: SIMD3<Float>) -> ModelEntity {
             let e = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
             e.position = position
             e.scale = scale
