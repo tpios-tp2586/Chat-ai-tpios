@@ -33,7 +33,7 @@ struct CompanionChatView: View {
 
                 ZStack(alignment: .bottom) {
                     GeometryReader { geo in
-                        Companion2DStage(emotion: emotion, isNight: isNight, isSpeaking: liveManager.aiSpeaking)
+                        Companion3DStage(emotion: emotionName, isNight: isNight, isSpeaking: liveManager.aiSpeaking)
                             .frame(width: geo.size.width, height: geo.size.height)
                             .contentShape(Rectangle())
                             .gesture(
@@ -252,6 +252,16 @@ struct CompanionChatView: View {
             touchMessage = nil
         } else {
             touchMessage = "Bấm “Tiếp tục chat” để kết nối Gemini Live trước nhé."
+        }
+    }
+
+    private var emotionName: String {
+        switch emotion {
+        case .idle: return "idle"
+        case .happy: return "happy"
+        case .thinking: return "thinking"
+        case .shy: return "shy"
+        case .surprised: return "surprised"
         }
     }
 
