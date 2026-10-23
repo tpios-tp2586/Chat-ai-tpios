@@ -1,9 +1,7 @@
 import SwiftUI
-import RealityKit
 import UIKit
 
-/// 3D companion screen. Loads the bundled rigged CompanionChibi.usdz when available.
-/// The procedural avatar remains only as a temporary fallback until the real asset is bundled.
+/// 2D anime companion screen. Keeps Gemini Live interactions while the dedicated sprite asset is prepared.
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
@@ -35,7 +33,7 @@ struct CompanionChatView: View {
 
                 ZStack(alignment: .bottom) {
                     GeometryReader { geo in
-                        CompanionRealityView(emotion: emotion, isNight: isNight, isSpeaking: liveManager.aiSpeaking)
+                        Companion2DStage(emotion: emotion, isNight: isNight, isSpeaking: liveManager.aiSpeaking)
                             .frame(width: geo.size.width, height: geo.size.height)
                             .contentShape(Rectangle())
                             .gesture(
@@ -282,156 +280,250 @@ private enum CompanionEmotion {
     case idle, happy, thinking, shy, surprised
 }
 
-/// RealityKit host for the rigged anime chibi asset. A bundled CompanionChibi.usdz takes priority;
-/// the procedural avatar below is only a fallback and does not provide real facial animation.
-private struct CompanionRealityView: UIViewRepresentable {
+
+/// Native SwiftUI 2D stage: layered anime-style character with motion and expression changes.
+/// It intentionally avoids RealityKit so the companion works without a bundled 3D model.
+private struct Companion2DStage: View {
     let emotion: CompanionEmotion
     let isNight: Bool
     let isSpeaking: Bool
+    @State private var blink = false
+    @State private var float = false
+    @State private var sway = false
 
-    func makeUIView(context: Context) -> ARView {
-        let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
-        view.environment.background = .color(isNight ? UIColor(red: 0.045, green: 0.07, blue: 0.18, alpha: 1) : UIColor(red: 0.27, green: 0.32, blue: 0.43, alpha: 1))
-
-        let camera = PerspectiveCamera()
-        camera.position = [0, 0.1, 2.7]
-        camera.look(at: [0, 0.1, 0], from: camera.position, relativeTo: nil)
-        let cameraAnchor = AnchorEntity(world: .zero)
-        cameraAnchor.addChild(camera)
-        view.scene.addAnchor(cameraAnchor)
-
-        let lightAnchor = AnchorEntity(world: .zero)
-        let light = DirectionalLight()
-        light.light.intensity = isNight ? 900 : 1500
-        light.orientation = simd_quatf(angle: -.pi / 5, axis: [1, 0, 0])
-        lightAnchor.addChild(light)
-        view.scene.addAnchor(lightAnchor)
-
-        // Prefer the real, rigged anime chibi asset. Add CompanionChibi.usdz to the app target's
-        // Copy Bundle Resources; keep the fallback so the screen remains usable during integration.
-        let avatar = (try? Entity.load(named: "CompanionChibi")) ?? makePlaceholderAvatar()
-        avatar.name = "companionAvatarRoot"
-        let avatarAnchor = AnchorEntity(world: [0, -0.15, 0])
-        avatarAnchor.addChild(avatar)
-        view.scene.addAnchor(avatarAnchor)
-        context.coordinator.avatarAnchor = avatarAnchor
-        return view
-    }
-
-    func updateUIView(_ view: ARView, context: Context) {
-        view.environment.background = .color(isNight ? UIColor(red: 0.045, green: 0.07, blue: 0.18, alpha: 1) : UIColor(red: 0.27, green: 0.32, blue: 0.43, alpha: 1))
-        if let avatar = context.coordinator.avatarAnchor?.children.first {
-            let yaw: Float
-            switch emotion {
-            case .idle: yaw = 0
-            case .happy: yaw = 0.08
-            case .thinking: yaw = -0.18
-            case .shy: yaw = 0.2
-            case .surprised: yaw = -0.08
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Circle()
+                    .fill(.white.opacity(isNight ? 0.07 : 0.12))
+                    .frame(width: min(geo.size.width * 0.86, 360))
+                    .blur(radius: 1)
+                    .offset(y: -20)
+                Circle()
+                    .stroke(.white.opacity(0.14), lineWidth: 1)
+                    .frame(width: min(geo.size.width * 0.92, 390))
+                    .overlay(alignment: .topTrailing) {
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 24, weight: .light))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .offset(x: -24, y: 28)
+                    }
+                    .overlay(alignment: .bottomLeading) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundStyle(.pink.opacity(0.8))
+                            .offset(x: 34, y: -52)
+                    }
+                VStack(spacing: 0) {
+                    character
+                        .frame(width: min(geo.size.width * 0.78, 300), height: geo.size.height * 0.77)
+                        .offset(y: float ? -7 : 5)
+                        .rotationEffect(.degrees(sway ? 1.2 : -1.2), anchor: .bottom)
+                        .animation(.easeInOut(duration: isSpeaking ? 0.34 : 2.0).repeatForever(autoreverses: true), value: float)
+                        .animation(.easeInOut(duration: 2.7).repeatForever(autoreverses: true), value: sway)
+                    Text(isSpeaking ? "♪  đang trò chuyện với anh  ♪" : "chạm vào em nhé ♡")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.82))
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 8)
+                        .background(.black.opacity(0.18), in: Capsule())
+                        .overlay(Capsule().stroke(.white.opacity(0.15), lineWidth: 1))
+                        .padding(.top, -4)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            avatar.transform.rotation = simd_quatf(angle: yaw, axis: [0, 1, 0])
-            let leftArm = avatar.findEntity(named: "leftArmPivot")
-            let rightArm = avatar.findEntity(named: "rightArmPivot")
-            let leftLeg = avatar.findEntity(named: "leftLegPivot")
-            let rightLeg = avatar.findEntity(named: "rightLegPivot")
-            let armSwing: Float = isSpeaking ? 0.18 : 0.035
-            leftArm?.transform.rotation = simd_quatf(angle: emotion == .shy ? -0.38 : armSwing, axis: [0, 0, 1])
-            rightArm?.transform.rotation = simd_quatf(angle: emotion == .happy ? -0.42 : -armSwing, axis: [0, 0, 1])
-            leftLeg?.transform.rotation = simd_quatf(angle: emotion == .surprised ? -0.12 : 0, axis: [1, 0, 0])
-            rightLeg?.transform.rotation = simd_quatf(angle: emotion == .surprised ? 0.12 : 0, axis: [1, 0, 0])
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear {
+                float = true
+                sway = true
+                startBlinking()
+            }
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator {
-        var avatarAnchor: AnchorEntity?
+    private var character: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            ZStack {
+                // Hair silhouette behind the body
+                Ellipse()
+                    .fill(LinearGradient(colors: [Color(red: 0.16, green: 0.10, blue: 0.20), Color(red: 0.055, green: 0.045, blue: 0.10)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: w * 0.83, height: h * 0.45)
+                    .offset(y: -h * 0.20)
+                // Long side locks
+                HStack(spacing: w * 0.48) {
+                    Capsule().fill(Color(red: 0.09, green: 0.065, blue: 0.13))
+                        .frame(width: w * 0.15, height: h * 0.37)
+                        .rotationEffect(.degrees(7))
+                    Capsule().fill(Color(red: 0.09, green: 0.065, blue: 0.13))
+                        .frame(width: w * 0.15, height: h * 0.37)
+                        .rotationEffect(.degrees(-7))
+                }
+                .offset(y: -h * 0.01)
+                // Legs and shoes
+                HStack(spacing: w * 0.055) {
+                    VStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: w * 0.055).fill(Color(red: 0.96, green: 0.77, blue: 0.72))
+                            .frame(width: w * 0.13, height: h * 0.19)
+                        Capsule().fill(Color(red: 0.18, green: 0.14, blue: 0.24))
+                            .frame(width: w * 0.18, height: h * 0.055)
+                    }
+                    VStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: w * 0.055).fill(Color(red: 0.96, green: 0.77, blue: 0.72))
+                            .frame(width: w * 0.13, height: h * 0.19)
+                        Capsule().fill(Color(red: 0.18, green: 0.14, blue: 0.24))
+                            .frame(width: w * 0.18, height: h * 0.055)
+                    }
+                }
+                .offset(y: h * 0.345)
+                // Dress body and collar
+                VStack(spacing: 0) {
+                    RoundedRectangle(cornerRadius: w * 0.16)
+                        .fill(LinearGradient(colors: [Color(red: 0.49, green: 0.43, blue: 0.78), Color(red: 0.28, green: 0.27, blue: 0.58)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: w * 0.46, height: h * 0.25)
+                        .overlay(alignment: .top) {
+                            HStack(spacing: 0) {
+                                UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 0, bottomTrailingRadius: 5, topTrailingRadius: 0)
+                                    .fill(.white.opacity(0.9)).frame(width: w * 0.10, height: h * 0.075)
+                                UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 5, bottomTrailingRadius: 0, topTrailingRadius: 3)
+                                    .fill(.white.opacity(0.9)).frame(width: w * 0.10, height: h * 0.075)
+                            }
+                        }
+                    Trapezoid()
+                        .fill(LinearGradient(colors: [Color(red: 0.65, green: 0.58, blue: 0.90), Color(red: 0.37, green: 0.32, blue: 0.67)], startPoint: .top, endPoint: .bottom))
+                        .frame(width: w * 0.58, height: h * 0.19)
+                        .overlay(alignment: .top) {
+                            Rectangle().fill(.white.opacity(0.55)).frame(height: 2).padding(.horizontal, 8)
+                        }
+                }
+                .offset(y: h * 0.19)
+                // Arms with small cuffs
+                HStack(spacing: w * 0.43) {
+                    Capsule().fill(Color(red: 0.49, green: 0.43, blue: 0.78))
+                        .frame(width: w * 0.12, height: h * 0.22)
+                        .rotationEffect(.degrees(emotion == .shy ? 27 : (isSpeaking ? 12 : -17)))
+                        .overlay(alignment: .bottom) {
+                            Circle().fill(Color(red: 0.96, green: 0.77, blue: 0.72)).frame(width: w * 0.12)
+                        }
+                    Capsule().fill(Color(red: 0.49, green: 0.43, blue: 0.78))
+                        .frame(width: w * 0.12, height: h * 0.22)
+                        .rotationEffect(.degrees(emotion == .happy || isSpeaking ? -27 : 17))
+                        .overlay(alignment: .bottom) {
+                            Circle().fill(Color(red: 0.96, green: 0.77, blue: 0.72)).frame(width: w * 0.12)
+                        }
+                }
+                .offset(y: h * 0.10)
+                // Face and hair framing
+                Ellipse()
+                    .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.86, blue: 0.80), Color(red: 0.94, green: 0.68, blue: 0.67)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: w * 0.62, height: h * 0.34)
+                    .overlay {
+                        face
+                    }
+                    .offset(y: -h * 0.18)
+                // Fringe, layered locks and hair shine
+                ZStack {
+                    UnevenRoundedRectangle(topLeadingRadius: w * 0.22, bottomLeadingRadius: w * 0.06, bottomTrailingRadius: w * 0.05, topTrailingRadius: w * 0.22)
+                        .fill(Color(red: 0.12, green: 0.075, blue: 0.16))
+                        .frame(width: w * 0.68, height: h * 0.18)
+                    HStack(spacing: -w * 0.055) {
+                        ForEach(0..<5, id: \.self) { i in
+                            Ellipse()
+                                .fill(LinearGradient(colors: [Color(red: 0.20, green: 0.13, blue: 0.26), Color(red: 0.08, green: 0.055, blue: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: w * 0.17, height: h * (i == 2 ? 0.16 : 0.13))
+                                .rotationEffect(.degrees(Double(i - 2) * 12))
+                        }
+                    }
+                    Ellipse().fill(.white.opacity(0.12)).frame(width: w * 0.28, height: h * 0.025).blur(radius: 3).offset(x: -w * 0.10, y: -h * 0.06)
+                }
+                .offset(y: -h * 0.30)
+                // Hair bow
+                HStack(spacing: -2) {
+                    Ellipse().fill(Color.pink.opacity(0.95)).frame(width: w * 0.11, height: h * 0.065).rotationEffect(.degrees(-24))
+                    Circle().fill(Color(red: 1, green: 0.83, blue: 0.89)).frame(width: w * 0.035)
+                    Ellipse().fill(Color.pink.opacity(0.95)).frame(width: w * 0.11, height: h * 0.065).rotationEffect(.degrees(24))
+                }
+                .offset(x: w * 0.24, y: -h * 0.355)
+                // Floating heart when happy/shy
+                if emotion == .happy || emotion == .shy {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.pink.opacity(0.9))
+                        .shadow(color: .pink.opacity(0.45), radius: 10)
+                        .offset(x: w * 0.39, y: -h * 0.18)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 
-    private func makePlaceholderAvatar() -> Entity {
-        let root = Entity()
-        let skin = SimpleMaterial(color: UIColor(red: 0.91, green: 0.70, blue: 0.61, alpha: 1), roughness: 0.42, isMetallic: false)
-        let hair = SimpleMaterial(color: UIColor(red: 0.12, green: 0.075, blue: 0.07, alpha: 1), roughness: 0.28, isMetallic: false)
-        let outfit = SimpleMaterial(color: UIColor(red: 0.20, green: 0.31, blue: 0.48, alpha: 1), roughness: 0.48, isMetallic: false)
-        let white = SimpleMaterial(color: .white, roughness: 0.2, isMetallic: false)
-        let iris = SimpleMaterial(color: UIColor(red: 0.22, green: 0.12, blue: 0.08, alpha: 1), roughness: 0.2, isMetallic: false)
-        let dark = SimpleMaterial(color: UIColor(red: 0.18, green: 0.09, blue: 0.10, alpha: 1), roughness: 0.4, isMetallic: false)
-        let blush = SimpleMaterial(color: UIColor(red: 0.88, green: 0.36, blue: 0.39, alpha: 0.45), roughness: 0.6, isMetallic: false)
-        func part(_ radius: Float, _ material: RealityKit.Material, _ position: SIMD3<Float>, _ scale: SIMD3<Float>) -> ModelEntity {
-            let e = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
-            e.position = position
-            e.scale = scale
-            return e
+    private var face: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            ZStack {
+                HStack(spacing: w * 0.12) {
+                    eye
+                    eye
+                }
+                .offset(y: -h * 0.035)
+                Ellipse().fill(Color.pink.opacity(0.25))
+                    .frame(width: w * 0.15, height: h * 0.055)
+                    .offset(x: -w * 0.28, y: h * 0.10)
+                Ellipse().fill(Color.pink.opacity(0.25))
+                    .frame(width: w * 0.15, height: h * 0.055)
+                    .offset(x: w * 0.28, y: h * 0.10)
+                if emotion == .surprised {
+                    Ellipse().fill(Color(red: 0.48, green: 0.19, blue: 0.26))
+                        .frame(width: w * 0.055, height: h * 0.075)
+                        .offset(y: h * 0.105)
+                } else {
+                    Capsule().fill(Color(red: 0.57, green: 0.25, blue: 0.31))
+                        .frame(width: w * 0.10, height: h * (isSpeaking ? 0.04 : 0.018))
+                        .offset(y: h * 0.11)
+                }
+                if emotion == .shy {
+                    Image(systemName: "heart.fill").font(.system(size: 10)).foregroundStyle(.pink).offset(y: h * 0.19)
+                }
+            }
         }
+    }
 
-        // Full-body silhouette, centered for the portrait camera.
-        let body = Entity()
-        body.name = "body"
-        body.position = [0, -0.52, 0]
-        root.addChild(body)
-        body.addChild(part(0.22, outfit, [0, 0.02, 0], [1.0, 1.35, 0.72])) // torso
-        body.addChild(part(0.19, outfit, [0, -0.28, 0], [1.15, 0.78, 0.8])) // skirt/hips
-        body.addChild(part(0.075, skin, [0, 0.29, 0.01], [0.85, 1.15, 0.85])) // neck
+    private var eye: some View {
+        ZStack {
+            Ellipse().fill(Color(red: 0.22, green: 0.12, blue: 0.25))
+                .frame(width: 25, height: blink ? 2 : 34)
+            if !blink {
+                Ellipse().fill(LinearGradient(colors: [Color(red: 0.70, green: 0.49, blue: 0.91), Color(red: 0.31, green: 0.26, blue: 0.63)], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 17, height: 25)
+                Circle().fill(.white).frame(width: 7).offset(x: -4, y: -7)
+                Circle().fill(.white.opacity(0.7)).frame(width: 3).offset(x: 4, y: 5)
+            }
+        }
+        .animation(.easeInOut(duration: 0.10), value: blink)
+    }
 
-        // Legs have separate thigh/shin groups, with pivots for animation.
-        for (x, prefix): (Float, String) in [(-0.105, "left"), (0.105, "right")] {
-            let legPivot = Entity()
-            legPivot.name = "\(prefix)LegPivot"
-            legPivot.position = [x, -0.30, 0]
-            body.addChild(legPivot)
-            legPivot.addChild(part(0.105, skin, [0, -0.12, 0], [0.72, 1.5, 0.78]))
-            let shin = Entity()
-            shin.position = [0, -0.27, 0]
-            legPivot.addChild(shin)
-            shin.addChild(part(0.078, skin, [0, -0.10, 0], [0.72, 1.65, 0.78]))
-            shin.addChild(part(0.095, outfit, [0, -0.27, 0.055], [1.0, 0.52, 1.35]))
-            shin.addChild(part(0.105, dark, [0, -0.34, 0.07], [1.0, 0.28, 1.55]))
+    private func startBlinking() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 2.2...4.2)) {
+            withAnimation { blink = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
+                withAnimation { blink = false }
+                startBlinking()
+            }
         }
+    }
+}
 
-        // Arms are articulated at the shoulder and have forearms and hands.
-        for (x, prefix): (Float, String) in [(-0.28, "left"), (0.28, "right")] {
-            let arm = Entity()
-            arm.name = "\(prefix)ArmPivot"
-            arm.position = [x, 0.16, 0]
-            body.addChild(arm)
-            arm.addChild(part(0.095, outfit, [0, -0.12, 0], [0.82, 1.55, 0.82]))
-            let forearm = Entity()
-            forearm.position = [0, -0.23, 0.015]
-            forearm.orientation = simd_quatf(angle: prefix == "left" ? -0.08 : 0.08, axis: [0, 0, 1])
-            arm.addChild(forearm)
-            forearm.addChild(part(0.072, skin, [0, -0.11, 0.01], [0.78, 1.6, 0.78]))
-            forearm.addChild(part(0.065, skin, [0, -0.23, 0.045], [0.92, 0.92, 0.82]))
+private struct Trapezoid: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.width * 0.18, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.width * 0.82, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.closeSubpath()
         }
-
-        // Head, ears, layered fringe, eyes, nose and cheeks.
-        let head = Entity()
-        head.name = "head"
-        head.position = [0, 0.22, 0.02]
-        root.addChild(head)
-        head.addChild(part(0.315, skin, [0, 0, 0], [0.88, 1.12, 0.82]))
-        for x: Float in [-0.275, 0.275] {
-            head.addChild(part(0.075, skin, [x, -0.01, 0], [0.72, 1.0, 0.7]))
-        }
-        head.addChild(part(0.335, hair, [0, 0.12, -0.06], [0.94, 0.88, 0.88]))
-        head.addChild(part(0.30, skin, [0, -0.07, 0.07], [0.88, 0.91, 0.83]))
-        for x: Float in [-0.18, 0, 0.18] {
-            let bang = part(0.15, hair, [x, 0.205, 0.20], [0.82, 0.62, 0.42])
-            bang.orientation = simd_quatf(angle: x * 0.8, axis: [0, 0, 1])
-            head.addChild(bang)
-        }
-        for x: Float in [-0.27, 0.27] {
-            head.addChild(part(0.105, hair, [x, -0.10, 0.12], [0.72, 1.55, 0.55]))
-        }
-        for x: Float in [-0.12, 0.12] {
-            head.addChild(part(0.057, white, [x, 0.00, 0.279], [0.82, 1.2, 0.42]))
-            head.addChild(part(0.033, iris, [x, -0.005, 0.303], [0.78, 1.25, 0.35]))
-            head.addChild(part(0.012, white, [x - 0.009, 0.013, 0.315], [1, 1, 0.5]))
-        }
-        head.addChild(part(0.025, skin, [0, -0.095, 0.305], [0.8, 0.8, 0.55]))
-        head.addChild(part(0.043, dark, [0, -0.165, 0.294], [1.25, 0.42, 0.35]))
-        for x: Float in [-0.19, 0.19] {
-            head.addChild(part(0.048, blush, [x, -0.105, 0.274], [1.2, 0.55, 0.25]))
-        }
-        return root
     }
 }
