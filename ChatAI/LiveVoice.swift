@@ -726,6 +726,23 @@ final class LiveVoiceManager: ObservableObject {
         aiSpeaking = false
     }
 
+    /// Gửi phản ứng chạm dạng văn bản vào cùng phiên Gemini Live để AI trả lời bằng giọng đã cấu hình.
+    func sendText(_ text: String) {
+        guard state == .live, let socket else {
+            errorText = "Bấm Tiếp tục chat để kết nối Gemini Live trước khi chạm tương tác."
+            return
+        }
+        socket.send([
+            "clientContent": [
+                "turns": [[
+                    "role": "user",
+                    "parts": [["text": text]]
+                ]],
+                "turnComplete": true
+            ]
+        ])
+    }
+
     func end() {
         if state != .idle {
             note("Người dùng kết thúc cuộc gọi")
