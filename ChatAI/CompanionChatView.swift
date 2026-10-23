@@ -437,14 +437,14 @@ private struct Companion3DStage: UIViewRepresentable {
             sphere("eyeSparkle" + suffix, 0.035, SCNVector3(x - 0.035, 2.13, 0.81), white)
             let blink = SCNAction.sequence([
                 .wait(duration: 2.7),
-                .scale(to: SCNVector3(1, 0.08, 1), duration: 0.07),
-                .scale(to: SCNVector3(1, 1.12, 1), duration: 0.09)
+                .customAction(duration: 0.07) { node, _ in node.scale.y = 0.08 },
+                .customAction(duration: 0.09) { node, _ in node.scale.y = 1.12 }
             ])
             eyeWhite.runAction(.repeatForever(blink), forKey: "blink")
             eyeIris.runAction(.repeatForever(.sequence([
                 .wait(duration: 2.7),
-                .scaleY(to: 0.08, duration: 0.07),
-                .scale(to: SCNVector3(1, 1.15, 1), duration: 0.09)
+                .customAction(duration: 0.07) { node, _ in node.scale.y = 0.08 },
+                .customAction(duration: 0.09) { node, _ in node.scale.y = 1.15 }
             ])), forKey: "blink")
         }
         _ = sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
@@ -462,8 +462,8 @@ private struct Companion3DStage: UIViewRepresentable {
         rightArm.eulerAngles.z = 0.45
         _ = capsule("leftLeg", radius: 0.14, height: 0.62, position: SCNVector3(-0.23, 0.08, 0.03), mat: skin)
         _ = capsule("rightLeg", radius: 0.14, height: 0.62, position: SCNVector3(0.23, 0.08, 0.03), mat: skin)
-        capsule("leftSock", radius: 0.15, height: 0.18, position: SCNVector3(-0.23, -0.20, 0.03), mat: white)
-        capsule("rightSock", radius: 0.15, height: 0.18, position: SCNVector3(0.23, -0.20, 0.03), mat: white)
+        _ = capsule("leftSock", radius: 0.15, height: 0.18, position: SCNVector3(-0.23, -0.20, 0.03), mat: white)
+        _ = capsule("rightSock", radius: 0.15, height: 0.18, position: SCNVector3(0.23, -0.20, 0.03), mat: white)
 
         let glow = SCNSphere(radius: 1.7)
         glow.firstMaterial = material(UIColor(red: 0.55, green: 0.63, blue: 1, alpha: 0.16))
