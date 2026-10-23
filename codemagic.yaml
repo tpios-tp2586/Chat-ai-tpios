@@ -52,6 +52,18 @@ workflows:
             exit 1
           fi
 
+      - name: Verify companion model resource
+        script: |
+          APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
+          echo "=== Companion USDZ bundle check ==="
+          if [ -f "$APP_PATH/CompanionChibi.usdz" ]; then
+            echo "FOUND: CompanionChibi.usdz is packaged in the app."
+          else
+            echo "WARNING: CompanionChibi.usdz is not packaged."
+            echo "The app will use the procedural companion placeholder."
+            echo "Convert the uploaded VRM to CompanionChibi.usdz and add it to ChatAI resources."
+          fi
+
       - name: Package IPA
         script: |
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
