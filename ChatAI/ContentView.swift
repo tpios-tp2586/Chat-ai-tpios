@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showHistory = false
     @State private var showProviderMenu = false
+    @State private var showCompanion = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,6 +75,7 @@ struct ContentView: View {
             inputBar
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
         .onAppear {
             viewModel.onSpeakReply = { text, gender in
@@ -94,6 +96,11 @@ struct ContentView: View {
                 }
                 .padding(.leading)
                 Spacer()
+                Button { showCompanion = true } label: {
+                    Image(systemName: "person.crop.rectangle.stack")
+                        .font(.title3)
+                }
+                .accessibilityLabel("Mở ChatAI 3D")
                 LiveCallButton(viewModel: viewModel)
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape").font(.title3)
