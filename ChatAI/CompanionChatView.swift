@@ -366,9 +366,9 @@ private struct Companion3DStage: UIViewRepresentable {
                 importedRoot.addChildNode(child.clone())
             }
 
-            var boundsMin = SCNVector3Zero
-            var boundsMax = SCNVector3Zero
-            importedRoot.__getBoundingBoxMin(&boundsMin, max: &boundsMax)
+            let bounds = importedRoot.boundingBox
+            let boundsMin = bounds.min
+            let boundsMax = bounds.max
             let height = max(boundsMax.y - boundsMin.y, 0.001)
             let targetHeight: Float = 2.8
             let scale = targetHeight / height
