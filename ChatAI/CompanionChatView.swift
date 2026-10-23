@@ -316,7 +316,7 @@ private struct Companion3DStage: UIViewRepresentable {
         character.childNode(withName: "mouth", recursively: true)?.scale.y = isSpeaking ? 2.8 : (emotion == "surprised" ? 2.2 : 1.0)
         scene.background.contents = UIColor.clear
         scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?.geometry?.firstMaterial?.diffuse.contents =
-            UIColor(isNight ? UIColor(red: 0.36, green: 0.43, blue: 0.92, alpha: 0.28) : UIColor(red: 1, green: 0.70, blue: 0.48, alpha: 0.25))
+            (isNight ? UIColor(red: 0.36, green: 0.43, blue: 0.92, alpha: 0.28) : UIColor(red: 1, green: 0.70, blue: 0.48, alpha: 0.25))
     }
 
     private func makeScene() -> SCNScene {
