@@ -58,7 +58,13 @@ struct AzureTTS {
     static func speak(text: String, apiKey: String, region: String, gender: VoiceGender) async -> Data? {
         guard !apiKey.isEmpty, !region.isEmpty else { return nil }
         let voiceName = (gender == .female) ? "vi-VN-HoaiMyNeural" : "vi-VN-NamMinhNeural"
-        let ssml = "<speak version='1.0' xml:lang='vi-VN'><voice name='\(voiceName)'>\(text)</voice></speak>"
+        let escapedText = text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+        let ssml = "<speak version='1.0' xml:lang='vi-VN'><voice name='\(voiceName)'>\(escapedText)</voice></speak>"
         guard let url = URL(string: "https://\(region).tts.speech.microsoft.com/cognitiveservices/v1") else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
