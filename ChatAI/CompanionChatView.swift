@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import SceneKit
 
 /// 2D anime companion screen. Keeps Gemini Live interactions while the dedicated sprite asset is prepared.
 struct CompanionChatView: View {
@@ -291,249 +292,160 @@ private enum CompanionEmotion {
 }
 
 
-/// Native SwiftUI 2D stage: layered anime-style character with motion and expression changes.
-/// It intentionally avoids RealityKit so the companion works without a bundled 3D model.
-private struct Companion2DStage: View {
-    let emotion: CompanionEmotion
+/// SceneKit-based 3D chibi companion stage. Procedural model is used until the licensed VRM asset is bundled.
+private struct Companion3DStage: UIViewRepresentable {
+    let emotion: String
     let isNight: Bool
     let isSpeaking: Bool
-    @State private var blink = false
-    @State private var float = false
-    @State private var sway = false
 
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Circle()
-                    .fill(.white.opacity(isNight ? 0.07 : 0.12))
-                    .frame(width: min(geo.size.width * 0.86, 360))
-                    .blur(radius: 1)
-                    .offset(y: -20)
-                Circle()
-                    .stroke(.white.opacity(0.14), lineWidth: 1)
-                    .frame(width: min(geo.size.width * 0.92, 390))
-                    .overlay(alignment: .topTrailing) {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 24, weight: .light))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .offset(x: -24, y: 28)
-                    }
-                    .overlay(alignment: .bottomLeading) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20, weight: .light))
-                            .foregroundStyle(.pink.opacity(0.8))
-                            .offset(x: 34, y: -52)
-                    }
-                VStack(spacing: 0) {
-                    character
-                        .frame(width: min(geo.size.width * 0.78, 300), height: geo.size.height * 0.77)
-                        .offset(y: float ? -7 : 5)
-                        .rotationEffect(.degrees(sway ? 1.2 : -1.2), anchor: .bottom)
-                        .animation(.easeInOut(duration: isSpeaking ? 0.34 : 2.0).repeatForever(autoreverses: true), value: float)
-                        .animation(.easeInOut(duration: 2.7).repeatForever(autoreverses: true), value: sway)
-                    Text(isSpeaking ? "♪  đang trò chuyện với anh  ♪" : "chạm vào em nhé ♡")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.82))
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 8)
-                        .background(.black.opacity(0.18), in: Capsule())
-                        .overlay(Capsule().stroke(.white.opacity(0.15), lineWidth: 1))
-                        .padding(.top, -4)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onAppear {
-                float = true
-                sway = true
-                startBlinking()
-            }
-        }
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.scene = makeScene()
+        view.backgroundColor = .clear
+        view.isPlaying = true
+        view.antialiasingMode = .multisampling4X
+        view.allowsCameraControl = false
+        view.autoenablesDefaultLighting = false
+        view.rendersContinuously = true
+        return view
     }
 
-    private var character: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            ZStack {
-                // Hair silhouette behind the body
-                Ellipse()
-                    .fill(LinearGradient(colors: [Color(red: 0.16, green: 0.10, blue: 0.20), Color(red: 0.055, green: 0.045, blue: 0.10)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: w * 0.83, height: h * 0.45)
-                    .offset(y: -h * 0.20)
-                // Long side locks
-                HStack(spacing: w * 0.48) {
-                    Capsule().fill(Color(red: 0.09, green: 0.065, blue: 0.13))
-                        .frame(width: w * 0.15, height: h * 0.37)
-                        .rotationEffect(.degrees(7))
-                    Capsule().fill(Color(red: 0.09, green: 0.065, blue: 0.13))
-                        .frame(width: w * 0.15, height: h * 0.37)
-                        .rotationEffect(.degrees(-7))
-                }
-                .offset(y: -h * 0.01)
-                // Legs and shoes
-                HStack(spacing: w * 0.055) {
-                    VStack(spacing: 0) {
-                        RoundedRectangle(cornerRadius: w * 0.055).fill(Color(red: 0.96, green: 0.77, blue: 0.72))
-                            .frame(width: w * 0.13, height: h * 0.19)
-                        Capsule().fill(Color(red: 0.18, green: 0.14, blue: 0.24))
-                            .frame(width: w * 0.18, height: h * 0.055)
-                    }
-                    VStack(spacing: 0) {
-                        RoundedRectangle(cornerRadius: w * 0.055).fill(Color(red: 0.96, green: 0.77, blue: 0.72))
-                            .frame(width: w * 0.13, height: h * 0.19)
-                        Capsule().fill(Color(red: 0.18, green: 0.14, blue: 0.24))
-                            .frame(width: w * 0.18, height: h * 0.055)
-                    }
-                }
-                .offset(y: h * 0.345)
-                // Dress body and collar
-                VStack(spacing: 0) {
-                    RoundedRectangle(cornerRadius: w * 0.16)
-                        .fill(LinearGradient(colors: [Color(red: 0.49, green: 0.43, blue: 0.78), Color(red: 0.28, green: 0.27, blue: 0.58)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: w * 0.46, height: h * 0.25)
-                        .overlay(alignment: .top) {
-                            HStack(spacing: 0) {
-                                UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 0, bottomTrailingRadius: 5, topTrailingRadius: 0)
-                                    .fill(.white.opacity(0.9)).frame(width: w * 0.10, height: h * 0.075)
-                                UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 5, bottomTrailingRadius: 0, topTrailingRadius: 3)
-                                    .fill(.white.opacity(0.9)).frame(width: w * 0.10, height: h * 0.075)
-                            }
-                        }
-                    Trapezoid()
-                        .fill(LinearGradient(colors: [Color(red: 0.65, green: 0.58, blue: 0.90), Color(red: 0.37, green: 0.32, blue: 0.67)], startPoint: .top, endPoint: .bottom))
-                        .frame(width: w * 0.58, height: h * 0.19)
-                        .overlay(alignment: .top) {
-                            Rectangle().fill(.white.opacity(0.55)).frame(height: 2).padding(.horizontal, 8)
-                        }
-                }
-                .offset(y: h * 0.19)
-                // Arms with small cuffs
-                HStack(spacing: w * 0.43) {
-                    Capsule().fill(Color(red: 0.49, green: 0.43, blue: 0.78))
-                        .frame(width: w * 0.12, height: h * 0.22)
-                        .rotationEffect(.degrees(emotion == .shy ? 27 : (isSpeaking ? 12 : -17)))
-                        .overlay(alignment: .bottom) {
-                            Circle().fill(Color(red: 0.96, green: 0.77, blue: 0.72)).frame(width: w * 0.12)
-                        }
-                    Capsule().fill(Color(red: 0.49, green: 0.43, blue: 0.78))
-                        .frame(width: w * 0.12, height: h * 0.22)
-                        .rotationEffect(.degrees(emotion == .happy || isSpeaking ? -27 : 17))
-                        .overlay(alignment: .bottom) {
-                            Circle().fill(Color(red: 0.96, green: 0.77, blue: 0.72)).frame(width: w * 0.12)
-                        }
-                }
-                .offset(y: h * 0.10)
-                // Face and hair framing
-                Ellipse()
-                    .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.86, blue: 0.80), Color(red: 0.94, green: 0.68, blue: 0.67)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: w * 0.62, height: h * 0.34)
-                    .overlay {
-                        face
-                    }
-                    .offset(y: -h * 0.18)
-                // Fringe, layered locks and hair shine
-                ZStack {
-                    UnevenRoundedRectangle(topLeadingRadius: w * 0.22, bottomLeadingRadius: w * 0.06, bottomTrailingRadius: w * 0.05, topTrailingRadius: w * 0.22)
-                        .fill(Color(red: 0.12, green: 0.075, blue: 0.16))
-                        .frame(width: w * 0.68, height: h * 0.18)
-                    HStack(spacing: -w * 0.055) {
-                        ForEach(0..<5, id: \.self) { i in
-                            Ellipse()
-                                .fill(LinearGradient(colors: [Color(red: 0.20, green: 0.13, blue: 0.26), Color(red: 0.08, green: 0.055, blue: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .frame(width: w * 0.17, height: h * (i == 2 ? 0.16 : 0.13))
-                                .rotationEffect(.degrees(Double(i - 2) * 12))
-                        }
-                    }
-                    Ellipse().fill(.white.opacity(0.12)).frame(width: w * 0.28, height: h * 0.025).blur(radius: 3).offset(x: -w * 0.10, y: -h * 0.06)
-                }
-                .offset(y: -h * 0.30)
-                // Hair bow
-                HStack(spacing: -2) {
-                    Ellipse().fill(Color.pink.opacity(0.95)).frame(width: w * 0.11, height: h * 0.065).rotationEffect(.degrees(-24))
-                    Circle().fill(Color(red: 1, green: 0.83, blue: 0.89)).frame(width: w * 0.035)
-                    Ellipse().fill(Color.pink.opacity(0.95)).frame(width: w * 0.11, height: h * 0.065).rotationEffect(.degrees(24))
-                }
-                .offset(x: w * 0.24, y: -h * 0.355)
-                // Floating heart when happy/shy
-                if emotion == .happy || emotion == .shy {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.pink.opacity(0.9))
-                        .shadow(color: .pink.opacity(0.45), radius: 10)
-                        .offset(x: w * 0.39, y: -h * 0.18)
-                        .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+    func updateUIView(_ view: SCNView, context: Context) {
+        guard let scene = view.scene, let character = scene.rootNode.childNode(withName: "companionRoot", recursively: true) else { return }
+        character.childNode(withName: "head", recursively: true)?.eulerAngles.z = emotion == "shy" ? 0.12 : 0
+        character.childNode(withName: "mouth", recursively: true)?.scale.y = isSpeaking ? 2.8 : (emotion == "surprised" ? 2.2 : 1.0)
+        scene.background.contents = UIColor.clear
+        scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?.geometry?.firstMaterial?.diffuse.contents =
+            UIColor(isNight ? UIColor(red: 0.36, green: 0.43, blue: 0.92, alpha: 0.28) : UIColor(red: 1, green: 0.70, blue: 0.48, alpha: 0.25))
     }
 
-    private var face: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            ZStack {
-                HStack(spacing: w * 0.12) {
-                    eye
-                    eye
-                }
-                .offset(y: -h * 0.035)
-                Ellipse().fill(Color.pink.opacity(0.25))
-                    .frame(width: w * 0.15, height: h * 0.055)
-                    .offset(x: -w * 0.28, y: h * 0.10)
-                Ellipse().fill(Color.pink.opacity(0.25))
-                    .frame(width: w * 0.15, height: h * 0.055)
-                    .offset(x: w * 0.28, y: h * 0.10)
-                if emotion == .surprised {
-                    Ellipse().fill(Color(red: 0.48, green: 0.19, blue: 0.26))
-                        .frame(width: w * 0.055, height: h * 0.075)
-                        .offset(y: h * 0.105)
-                } else {
-                    Capsule().fill(Color(red: 0.57, green: 0.25, blue: 0.31))
-                        .frame(width: w * 0.10, height: h * (isSpeaking ? 0.04 : 0.018))
-                        .offset(y: h * 0.11)
-                }
-                if emotion == .shy {
-                    Image(systemName: "heart.fill").font(.system(size: 10)).foregroundStyle(.pink).offset(y: h * 0.19)
-                }
-            }
-        }
-    }
+    private func makeScene() -> SCNScene {
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
+        scene.lightingEnvironment.contents = UIColor(white: 0.8, alpha: 1)
 
-    private var eye: some View {
-        ZStack {
-            Ellipse().fill(Color(red: 0.22, green: 0.12, blue: 0.25))
-                .frame(width: 25, height: blink ? 2 : 34)
-            if !blink {
-                Ellipse().fill(LinearGradient(colors: [Color(red: 0.70, green: 0.49, blue: 0.91), Color(red: 0.31, green: 0.26, blue: 0.63)], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 17, height: 25)
-                Circle().fill(.white).frame(width: 7).offset(x: -4, y: -7)
-                Circle().fill(.white.opacity(0.7)).frame(width: 3).offset(x: 4, y: 5)
-            }
-        }
-        .animation(.easeInOut(duration: 0.10), value: blink)
-    }
+        let camera = SCNCamera()
+        camera.fieldOfView = 34
+        let cameraNode = SCNNode()
+        cameraNode.camera = camera
+        cameraNode.position = SCNVector3(0, 1.65, 7.8)
+        cameraNode.look(at: SCNVector3(0, 1.45, 0))
+        scene.rootNode.addChildNode(cameraNode)
 
-    private func startBlinking() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 2.2...4.2)) {
-            withAnimation { blink = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.13) {
-                withAnimation { blink = false }
-                startBlinking()
-            }
-        }
-    }
-}
+        let key = SCNNode()
+        key.light = SCNLight()
+        key.light?.type = .omni
+        key.light?.intensity = 850
+        key.position = SCNVector3(-3, 5, 5)
+        scene.rootNode.addChildNode(key)
+        let fill = SCNNode()
+        fill.light = SCNLight()
+        fill.light?.type = .omni
+        fill.light?.intensity = 500
+        fill.position = SCNVector3(3, 2, 2)
+        scene.rootNode.addChildNode(fill)
 
-private struct Trapezoid: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: rect.width * 0.18, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.width * 0.82, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            path.closeSubpath()
+        let root = SCNNode()
+        root.name = "companionRoot"
+        scene.rootNode.addChildNode(root)
+
+        func material(_ color: UIColor, roughness: CGFloat = 0.48, metallic: CGFloat = 0) -> SCNMaterial {
+            let m = SCNMaterial()
+            m.diffuse.contents = color
+            m.roughness.contents = roughness
+            m.metalness.contents = metallic
+            return m
         }
+        let skin = material(UIColor(red: 1, green: 0.77, blue: 0.69, alpha: 1))
+        let hair = material(UIColor(red: 0.12, green: 0.075, blue: 0.19, alpha: 1), roughness: 0.3)
+        let hairLight = material(UIColor(red: 0.29, green: 0.18, blue: 0.39, alpha: 1), roughness: 0.3)
+        let dress = material(UIColor(red: 0.43, green: 0.34, blue: 0.78, alpha: 1))
+        let white = material(.white)
+        let iris = material(UIColor(red: 0.44, green: 0.28, blue: 0.76, alpha: 1), roughness: 0.2)
+        let black = material(UIColor(red: 0.12, green: 0.07, blue: 0.15, alpha: 1))
+        let pink = material(UIColor(red: 1, green: 0.35, blue: 0.59, alpha: 1))
+
+        func sphere(_ name: String, _ radius: CGFloat, _ position: SCNVector3, _ mat: SCNMaterial, scale: SCNVector3? = nil) -> SCNNode {
+            let g = SCNSphere(radius: radius)
+            g.segmentCount = 24
+            g.firstMaterial = mat
+            let n = SCNNode(geometry: g)
+            n.name = name
+            n.position = position
+            if let scale { n.scale = scale }
+            root.addChildNode(n)
+            return n
+        }
+        func capsule(_ name: String, radius: CGFloat, height: CGFloat, position: SCNVector3, mat: SCNMaterial) -> SCNNode {
+            let n = SCNNode(geometry: SCNCapsule(capRadius: radius, height: height))
+            n.name = name
+            n.position = position
+            n.geometry?.firstMaterial = mat
+            root.addChildNode(n)
+            return n
+        }
+
+        // Oversized head, layered hair, large anime eyes, and a compact outfit.
+        sphere("body", 0.53, SCNVector3(0, 0.72, 0), dress, scale: SCNVector3(0.88, 1.25, 0.7))
+        capsule("neck", radius: 0.13, height: 0.28, position: SCNVector3(0, 1.28, 0), mat: skin)
+        let head = sphere("head", 0.82, SCNVector3(0, 2.02, 0), skin, scale: SCNVector3(0.92, 1.05, 0.78))
+        sphere("backHair", 0.86, SCNVector3(0, 2.12, -0.12), hair, scale: SCNVector3(1.05, 1.12, 0.88)).renderingOrder = -1
+        sphere("fringe", 0.55, SCNVector3(0, 2.52, 0.35), hair, scale: SCNVector3(1.3, 0.48, 0.55))
+        sphere("leftLock", 0.2, SCNVector3(-0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
+        sphere("rightLock", 0.2, SCNVector3(0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
+        sphere("hairShine", 0.07, SCNVector3(-0.34, 2.72, 0.69), hairLight, scale: SCNVector3(2.2, 0.5, 0.4))
+
+        for x: Float in [-0.31, 0.31] {
+            sphere("eyeWhite", 0.19, SCNVector3(x, 2.08, 0.69), white, scale: SCNVector3(0.82, 1.12, 0.3))
+            sphere("iris", 0.13, SCNVector3(x, 2.07, 0.755), iris, scale: SCNVector3(0.82, 1.15, 0.3))
+            sphere("pupil", 0.065, SCNVector3(x, 2.08, 0.79), black, scale: SCNVector3(0.8, 1.2, 0.3))
+            sphere("eyeSparkle", 0.035, SCNVector3(x - 0.035, 2.13, 0.81), white)
+        }
+        sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
+        sphere("blushR", 0.1, SCNVector3(0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
+        sphere("mouth", 0.055, SCNVector3(0, 1.83, 0.72), black, scale: SCNVector3(1.0, 0.65, 0.25))
+
+        // Bow and dangling hair accessories.
+        sphere("bowL", 0.15, SCNVector3(0.59, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
+        sphere("bowR", 0.15, SCNVector3(0.81, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
+        sphere("bowKnot", 0.07, SCNVector3(0.70, 2.75, 0.17), white)
+
+        let leftArm = capsule("leftArm", radius: 0.12, height: 0.72, position: SCNVector3(-0.56, 0.85, 0.02), mat: dress)
+        leftArm.eulerAngles.z = -0.45
+        let rightArm = capsule("rightArm", radius: 0.12, height: 0.72, position: SCNVector3(0.56, 0.85, 0.02), mat: dress)
+        rightArm.eulerAngles.z = 0.45
+        capsule("leftLeg", radius: 0.14, height: 0.62, position: SCNVector3(-0.23, 0.08, 0.03), mat: skin)
+        capsule("rightLeg", radius: 0.14, height: 0.62, position: SCNVector3(0.23, 0.08, 0.03), mat: skin)
+        capsule("leftSock", radius: 0.15, height: 0.18, position: SCNVector3(-0.23, -0.20, 0.03), mat: white)
+        capsule("rightSock", radius: 0.15, height: 0.18, position: SCNVector3(0.23, -0.20, 0.03), mat: white)
+
+        let glow = SCNSphere(radius: 1.7)
+        glow.firstMaterial = material(UIColor(red: 0.55, green: 0.63, blue: 1, alpha: 0.16))
+        glow.firstMaterial?.isDoubleSided = true
+        let glowNode = SCNNode(geometry: glow)
+        glowNode.name = "environmentGlow"
+        glowNode.position = SCNVector3(0, 1.55, -1.2)
+        glowNode.scale = SCNVector3(1.05, 1.2, 0.1)
+        root.addChildNode(glowNode)
+
+        // Gentle breathing, floating, and arm sway animations.
+        let breathe = SCNAction.repeatForever(.sequence([
+            .scale(to: 1.025, duration: 1.8),
+            .scale(to: 1.0, duration: 1.8)
+        ]))
+        root.runAction(breathe, forKey: "breathing")
+        head.runAction(.repeatForever(.sequence([
+            .rotateTo(x: 0, y: 0, z: 0.035, duration: 1.6),
+            .rotateTo(x: 0, y: 0, z: -0.035, duration: 1.6)
+        ])), forKey: "headIdle")
+        leftArm.runAction(.repeatForever(.sequence([
+            .rotateTo(x: 0, y: 0, z: -0.35, duration: 1.2),
+            .rotateTo(x: 0, y: 0, z: -0.52, duration: 1.2)
+        ])), forKey: "armSwayL")
+        rightArm.runAction(.repeatForever(.sequence([
+            .rotateTo(x: 0, y: 0, z: 0.52, duration: 1.2),
+            .rotateTo(x: 0, y: 0, z: 0.35, duration: 1.2)
+        ])), forKey: "armSwayR")
+        return scene
     }
 }
