@@ -34,13 +34,23 @@ struct CompanionChatView: View {
                 topBar
 
                 ZStack(alignment: .bottom) {
-                    CompanionRealityView(emotion: emotion, isNight: isNight)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            emotion = .surprised
-                            touchMessage = "Ơ, anh làm em giật mình đó!"
-                        }
+                    GeometryReader { geo in
+                        CompanionRealityView(emotion: emotion, isNight: isNight, isSpeaking: liveManager.aiSpeaking)
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                SpatialTapGesture().onEnded { value in
+                                    let point = value.location
+                                    let ratio = point.y / max(geo.size.height, 1)
+                                    if ratio < 0.48 {
+                                        let xRatio = point.x / max(geo.size.width, 1)
+                                        reactToTouch(xRatio < 0.38 || xRatio > 0.62 ? .cheek : .head)
+                                    } else {
+                                        reactToTouch(.body)
+                                    }
+                                }
+                            )
+                    }
 
                     VStack(spacing: 12) {
                         HStack {
@@ -91,6 +101,9 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.errorText) { message in
             if let message, !message.isEmpty { touchMessage = message }
+        }
+        .onChange(of: liveManager.aiSpeaking) { speaking in
+            if speaking { emotion = .happy }
         }
         .onDisappear { liveManager.end() }
     }
@@ -169,12 +182,6 @@ struct CompanionChatView: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 18) {
-                touchButton("Đầu", icon: "hand.tap", emotion: .surprised, message: "Ơ hay, lại định trêu gì em đấy?")
-                touchButton("Má", icon: "heart", emotion: .shy, message: "Ơ... anh đừng chọc em nữa mà!")
-                touchButton("Vui", icon: "face.smiling", emotion: .happy, message: nil)
-            }
-
             HStack(spacing: 14) {
                 Button {
                     if liveManager.state == .idle {
@@ -227,19 +234,26 @@ struct CompanionChatView: View {
         liveManager.start(model: liveModel, voice: liveVoice, persona: livePersona, bargeIn: liveBargeIn)
     }
 
-    private func touchButton(_ title: String, icon: String, emotion nextEmotion: CompanionEmotion, message: String?) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.68)) {
-                emotion = nextEmotion
-                touchMessage = message
-            }
-        } label: {
-            Label(title, systemImage: icon)
-                .font(.caption.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(.white.opacity(0.11), in: Capsule())
-                .overlay(Capsule().stroke(.white.opacity(0.16), lineWidth: 1))
+    private enum TouchTarget { case head, cheek, body }
+
+    private func reactToTouch(_ target: TouchTarget) {
+        let prompt: String
+        switch target {
+        case .head:
+            prompt = "Anh vừa chạm nhẹ vào đầu em. Hãy phản ứng ấm áp, tự nhiên bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
+            emotion = .happy
+        case .cheek:
+            prompt = "Anh vừa chạm nhẹ vào má em. Hãy phản ứng hơi ngại ngùng, dễ thương bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
+            emotion = .shy
+        case .body:
+            prompt = "Anh vừa chạm vào em để gọi em. Hãy phản ứng vui vẻ, tự nhiên bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
+            emotion = .surprised
+        }
+        if liveManager.state == .live {
+            liveManager.sendText(prompt)
+            touchMessage = nil
+        } else {
+            touchMessage = "Bấm “Tiếp tục chat” để kết nối Gemini Live trước nhé."
         }
     }
 
@@ -273,6 +287,7 @@ private enum CompanionEmotion {
 private struct CompanionRealityView: UIViewRepresentable {
     let emotion: CompanionEmotion
     let isNight: Bool
+    let isSpeaking: Bool
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
@@ -326,36 +341,57 @@ private struct CompanionRealityView: UIViewRepresentable {
 
     private func makePlaceholderAvatar() -> Entity {
         let root = Entity()
-        let skin = SimpleMaterial(color: UIColor(red: 0.96, green: 0.72, blue: 0.66, alpha: 1), roughness: 0.42, isMetallic: false)
-        let hair = SimpleMaterial(color: UIColor(red: 0.16, green: 0.10, blue: 0.20, alpha: 1), roughness: 0.32, isMetallic: false)
-        let outfit = SimpleMaterial(color: UIColor(red: 0.18, green: 0.22, blue: 0.34, alpha: 1), roughness: 0.5, isMetallic: false)
-        let eye = SimpleMaterial(color: UIColor(red: 0.12, green: 0.07, blue: 0.16, alpha: 1), roughness: 0.25, isMetallic: false)
+        let skin = SimpleMaterial(color: UIColor(red: 0.91, green: 0.70, blue: 0.61, alpha: 1), roughness: 0.42, isMetallic: false)
+        let hair = SimpleMaterial(color: UIColor(red: 0.12, green: 0.075, blue: 0.07, alpha: 1), roughness: 0.28, isMetallic: false)
+        let outfit = SimpleMaterial(color: UIColor(red: 0.20, green: 0.31, blue: 0.48, alpha: 1), roughness: 0.48, isMetallic: false)
+        let white = SimpleMaterial(color: .white, roughness: 0.2, isMetallic: false)
+        let iris = SimpleMaterial(color: UIColor(red: 0.22, green: 0.12, blue: 0.08, alpha: 1), roughness: 0.2, isMetallic: false)
+        let dark = SimpleMaterial(color: UIColor(red: 0.18, green: 0.09, blue: 0.10, alpha: 1), roughness: 0.4, isMetallic: false)
+        let blush = SimpleMaterial(color: UIColor(red: 0.88, green: 0.36, blue: 0.39, alpha: 0.45), roughness: 0.6, isMetallic: false)
 
-        let torso = ModelEntity(mesh: .generateBox(size: SIMD3<Float>(0.42, 0.78, 0.28)), materials: [outfit])
-        torso.position = [0, -0.48, 0]
-        root.addChild(torso)
-
-        let head = ModelEntity(mesh: .generateSphere(radius: 0.34), materials: [skin])
-        head.position = [0, 0.16, 0.02]
-        root.addChild(head)
-
-        let hairCap = ModelEntity(mesh: .generateSphere(radius: 0.355), materials: [hair])
-        hairCap.position = [0, 0.27, -0.055]
-        hairCap.scale = [1.0, 0.72, 0.9]
-        root.addChild(hairCap)
-
-        for x: Float in [-0.13, 0.13] {
-            let eyeEntity = ModelEntity(mesh: .generateSphere(radius: 0.035), materials: [eye])
-            eyeEntity.position = [x, 0.17, 0.335]
-            eyeEntity.scale = [1, 1.25, 0.35]
-            root.addChild(eyeEntity)
+        func ellipsoid(_ radius: Float, material: Material, position: SIMD3<Float>, scale: SIMD3<Float>) -> ModelEntity {
+            let e = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
+            e.position = position
+            e.scale = scale
+            return e
         }
 
-        let fringe = ModelEntity(mesh: .generateBox(size: [0.45, 0.12, 0.08]), materials: [hair])
-        fringe.position = [0, 0.39, 0.29]
-        fringe.orientation = simd_quatf(angle: -0.18, axis: [0, 0, 1])
-        root.addChild(fringe)
+        // Neck, shoulders and a fitted upper-body silhouette.
+        root.addChild(ellipsoid(0.105, material: skin, position: [0, -0.18, 0.01], scale: [0.78, 1.25, 0.8]))
+        root.addChild(ellipsoid(0.31, material: outfit, position: [0, -0.48, 0], scale: [1.28, 1.25, 0.72]))
+        for x: Float in [-0.31, 0.31] {
+            root.addChild(ellipsoid(0.13, material: outfit, position: [x, -0.35, 0], scale: [0.8, 1.5, 0.8]))
+        }
 
+        // More oval face, ears and layered hair instead of a round toy head.
+        root.addChild(ellipsoid(0.315, material: skin, position: [0, 0.20, 0.015], scale: [0.88, 1.12, 0.82]))
+        for x: Float in [-0.275, 0.275] {
+            root.addChild(ellipsoid(0.075, material: skin, position: [x, 0.19, 0.015], scale: [0.72, 1.0, 0.7]))
+        }
+        root.addChild(ellipsoid(0.335, material: hair, position: [0, 0.32, -0.045], scale: [0.94, 0.88, 0.88]))
+        root.addChild(ellipsoid(0.30, material: skin, position: [0, 0.13, 0.07], scale: [0.88, 0.91, 0.83]))
+
+        // Bangs and side locks frame the face.
+        for x: Float in [-0.18, 0, 0.18] {
+            let bang = ellipsoid(0.15, material: hair, position: [x, 0.405, 0.20], scale: [0.82, 0.62, 0.42])
+            bang.orientation = simd_quatf(angle: x * 0.8, axis: [0, 0, 1])
+            root.addChild(bang)
+        }
+        for x: Float in [-0.27, 0.27] {
+            root.addChild(ellipsoid(0.105, material: hair, position: [x, 0.10, 0.12], scale: [0.72, 1.55, 0.55]))
+        }
+
+        // Eyes with whites, irises and highlights.
+        for x: Float in [-0.12, 0.12] {
+            root.addChild(ellipsoid(0.057, material: white, position: [x, 0.20, 0.279], scale: [0.82, 1.2, 0.42]))
+            root.addChild(ellipsoid(0.033, material: iris, position: [x, 0.195, 0.303], scale: [0.78, 1.25, 0.35]))
+            root.addChild(ellipsoid(0.012, material: white, position: [x - 0.009, 0.213, 0.315], scale: [1, 1, 0.5]))
+        }
+        root.addChild(ellipsoid(0.025, material: skin, position: [0, 0.105, 0.305], scale: [0.8, 0.8, 0.55]))
+        root.addChild(ellipsoid(0.043, material: dark, position: [0, 0.035, 0.294], scale: [1.25, 0.42, 0.35]))
+        for x: Float in [-0.19, 0.19] {
+            root.addChild(ellipsoid(0.048, material: blush, position: [x, 0.095, 0.274], scale: [1.2, 0.55, 0.25]))
+        }
         return root
     }
 }
