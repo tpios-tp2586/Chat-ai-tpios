@@ -187,7 +187,7 @@ struct CompanionChatView: View {
                     Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
                         .font(.title3)
                         .frame(width: 50, height: 50)
-                        .background(voiceManager.isListening ? .red.opacity(0.8) : .white.opacity(0.12), in: Circle())
+                        .background(liveManager.state == .idle ? .white.opacity(0.12) : .red.opacity(0.8), in: Circle())
                 }
                 .accessibilityLabel(liveManager.state == .idle ? "Bắt đầu Gemini Live" : "Kết thúc Gemini Live")
 
