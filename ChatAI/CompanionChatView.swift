@@ -185,8 +185,9 @@ struct CompanionChatView: View {
                 .accessibilityLabel(voiceManager.isListening ? "Dừng ghi âm và gửi" : "Bắt đầu nói")
 
                 Button {
-                    showConversation = true
-                    dismiss()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showConversation = true
+                    }
                 } label: {
                     Label("Tiếp tục chat", systemImage: "message.fill")
                         .font(.subheadline.weight(.semibold))
