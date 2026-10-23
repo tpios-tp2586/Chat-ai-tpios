@@ -8,8 +8,6 @@ struct SettingsView: View {
     @State private var grokKey:      String = KeychainHelper.read(forKey: AIProviderKind.grok.keychainKey) ?? ""
     @State private var deepseekKey:  String = KeychainHelper.read(forKey: AIProviderKind.deepseek.keychainKey) ?? ""
     @State private var groqKey:      String = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
-    @State private var azureKey:     String = KeychainHelper.read(forKey: "azure_tts_key") ?? ""
-    @State private var azureRegion:  String = KeychainHelper.read(forKey: "azure_tts_region") ?? ""
 
     @AppStorage("model_openai")    var openAIModel:    String = AIProviderKind.openAI.defaultModel
     @AppStorage("model_anthropic") var anthropicModel: String = AIProviderKind.anthropic.defaultModel
@@ -33,16 +31,6 @@ struct SettingsView: View {
                             Text(g.rawValue).tag(g.rawValue)
                         }
                     }
-                }
-
-                Section {
-                    SecureField("Azure TTS key (F0 miễn phí)", text: $azureKey)
-                    TextField("Region (vd: southeastasia)", text: $azureRegion)
-                } header: {
-                    Text("Azure TTS – giọng neural tiếng Việt")
-                } footer: {
-                    Text("Đăng ký miễn phí tại portal.azure.com → Speech. Nếu để trống dùng giọng iOS mặc định.")
-                        .font(.caption)
                 }
 
                 Section("AI Memory") {
@@ -108,8 +96,6 @@ struct SettingsView: View {
                         KeychainHelper.save(grokKey,      forKey: AIProviderKind.grok.keychainKey)
                         KeychainHelper.save(deepseekKey,  forKey: AIProviderKind.deepseek.keychainKey)
                         KeychainHelper.save(groqKey,      forKey: AIProviderKind.groq.keychainKey)
-                        KeychainHelper.save(azureKey,     forKey: "azure_tts_key")
-                        KeychainHelper.save(azureRegion,  forKey: "azure_tts_region")
                         dismiss()
                     }
                 }
