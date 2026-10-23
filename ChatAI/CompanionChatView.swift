@@ -405,7 +405,8 @@ private struct Companion3DStage: UIViewRepresentable {
         sphere("rightLock", 0.2, SCNVector3(0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
         sphere("hairShine", 0.07, SCNVector3(-0.34, 2.72, 0.69), hairLight, scale: SCNVector3(2.2, 0.5, 0.4))
 
-        for (x, suffix): (Float, String) in [(-0.31, "L"), (0.31, "R")] {
+        let eyePositions: [(x: Float, suffix: String)] = [(-0.31, "L"), (0.31, "R")]
+        for (x, suffix) in eyePositions {
             let eyeWhite = sphere("eyeWhite" + suffix, 0.19, SCNVector3(x, 2.08, 0.69), white, scale: SCNVector3(0.82, 1.12, 0.3))
             let eyeIris = sphere("iris" + suffix, 0.13, SCNVector3(x, 2.07, 0.755), iris, scale: SCNVector3(0.82, 1.15, 0.3))
             sphere("pupil" + suffix, 0.065, SCNVector3(x, 2.08, 0.79), black, scale: SCNVector3(0.8, 1.2, 0.3))
