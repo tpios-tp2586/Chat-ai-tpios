@@ -315,7 +315,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         let outfit = SimpleMaterial(color: UIColor(red: 0.18, green: 0.22, blue: 0.34, alpha: 1), roughness: 0.5, isMetallic: false)
         let eye = SimpleMaterial(color: UIColor(red: 0.12, green: 0.07, blue: 0.16, alpha: 1), roughness: 0.25, isMetallic: false)
 
-        let torso = ModelEntity(mesh: .generateCapsule(height: 0.78, radius: 0.25), materials: [outfit])
+        let torso = ModelEntity(mesh: .generateCylinder(height: 0.78, radius: 0.25), materials: [outfit])
         torso.position = [0, -0.48, 0]
         root.addChild(torso)
 
