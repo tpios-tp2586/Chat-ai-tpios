@@ -1,298 +1,6 @@
-import SwiftUI
-import UIKit
-import SceneKit
-
-/// Anime companion screen with a procedural SceneKit 3D stage and Gemini Live voice interaction.
-struct CompanionChatView: View {
-    @ObservedObject var viewModel: ChatViewModel
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var liveManager = LiveVoiceManager()
-    @AppStorage("live_model") private var liveModel = "gemini-3.8-live"
-    @AppStorage("live_voice") private var liveVoice = "Zephyr"
-    @AppStorage("live_persona") private var livePersona = LivePersona.defaultText
-    @AppStorage("live_barge_in") private var liveBargeIn = false
-    @State private var emotion: CompanionEmotion = .idle
-    @State private var showConversation = true
-    @State private var isVoiceChatActive = false
-    @State private var touchMessage: String?
-    @State private var isNight = Calendar.current.component(.hour, from: Date()) >= 19 ||
-        Calendar.current.component(.hour, from: Date()) < 6
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: isNight
-                    ? [Color(red: 0.035, green: 0.055, blue: 0.16), Color(red: 0.18, green: 0.12, blue: 0.31)]
-                    : [Color(red: 0.18, green: 0.27, blue: 0.43), Color(red: 0.57, green: 0.35, blue: 0.31)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                topBar
-
-                ZStack(alignment: .bottom) {
-                    GeometryReader { geo in
-                        Companion3DStage(emotion: emotionName, isNight: isNight, isSpeaking: liveManager.aiSpeaking)
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .contentShape(Rectangle())
-                            .gesture(
-                                SpatialTapGesture().onEnded { value in
-                                    let point = value.location
-                                    let ratio = point.y / max(geo.size.height, 1)
-                                    if ratio < 0.48 {
-                                        let xRatio = point.x / max(geo.size.width, 1)
-                                        reactToTouch(xRatio < 0.38 || xRatio > 0.62 ? .cheek : .head)
-                                    } else {
-                                        reactToTouch(.body)
-                                    }
-                                }
-                            )
-                    }
-
-                    VStack(spacing: 12) {
-                        HStack {
-                            Label(statusText, systemImage: statusSymbol)
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(.ultraThinMaterial, in: Capsule())
-                            Spacer()
-                            Button {
-                                isNight.toggle()
-                            } label: {
-                                Image(systemName: isNight ? "moon.stars.fill" : "sun.max.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.white)
-                                    .frame(width: 42, height: 42)
-                                    .background(.ultraThinMaterial, in: Circle())
-                            }
-                            .accessibilityLabel("Đổi môi trường ngày đêm")
-                        }
-
-                        if let touchMessage {
-                            Text(touchMessage)
-                                .font(.subheadline.weight(.medium))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-
-                        if showConversation {
-                            conversationPreview
-                        }
-                    }
-                    .padding(16)
-                }
-
-                controls
-            }
-        }
-        .preferredColorScheme(.dark)
-        .onChange(of: liveManager.lines.count) { _ in
-            if let line = liveManager.lines.last {
-                touchMessage = line.text
-                emotion = line.role == .assistant ? .happy : .thinking
-            }
-        }
-        .onChange(of: liveManager.errorText) { message in
-            if let message, !message.isEmpty { touchMessage = message }
-        }
-        .onChange(of: liveManager.aiSpeaking) { speaking in
-            if speaking { emotion = .happy }
-        }
-        .onDisappear { liveManager.end() }
-    }
-
-    private var topBar: some View {
-        HStack(spacing: 12) {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.down")
-                    .font(.headline)
-                    .frame(width: 40, height: 40)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ChatAI Companion")
-                    .font(.headline)
-                Text(viewModel.selectedProvider.rawValue)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.68))
-            }
-
-            Spacer()
-
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                    showConversation.toggle()
-                }
-            } label: {
-                Image(systemName: showConversation ? "text.bubble" : "text.bubble.fill")
-                    .font(.title3)
-                    .frame(width: 42, height: 42)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .accessibilityLabel("Ẩn hoặc hiện hội thoại")
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
-    }
-
-    private var conversationPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let lastUser = viewModel.messages.last(where: { $0.role == .user }) {
-                Text("ANH")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.55))
-                Text(lastUser.content)
-                    .font(.subheadline)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if let lastReply = viewModel.messages.last(where: { $0.role == .assistant }) {
-                Text("CHATAI")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.cyan.opacity(0.9))
-                Text(lastReply.content)
-                    .font(.subheadline)
-                    .lineLimit(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if viewModel.isSending {
-                Label("Đang suy nghĩ...", systemImage: "sparkles")
-                    .font(.subheadline)
-            } else if viewModel.messages.isEmpty {
-                Text("Chào anh! Mình trò chuyện nhé.")
-                    .font(.subheadline)
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.black.opacity(0.26), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.12), lineWidth: 1))
-    }
-
-    private var controls: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                Button {
-                    if liveManager.state == .idle {
-                        startGeminiLive()
-                    } else {
-                        liveManager.end()
-                        isVoiceChatActive = false
-                    }
-                } label: {
-                    Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
-                        .font(.title3)
-                        .frame(width: 50, height: 50)
-                        .background(liveManager.state == .idle ? .white.opacity(0.12) : .red.opacity(0.8), in: Circle())
-                }
-                .accessibilityLabel(liveManager.state == .idle ? "Bắt đầu Gemini Live" : "Kết thúc Gemini Live")
-
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        showConversation = true
-                        isVoiceChatActive = true
-                    }
-                    if liveManager.state == .idle { startGeminiLive() }
-                } label: {
-                    Label(liveManager.state == .live ? (liveManager.aiSpeaking ? "AI đang nói..." : "Đang nghe anh") : (liveManager.state == .connecting ? "Đang kết nối Gemini..." : "Tiếp tục chat"), systemImage: "waveform")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing), in: Capsule())
-                }
-
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.headline)
-                        .frame(width: 50, height: 50)
-                        .background(.red.opacity(0.8), in: Circle())
-                }
-                .accessibilityLabel("Đóng màn hình companion")
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
-        .background(.black.opacity(0.22))
-    }
-
-    private func startGeminiLive() {
-        isVoiceChatActive = true
-        showConversation = true
-        liveManager.start(model: liveModel, voice: liveVoice, persona: livePersona, bargeIn: liveBargeIn)
-    }
-
-    private enum TouchTarget { case head, cheek, body }
-
-    private func reactToTouch(_ target: TouchTarget) {
-        let prompt: String
-        switch target {
-        case .head:
-            prompt = "Anh vừa chạm nhẹ vào đầu em. Hãy phản ứng ấm áp, tự nhiên bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
-            emotion = .happy
-        case .cheek:
-            prompt = "Anh vừa chạm nhẹ vào má em. Hãy phản ứng hơi ngại ngùng, dễ thương bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
-            emotion = .shy
-        case .body:
-            prompt = "Anh vừa chạm vào em để gọi em. Hãy phản ứng vui vẻ, tự nhiên bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
-            emotion = .surprised
-        }
-        if liveManager.state == .live {
-            liveManager.sendText(prompt)
-            touchMessage = nil
-        } else {
-            touchMessage = "Bấm “Tiếp tục chat” để kết nối Gemini Live trước nhé."
-        }
-    }
-
-    private var emotionName: String {
-        switch emotion {
-        case .idle: return "idle"
-        case .happy: return "happy"
-        case .thinking: return "thinking"
-        case .shy: return "shy"
-        case .surprised: return "surprised"
-        }
-    }
-
-    private var statusText: String {
-        switch emotion {
-        case .idle: return "Đang ở đây với anh"
-        case .happy: return "Em đang vui"
-        case .thinking: return "Đang suy nghĩ"
-        case .shy: return "Em hơi ngại..."
-        case .surprised: return "Ơ, bất ngờ quá!"
-        }
-    }
-
-    private var statusSymbol: String {
-        switch emotion {
-        case .idle: return "sparkles"
-        case .happy: return "face.smiling"
-        case .thinking: return "ellipsis.bubble"
-        case .shy: return "heart.fill"
-        case .surprised: return "exclamationmark.bubble"
-        }
-    }
-}
-
-private enum CompanionEmotion {
-    case idle, happy, thinking, shy, surprised
-}
-
-
-/// SceneKit-based 3D chibi companion stage. Procedural model is used until the licensed VRM asset is bundled.
+/// SceneKit-based 3D chibi companion stage.
+/// Drop this struct in place of the existing Companion3DStage in CompanionChatView.swift.
+/// Node names used by updateUIView are preserved: companionRoot, head, irisL, irisR, mouth, environmentGlow.
 private struct Companion3DStage: UIViewRepresentable {
     let emotion: String
     let isNight: Bool
@@ -311,187 +19,307 @@ private struct Companion3DStage: UIViewRepresentable {
     }
 
     func updateUIView(_ view: SCNView, context: Context) {
-        guard let scene = view.scene, let character = scene.rootNode.childNode(withName: "companionRoot", recursively: true) else { return }
+        guard let scene = view.scene,
+              let character = scene.rootNode.childNode(withName: "companionRoot", recursively: true) else { return }
+
         let head = character.childNode(withName: "head", recursively: true)
-        head?.eulerAngles.z = emotion == "shy" ? 0.12 : (emotion == "thinking" ? -0.10 : 0)
-        head?.eulerAngles.y = emotion == "thinking" ? -0.12 : 0
+        head?.eulerAngles.z = emotion == "shy"     ?  0.14 : (emotion == "thinking" ? -0.11 : 0)
+        head?.eulerAngles.y = emotion == "thinking" ? -0.13 : 0
 
         let mouth = character.childNode(withName: "mouth", recursively: true)
-        mouth?.scale.y = isSpeaking ? 2.8 : (emotion == "surprised" ? 2.2 : 1.0)
-        mouth?.scale.x = emotion == "happy" ? 1.6 : 1.0
+        mouth?.scale.y = isSpeaking ? 3.0 : (emotion == "surprised" ? 2.4 : (emotion == "happy" ? 1.6 : 1.0))
+        mouth?.scale.x = emotion == "happy" ? 1.7 : (emotion == "surprised" ? 1.3 : 1.0)
 
         for suffix in ["L", "R"] {
             character.childNode(withName: "iris" + suffix, recursively: true)?.position.x =
-                Float(suffix == "L" ? -0.31 : 0.31) + Float(emotion == "thinking" ? -0.045 : 0)
+                Float(suffix == "L" ? -0.30 : 0.30) + Float(emotion == "thinking" ? -0.048 : 0)
         }
+
         scene.background.contents = UIColor.clear
-        scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?.geometry?.firstMaterial?.diffuse.contents =
-            (isNight ? UIColor(red: 0.36, green: 0.43, blue: 0.92, alpha: 0.28) : UIColor(red: 1, green: 0.70, blue: 0.48, alpha: 0.25))
+        scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?
+            .geometry?.firstMaterial?.diffuse.contents =
+            isNight
+            ? UIColor(red: 0.34, green: 0.42, blue: 0.95, alpha: 0.26)
+            : UIColor(red: 1.00, green: 0.68, blue: 0.46, alpha: 0.22)
     }
+
+    // MARK: - Scene construction
 
     private func makeScene() -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
-        scene.lightingEnvironment.contents = UIColor(white: 0.8, alpha: 1)
+        scene.lightingEnvironment.contents = UIColor(white: 0.82, alpha: 1)
 
-        let camera = SCNCamera()
-        camera.fieldOfView = 34
-        let cameraNode = SCNNode()
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 1.65, 7.8)
-        cameraNode.look(at: SCNVector3(0, 1.45, 0))
-        scene.rootNode.addChildNode(cameraNode)
+        // Camera
+        let cam = SCNCamera()
+        cam.fieldOfView = 32
+        let camNode = SCNNode()
+        camNode.camera = cam
+        camNode.position = SCNVector3(0, 1.72, 7.6)
+        camNode.look(at: SCNVector3(0, 1.52, 0))
+        scene.rootNode.addChildNode(camNode)
 
-        let key = SCNNode()
-        key.light = SCNLight()
-        key.light?.type = .omni
-        key.light?.intensity = 850
-        key.position = SCNVector3(-3, 5, 5)
-        scene.rootNode.addChildNode(key)
-        let fill = SCNNode()
-        fill.light = SCNLight()
-        fill.light?.type = .omni
-        fill.light?.intensity = 500
-        fill.position = SCNVector3(3, 2, 2)
-        scene.rootNode.addChildNode(fill)
+        // Key light (warm, front-left)
+        addLight(to: scene, type: .directional,
+                 color: UIColor(red: 1.0, green: 0.95, blue: 0.90, alpha: 1),
+                 intensity: 920,
+                 position: SCNVector3(-3, 6, 5),
+                 lookAt: SCNVector3(0, 1.5, 0))
 
-        // Prefer the converted real model when it is bundled in the app.
-        // The VRM source file itself is not loaded by SceneKit; convert it to
-        // CompanionChibi.usdz and add that USDZ to the ChatAI target resources.
+        // Fill light (right)
+        addLight(to: scene, type: .omni,
+                 color: UIColor(red: 0.90, green: 0.90, blue: 1.0, alpha: 1),
+                 intensity: 380,
+                 position: SCNVector3(3, 2, 3))
+
+        // Rim light (cyan, behind character — gives anime depth)
+        addLight(to: scene, type: .omni,
+                 color: UIColor(red: 0.38, green: 0.72, blue: 1.0, alpha: 1),
+                 intensity: 680,
+                 position: SCNVector3(0, 3.5, -4.5))
+
+        // Ambient
+        addLight(to: scene, type: .ambient,
+                 color: UIColor(red: 0.78, green: 0.78, blue: 1.0, alpha: 1),
+                 intensity: 220,
+                 position: SCNVector3(0, 0, 0))
+
+        // Load real USDZ if available
         if let modelURL = Bundle.main.url(forResource: "CompanionChibi", withExtension: "usdz"),
-           let importedScene = try? SCNScene(url: modelURL, options: nil) {
+           let imported = try? SCNScene(url: modelURL, options: nil) {
             let importedRoot = SCNNode()
             importedRoot.name = "companionRoot"
-            for child in importedScene.rootNode.childNodes {
+            for child in imported.rootNode.childNodes {
                 importedRoot.addChildNode(child.clone())
             }
-
-            let bounds = importedRoot.boundingBox
-            let boundsMin = bounds.min
-            let boundsMax = bounds.max
-            let height = max(boundsMax.y - boundsMin.y, 0.001)
-            let targetHeight: Float = 2.8
-            let scale = targetHeight / height
-            importedRoot.scale = SCNVector3(scale, scale, scale)
-            importedRoot.position.y = -((boundsMin.y + boundsMax.y) * 0.5) * scale + 1.4
-
+            let b = importedRoot.boundingBox
+            let h = max(b.max.y - b.min.y, 0.001)
+            let s = Float(2.8) / h
+            importedRoot.scale    = SCNVector3(s, s, s)
+            importedRoot.position.y = -((b.min.y + b.max.y) * 0.5) * s + 1.4
             scene.rootNode.addChildNode(importedRoot)
             return scene
         }
 
+        // ── Procedural character ──────────────────────────────────────────
         let root = SCNNode()
         root.name = "companionRoot"
         scene.rootNode.addChildNode(root)
 
-        func material(_ color: UIColor, roughness: CGFloat = 0.48, metallic: CGFloat = 0) -> SCNMaterial {
-            let m = SCNMaterial()
-            m.diffuse.contents = color
-            m.roughness.contents = roughness
-            m.metalness.contents = metallic
-            return m
-        }
-        let skin = material(UIColor(red: 1, green: 0.77, blue: 0.69, alpha: 1))
-        let hair = material(UIColor(red: 0.12, green: 0.075, blue: 0.19, alpha: 1), roughness: 0.3)
-        let hairLight = material(UIColor(red: 0.29, green: 0.18, blue: 0.39, alpha: 1), roughness: 0.3)
-        let dress = material(UIColor(red: 0.43, green: 0.34, blue: 0.78, alpha: 1))
-        let white = material(.white)
-        let iris = material(UIColor(red: 0.44, green: 0.28, blue: 0.76, alpha: 1), roughness: 0.2)
-        let black = material(UIColor(red: 0.12, green: 0.07, blue: 0.15, alpha: 1))
-        let pink = material(UIColor(red: 1, green: 0.35, blue: 0.59, alpha: 1))
+        // Materials
+        let mSkin   = pbr(UIColor(red: 1.00, green: 0.83, blue: 0.74, alpha: 1), r: 0.50)
+        let mHair   = pbr(UIColor(red: 0.08, green: 0.05, blue: 0.15, alpha: 1), r: 0.22)
+        let mHairHi = pbr(UIColor(red: 0.30, green: 0.18, blue: 0.46, alpha: 1), r: 0.20)
+        let mDress  = pbr(UIColor(red: 0.44, green: 0.32, blue: 0.84, alpha: 1), r: 0.55)
+        let mSkirt  = pbr(UIColor(red: 0.52, green: 0.38, blue: 0.90, alpha: 1), r: 0.50)
+        let mWhite  = pbr(.white, r: 0.45)
+        let mIris   = pbr(UIColor(red: 0.42, green: 0.26, blue: 0.82, alpha: 1), r: 0.12,
+                          emit: UIColor(red: 0.18, green: 0.08, blue: 0.48, alpha: 0.35))
+        let mBlack  = pbr(UIColor(red: 0.08, green: 0.05, blue: 0.10, alpha: 1), r: 0.30)
+        let mPink   = pbr(UIColor(red: 1.00, green: 0.36, blue: 0.62, alpha: 1), r: 0.50)
+        let mBlush  = pbr(UIColor(red: 1.00, green: 0.56, blue: 0.68, alpha: 0.65), r: 0.80)
+        let mNose   = pbr(UIColor(red: 0.97, green: 0.73, blue: 0.68, alpha: 1), r: 0.60)
+        let mSock   = pbr(UIColor(red: 0.96, green: 0.95, blue: 0.99, alpha: 1), r: 0.55)
+        let mShoe   = pbr(UIColor(red: 0.14, green: 0.09, blue: 0.22, alpha: 1), r: 0.35)
 
-        func sphere(_ name: String, _ radius: CGFloat, _ position: SCNVector3, _ mat: SCNMaterial, scale: SCNVector3? = nil) -> SCNNode {
-            let g = SCNSphere(radius: radius)
-            g.segmentCount = 24
-            g.firstMaterial = mat
-            let n = SCNNode(geometry: g)
-            n.name = name
-            n.position = position
-            if let scale { n.scale = scale }
-            root.addChildNode(n)
-            return n
-        }
-        func capsule(_ name: String, radius: CGFloat, height: CGFloat, position: SCNVector3, mat: SCNMaterial) -> SCNNode {
-            let n = SCNNode(geometry: SCNCapsule(capRadius: radius, height: height))
-            n.name = name
-            n.position = position
-            n.geometry?.firstMaterial = mat
-            root.addChildNode(n)
-            return n
-        }
+        // ── Body ─────────────────────────────────────────────────────────
+        sph(root, "body",   r: 0.56, p: SCNVector3(0, 0.98, 0),  m: mDress,  s: SCNVector3(1.00, 1.10, 0.72))
 
-        // Oversized head, layered hair, large anime eyes, and a compact outfit.
-        _ = sphere("body", 0.53, SCNVector3(0, 0.72, 0), dress, scale: SCNVector3(0.88, 1.25, 0.7))
-        capsule("neck", radius: 0.13, height: 0.28, position: SCNVector3(0, 1.28, 0), mat: skin)
-        let head = sphere("head", 0.82, SCNVector3(0, 2.02, 0), skin, scale: SCNVector3(0.92, 1.05, 0.78))
-        _ = sphere("backHair", 0.86, SCNVector3(0, 2.12, -0.12), hair, scale: SCNVector3(1.05, 1.12, 0.88)).renderingOrder = -1
-        _ = sphere("fringe", 0.55, SCNVector3(0, 2.52, 0.35), hair, scale: SCNVector3(1.3, 0.48, 0.55))
-        _ = sphere("leftLock", 0.2, SCNVector3(-0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
-        _ = sphere("rightLock", 0.2, SCNVector3(0.68, 1.86, 0.02), hair, scale: SCNVector3(0.8, 2.6, 0.8))
-        _ = sphere("hairShine", 0.07, SCNVector3(-0.34, 2.72, 0.69), hairLight, scale: SCNVector3(2.2, 0.5, 0.4))
+        // Skirt cone (wider bottom)
+        let skirtGeo = SCNCone(topRadius: 0.44, bottomRadius: 0.72, height: 0.58)
+        skirtGeo.radialSegmentCount = 32; skirtGeo.firstMaterial = mSkirt
+        let skirtNode = SCNNode(geometry: skirtGeo)
+        skirtNode.name = "skirt"; skirtNode.position = SCNVector3(0, 0.50, 0)
+        root.addChildNode(skirtNode)
 
-        let eyePositions: [(x: Float, suffix: String)] = [(-0.31, "L"), (0.31, "R")]
-        for (x, suffix) in eyePositions {
-            let eyeWhite = sphere("eyeWhite" + suffix, 0.19, SCNVector3(x, 2.08, 0.69), white, scale: SCNVector3(0.82, 1.12, 0.3))
-            let eyeIris = sphere("iris" + suffix, 0.13, SCNVector3(x, 2.07, 0.755), iris, scale: SCNVector3(0.82, 1.15, 0.3))
-            sphere("pupil" + suffix, 0.065, SCNVector3(x, 2.08, 0.79), black, scale: SCNVector3(0.8, 1.2, 0.3))
-            sphere("eyeSparkle" + suffix, 0.035, SCNVector3(x - 0.035, 2.13, 0.81), white)
-            let blink = SCNAction.sequence([
-                .wait(duration: 2.7),
-                .customAction(duration: 0.07) { node, _ in node.scale.y = 0.08 },
-                .customAction(duration: 0.09) { node, _ in node.scale.y = 1.12 }
-            ])
-            eyeWhite.runAction(.repeatForever(blink), forKey: "blink")
-            eyeIris.runAction(.repeatForever(.sequence([
-                .wait(duration: 2.7),
-                .customAction(duration: 0.07) { node, _ in node.scale.y = 0.08 },
-                .customAction(duration: 0.09) { node, _ in node.scale.y = 1.15 }
+        // Collar
+        sph(root, "collar", r: 0.15, p: SCNVector3(0, 1.28, 0.20), m: mWhite, s: SCNVector3(1.9, 0.38, 0.75))
+
+        // Neck
+        cap(root, "neck", cr: 0.112, h: 0.22, p: SCNVector3(0, 1.38, 0), m: mSkin)
+
+        // ── Head ─────────────────────────────────────────────────────────
+        let head = sph(root, "head", r: 0.69, p: SCNVector3(0, 2.10, 0), m: mSkin, s: SCNVector3(0.93, 1.00, 0.80))
+
+        // ── Hair ─────────────────────────────────────────────────────────
+        let backHair = sph(root, "backHair", r: 0.75, p: SCNVector3(0, 2.20, -0.15), m: mHair, s: SCNVector3(1.08, 1.10, 0.92))
+        backHair.renderingOrder = -1
+        sph(root, "fringe",  r: 0.50, p: SCNVector3(0, 2.60, 0.37),  m: mHair, s: SCNVector3(1.38, 0.42, 0.50))
+        sph(root, "bangL",   r: 0.21, p: SCNVector3(-0.54, 2.40, 0.30), m: mHair, s: SCNVector3(0.68, 1.45, 0.58))
+        sph(root, "bangR",   r: 0.21, p: SCNVector3( 0.54, 2.40, 0.30), m: mHair, s: SCNVector3(0.68, 1.45, 0.58))
+        // Twin tails
+        cap(root, "leftLock",  cr: 0.125, h: 1.00, p: SCNVector3(-0.74, 1.70, 0.04), m: mHair,
+            euler: SCNVector3(0.08, 0, 0.16))
+        cap(root, "rightLock", cr: 0.125, h: 1.00, p: SCNVector3( 0.74, 1.70, 0.04), m: mHair,
+            euler: SCNVector3(0.08, 0, -0.16))
+        sph(root, "hairShine", r: 0.055, p: SCNVector3(-0.28, 2.76, 0.70), m: mHairHi, s: SCNVector3(2.5, 0.48, 0.38))
+
+        // ── Eyes ─────────────────────────────────────────────────────────
+        for (x, sfx) in [(-Float(0.30), "L"), (Float(0.30), "R")] {
+            let ew = sph(root, "eyeWhite\(sfx)", r: 0.182,
+                         p: SCNVector3(x, 2.14, 0.635), m: mWhite, s: SCNVector3(0.86, 1.16, 0.27))
+            let ei = sph(root, "iris\(sfx)", r: 0.126,
+                         p: SCNVector3(x, 2.12, 0.698), m: mIris,  s: SCNVector3(0.86, 1.20, 0.27))
+            sph(root, "pupil\(sfx)", r: 0.060,
+                p: SCNVector3(x, 2.125, 0.730), m: mBlack, s: SCNVector3(0.82, 1.24, 0.27))
+            sph(root, "sparkle1\(sfx)", r: 0.026, p: SCNVector3(x - 0.028, 2.162, 0.744), m: mWhite)
+            sph(root, "sparkle2\(sfx)", r: 0.014, p: SCNVector3(x + 0.046, 2.090, 0.744), m: mWhite)
+
+            // Eyelash — thin box across top of eye
+            let lashGeo = SCNBox(width: CGFloat(0.36), height: 0.030, length: 0.038, chamferRadius: 0.008)
+            lashGeo.firstMaterial = mBlack
+            let lash = SCNNode(geometry: lashGeo)
+            lash.name = "lash\(sfx)"; lash.position = SCNVector3(x, 2.202, 0.672)
+            root.addChildNode(lash)
+
+            // Eyebrow — slight arch toward outer edge
+            let browGeo = SCNBox(width: CGFloat(0.26), height: 0.022, length: 0.036, chamferRadius: 0.006)
+            browGeo.firstMaterial = mHair
+            let brow = SCNNode(geometry: browGeo)
+            brow.name = "brow\(sfx)"; brow.position = SCNVector3(x, 2.302, 0.648)
+            brow.eulerAngles.z = sfx == "L" ?  0.10 : -0.10
+            root.addChildNode(brow)
+
+            // Blink
+            let blinkWait = Double.random(in: 2.6...3.8)
+            let blinkSeq = SCNAction.repeatForever(.sequence([
+                .wait(duration: blinkWait),
+                .customAction(duration: 0.07) { n, _ in n.scale.y = 0.07 },
+                .customAction(duration: 0.10) { n, _ in n.scale.y = 1.16 }
+            ]))
+            ew.runAction(blinkSeq, forKey: "blink")
+            ei.runAction(.repeatForever(.sequence([
+                .wait(duration: blinkWait),
+                .customAction(duration: 0.07) { n, _ in n.scale.y = 0.07 },
+                .customAction(duration: 0.10) { n, _ in n.scale.y = 1.20 }
             ])), forKey: "blink")
         }
-        _ = sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
-        _ = sphere("blushR", 0.1, SCNVector3(0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
-        _ = sphere("mouth", 0.055, SCNVector3(0, 1.83, 0.72), black, scale: SCNVector3(1.0, 0.65, 0.25))
 
-        // Bow and dangling hair accessories.
-        _ = sphere("bowL", 0.15, SCNVector3(0.59, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
-        _ = sphere("bowR", 0.15, SCNVector3(0.81, 2.75, 0.08), pink, scale: SCNVector3(1.2, 0.6, 0.45))
-        _ = sphere("bowKnot", 0.07, SCNVector3(0.70, 2.75, 0.17), white)
+        // Blush
+        sph(root, "blushL", r: 0.090, p: SCNVector3(-0.50, 1.96, 0.612), m: mBlush, s: SCNVector3(1.45, 0.40, 0.22))
+        sph(root, "blushR", r: 0.090, p: SCNVector3( 0.50, 1.96, 0.612), m: mBlush, s: SCNVector3(1.45, 0.40, 0.22))
 
-        let leftArm = capsule("leftArm", radius: 0.12, height: 0.72, position: SCNVector3(-0.56, 0.85, 0.02), mat: dress)
-        leftArm.eulerAngles.z = -0.45
-        let rightArm = capsule("rightArm", radius: 0.12, height: 0.72, position: SCNVector3(0.56, 0.85, 0.02), mat: dress)
-        rightArm.eulerAngles.z = 0.45
-        _ = capsule("leftLeg", radius: 0.14, height: 0.62, position: SCNVector3(-0.23, 0.08, 0.03), mat: skin)
-        _ = capsule("rightLeg", radius: 0.14, height: 0.62, position: SCNVector3(0.23, 0.08, 0.03), mat: skin)
-        _ = capsule("leftSock", radius: 0.15, height: 0.18, position: SCNVector3(-0.23, -0.20, 0.03), mat: white)
-        _ = capsule("rightSock", radius: 0.15, height: 0.18, position: SCNVector3(0.23, -0.20, 0.03), mat: white)
+        // Nose hint
+        sph(root, "nose",  r: 0.026, p: SCNVector3(0, 2.02, 0.698), m: mNose)
 
-        let glow = SCNSphere(radius: 1.7)
-        glow.firstMaterial = material(UIColor(red: 0.55, green: 0.63, blue: 1, alpha: 0.16))
-        glow.firstMaterial?.isDoubleSided = true
-        let glowNode = SCNNode(geometry: glow)
+        // Mouth
+        sph(root, "mouth", r: 0.046, p: SCNVector3(0, 1.89, 0.692), m: mBlack, s: SCNVector3(1.15, 0.58, 0.22))
+
+        // ── Hair accessory — bow ─────────────────────────────────────────
+        sph(root, "bowWingL", r: 0.125, p: SCNVector3(-0.66, 2.74, 0.14), m: mPink, s: SCNVector3(1.30, 0.60, 0.46))
+        sph(root, "bowWingR", r: 0.125, p: SCNVector3(-0.84, 2.74, 0.14), m: mPink, s: SCNVector3(1.30, 0.60, 0.46))
+        sph(root, "bowKnot",  r: 0.062, p: SCNVector3(-0.75, 2.74, 0.20), m: mWhite)
+
+        // ── Arms ─────────────────────────────────────────────────────────
+        let leftArm = cap(root, "leftArm",  cr: 0.108, h: 0.66,
+                          p: SCNVector3(-0.64, 0.98, 0.02), m: mDress,
+                          euler: SCNVector3(0, 0, -0.40))
+        let rightArm = cap(root, "rightArm", cr: 0.108, h: 0.66,
+                           p: SCNVector3( 0.64, 0.98, 0.02), m: mDress,
+                           euler: SCNVector3(0, 0,  0.40))
+        // Hands
+        sph(root, "handL", r: 0.115, p: SCNVector3(-0.90, 0.67, 0.02), m: mSkin, s: SCNVector3(0.90, 0.84, 0.74))
+        sph(root, "handR", r: 0.115, p: SCNVector3( 0.90, 0.67, 0.02), m: mSkin, s: SCNVector3(0.90, 0.84, 0.74))
+
+        // ── Legs ─────────────────────────────────────────────────────────
+        cap(root, "leftLeg",  cr: 0.122, h: 0.54, p: SCNVector3(-0.21, 0.06, 0.02), m: mSkin)
+        cap(root, "rightLeg", cr: 0.122, h: 0.54, p: SCNVector3( 0.21, 0.06, 0.02), m: mSkin)
+        cap(root, "leftSock",  cr: 0.130, h: 0.22, p: SCNVector3(-0.21, -0.23, 0.02), m: mSock)
+        cap(root, "rightSock", cr: 0.130, h: 0.22, p: SCNVector3( 0.21, -0.23, 0.02), m: mSock)
+        // Shoes — elongated sphere for chibi style
+        sph(root, "shoeL", r: 0.140, p: SCNVector3(-0.21, -0.38, 0.05), m: mShoe, s: SCNVector3(0.86, 0.60, 1.28))
+        sph(root, "shoeR", r: 0.140, p: SCNVector3( 0.21, -0.38, 0.05), m: mShoe, s: SCNVector3(0.86, 0.60, 1.28))
+
+        // ── Environment glow disc ─────────────────────────────────────────
+        let glowGeo = SCNSphere(radius: 1.62)
+        glowGeo.firstMaterial = pbr(UIColor(red: 0.54, green: 0.62, blue: 1.0, alpha: 0.13))
+        glowGeo.firstMaterial?.isDoubleSided = true
+        let glowNode = SCNNode(geometry: glowGeo)
         glowNode.name = "environmentGlow"
-        glowNode.position = SCNVector3(0, 1.55, -1.2)
-        glowNode.scale = SCNVector3(1.05, 1.2, 0.1)
+        glowNode.position = SCNVector3(0, 1.60, -1.05)
+        glowNode.scale = SCNVector3(1.08, 1.22, 0.11)
         root.addChildNode(glowNode)
 
-        // Gentle breathing, floating, and arm sway animations.
-        let breathe = SCNAction.repeatForever(.sequence([
-            .scale(to: 1.025, duration: 1.8),
-            .scale(to: 1.0, duration: 1.8)
-        ]))
-        root.runAction(breathe, forKey: "breathing")
+        // Drop shadow under feet
+        let shadowGeo = SCNPlane(width: 0.88, height: 0.36)
+        let shadowMat = SCNMaterial()
+        shadowMat.diffuse.contents = UIColor(white: 0, alpha: 0.25)
+        shadowMat.isDoubleSided = true
+        shadowGeo.firstMaterial = shadowMat
+        let shadowNode = SCNNode(geometry: shadowGeo)
+        shadowNode.name = "shadow"
+        shadowNode.position = SCNVector3(0, -0.49, 0.06)
+        shadowNode.eulerAngles.x = -.pi / 2
+        root.addChildNode(shadowNode)
+
+        // ── Animations ───────────────────────────────────────────────────
+        // Breathing (whole root scales)
+        root.runAction(.repeatForever(.sequence([
+            .scale(to: 1.022, duration: 2.0),
+            .scale(to: 1.000, duration: 2.0)
+        ])), forKey: "breathing")
+
+        // Float up/down
+        root.runAction(.repeatForever(.sequence([
+            .moveBy(x: 0, y: 0.045, z: 0, duration: 1.9),
+            .moveBy(x: 0, y: -0.045, z: 0, duration: 1.9)
+        ])), forKey: "float")
+
+        // Head idle tilt
         head.runAction(.repeatForever(.sequence([
-            .rotateTo(x: 0, y: 0, z: 0.035, duration: 1.6),
-            .rotateTo(x: 0, y: 0, z: -0.035, duration: 1.6)
+            .rotateTo(x: 0, y: 0, z:  0.032, duration: 1.9),
+            .rotateTo(x: 0, y: 0, z: -0.032, duration: 1.9)
         ])), forKey: "headIdle")
+
+        // Arm sway
         leftArm.runAction(.repeatForever(.sequence([
-            .rotateTo(x: 0, y: 0, z: -0.35, duration: 1.2),
-            .rotateTo(x: 0, y: 0, z: -0.52, duration: 1.2)
+            .rotateTo(x: 0, y: 0, z: -0.30, duration: 1.4),
+            .rotateTo(x: 0, y: 0, z: -0.48, duration: 1.4)
         ])), forKey: "armSwayL")
         rightArm.runAction(.repeatForever(.sequence([
-            .rotateTo(x: 0, y: 0, z: 0.52, duration: 1.2),
-            .rotateTo(x: 0, y: 0, z: 0.35, duration: 1.2)
+            .rotateTo(x: 0, y: 0, z: 0.48, duration: 1.4),
+            .rotateTo(x: 0, y: 0, z: 0.30, duration: 1.4)
         ])), forKey: "armSwayR")
+
         return scene
+    }
+
+    // MARK: - Helpers
+
+    @discardableResult
+    private func sph(_ parent: SCNNode, _ name: String, r: CGFloat,
+                     p: SCNVector3, m: SCNMaterial, s: SCNVector3 = SCNVector3(1,1,1)) -> SCNNode {
+        let geo = SCNSphere(radius: r); geo.segmentCount = 32; geo.firstMaterial = m
+        let node = SCNNode(geometry: geo); node.name = name; node.position = p; node.scale = s
+        parent.addChildNode(node); return node
+    }
+
+    @discardableResult
+    private func cap(_ parent: SCNNode, _ name: String, cr: CGFloat, h: CGFloat,
+                     p: SCNVector3, m: SCNMaterial, euler: SCNVector3 = .init(0,0,0)) -> SCNNode {
+        let geo = SCNCapsule(capRadius: cr, height: h); geo.segmentCount = 24; geo.firstMaterial = m
+        let node = SCNNode(geometry: geo); node.name = name; node.position = p; node.eulerAngles = euler
+        parent.addChildNode(node); return node
+    }
+
+    private func pbr(_ color: UIColor, r: CGFloat = 0.50, metallic: CGFloat = 0,
+                     emit: UIColor? = nil) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.lightingModel = .physicallyBased
+        m.diffuse.contents = color
+        m.roughness.contents = r
+        m.metalness.contents = metallic
+        if let e = emit { m.emission.contents = e }
+        return m
+    }
+
+    @discardableResult
+    private func addLight(to scene: SCNScene, type: SCNLight.LightType,
+                          color: UIColor, intensity: CGFloat,
+                          position: SCNVector3, lookAt: SCNVector3? = nil) -> SCNNode {
+        let light = SCNLight(); light.type = type; light.color = color; light.intensity = intensity
+        let node = SCNNode(); node.light = light; node.position = position
+        if let t = lookAt { node.look(at: t) }
+        scene.rootNode.addChildNode(node); return node
     }
 }
