@@ -33,8 +33,13 @@ struct AnthropicService {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let systemText = history.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
         let messages = history.filter { $0.role != .system }.map { ["role": $0.role == .assistant ? "assistant" : "user", "content": $0.content] }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "max_tokens": 1024, "messages": messages])
+        var body: [String: Any] = ["model": model, "max_tokens": 1024, "messages": messages]
+        if !systemText.isEmpty {
+            body["system"] = systemText
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let text = String(data: data, encoding: .utf8) ?? "unknown error"
@@ -55,8 +60,13 @@ struct GeminiService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let systemText = history.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
         let contents = history.filter { $0.role != .system }.map { m -> [String: Any] in ["role": m.role == .assistant ? "model" : "user", "parts": [["text": m.content]]] }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["contents": contents])
+        var body: [String: Any] = ["contents": contents]
+        if !systemText.isEmpty {
+            body["systemInstruction"] = ["parts": [["text": systemText]]]
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let text = String(data: data, encoding: .utf8) ?? "unknown error"
