@@ -7,7 +7,11 @@ import UIKit
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var voiceManager = VoiceManager()
+    @StateObject private var liveManager = LiveVoiceManager()
+    @AppStorage("live_model") private var liveModel = "gemini-3.8-live"
+    @AppStorage("live_voice") private var liveVoice = "Zephyr"
+    @AppStorage("live_persona") private var livePersona = LivePersona.defaultText
+    @AppStorage("live_barge_in") private var liveBargeIn = false
     @State private var emotion: CompanionEmotion = .idle
     @State private var showConversation = true
     @State private var isVoiceChatActive = false
@@ -79,18 +83,16 @@ struct CompanionChatView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onChange(of: viewModel.messages.count) { _ in
-            guard let last = viewModel.messages.last, last.role == .assistant else { return }
-            emotion = .happy
-            if isVoiceChatActive {
-                let azureKey = KeychainHelper.read(forKey: "azureAPIKey") ?? ""
-                let azureRegion = UserDefaults.standard.string(forKey: "azureRegion") ?? ""
-                voiceManager.speak(text: last.content, gender: viewModel.voiceGender, azureKey: azureKey, azureRegion: azureRegion)
+        .onChange(of: liveManager.lines.count) { _ in
+            if let line = liveManager.lines.last {
+                touchMessage = line.text
+                emotion = line.role == .assistant ? .happy : .thinking
             }
         }
-        .onChange(of: voiceManager.voiceErrorMessage) { message in
+        .onChange(of: liveManager.errorText) { message in
             if let message, !message.isEmpty { touchMessage = message }
         }
+        .onDisappear { liveManager.end() }
     }
 
     private var topBar: some View {
@@ -175,32 +177,28 @@ struct CompanionChatView: View {
 
             HStack(spacing: 14) {
                 Button {
-                    let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
-                    voiceManager.startListening(
-                        groqAPIKey: groqKey,
-                        onPartialResult: { _ in },
-                        onFinish: { text in
-                            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                            viewModel.inputText = text
-                            viewModel.send()
-                        }
-                    )
+                    if liveManager.state == .idle {
+                        startGeminiLive()
+                    } else {
+                        liveManager.end()
+                        isVoiceChatActive = false
+                    }
                 } label: {
-                    Image(systemName: voiceManager.isListening ? "stop.fill" : "mic.fill")
+                    Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
                         .font(.title3)
                         .frame(width: 50, height: 50)
                         .background(voiceManager.isListening ? .red.opacity(0.8) : .white.opacity(0.12), in: Circle())
                 }
-                .accessibilityLabel(voiceManager.isListening ? "Dừng ghi âm và gửi" : "Bắt đầu nói")
+                .accessibilityLabel(liveManager.state == .idle ? "Bắt đầu Gemini Live" : "Kết thúc Gemini Live")
 
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         showConversation = true
                         isVoiceChatActive = true
                     }
-                    startVoiceInput()
+                    if liveManager.state == .idle { startGeminiLive() }
                 } label: {
-                    Label(isVoiceChatActive ? "Đang chat thoại" : "Tiếp tục chat", systemImage: "message.fill")
+                    Label(liveManager.state == .live ? (liveManager.aiSpeaking ? "AI đang nói..." : "Đang nghe anh") : (liveManager.state == .connecting ? "Đang kết nối Gemini..." : "Tiếp tục chat"), systemImage: "waveform")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
@@ -223,21 +221,10 @@ struct CompanionChatView: View {
         .background(.black.opacity(0.22))
     }
 
-    private func startVoiceInput() {
-        let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
-        voiceManager.startListening(
-            groqAPIKey: groqKey,
-            onPartialResult: { _ in },
-            onFinish: { text in
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else {
-                    if let error = voiceManager.voiceErrorMessage { touchMessage = error }
-                    return
-                }
-                viewModel.inputText = trimmed
-                viewModel.send()
-            }
-        )
+    private func startGeminiLive() {
+        isVoiceChatActive = true
+        showConversation = true
+        liveManager.start(model: liveModel, voice: liveVoice, persona: livePersona, bargeIn: liveBargeIn)
     }
 
     private func touchButton(_ title: String, icon: String, emotion nextEmotion: CompanionEmotion, message: String?) -> some View {
