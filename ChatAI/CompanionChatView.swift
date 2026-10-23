@@ -10,6 +10,7 @@ struct CompanionChatView: View {
     @StateObject private var voiceManager = VoiceManager()
     @State private var emotion: CompanionEmotion = .idle
     @State private var showConversation = true
+    @State private var isVoiceChatActive = false
     @State private var touchMessage: String?
     @State private var isNight = Calendar.current.component(.hour, from: Date()) >= 19 ||
         Calendar.current.component(.hour, from: Date()) < 6
@@ -81,6 +82,14 @@ struct CompanionChatView: View {
         .onChange(of: viewModel.messages.count) { _ in
             guard let last = viewModel.messages.last, last.role == .assistant else { return }
             emotion = .happy
+            if isVoiceChatActive {
+                let azureKey = KeychainHelper.read(forKey: "azureAPIKey") ?? ""
+                let azureRegion = UserDefaults.standard.string(forKey: "azureRegion") ?? ""
+                voiceManager.speak(text: last.content, gender: viewModel.voiceGender, azureKey: azureKey, azureRegion: azureRegion)
+            }
+        }
+        .onChange(of: voiceManager.voiceErrorMessage) { message in
+            if let message, !message.isEmpty { touchMessage = message }
         }
     }
 
@@ -187,9 +196,11 @@ struct CompanionChatView: View {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         showConversation = true
+                        isVoiceChatActive = true
                     }
+                    startVoiceInput()
                 } label: {
-                    Label("Tiếp tục chat", systemImage: "message.fill")
+                    Label(isVoiceChatActive ? "Đang chat thoại" : "Tiếp tục chat", systemImage: "message.fill")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
@@ -210,6 +221,23 @@ struct CompanionChatView: View {
         .padding(.top, 12)
         .padding(.bottom, 12)
         .background(.black.opacity(0.22))
+    }
+
+    private func startVoiceInput() {
+        let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
+        voiceManager.startListening(
+            groqAPIKey: groqKey,
+            onPartialResult: { _ in },
+            onFinish: { text in
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    if let error = voiceManager.voiceErrorMessage { touchMessage = error }
+                    return
+                }
+                viewModel.inputText = trimmed
+                viewModel.send()
+            }
+        )
     }
 
     private func touchButton(_ title: String, icon: String, emotion nextEmotion: CompanionEmotion, message: String?) -> some View {
