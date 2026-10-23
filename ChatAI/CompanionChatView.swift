@@ -322,7 +322,7 @@ private struct Companion3DStage: UIViewRepresentable {
 
         for suffix in ["L", "R"] {
             character.childNode(withName: "iris" + suffix, recursively: true)?.position.x =
-                (suffix == "L" ? -0.31 : 0.31) + (emotion == "thinking" ? -0.045 : 0)
+                Float(suffix == "L" ? -0.31 : 0.31) + Float(emotion == "thinking" ? -0.045 : 0)
         }
         scene.background.contents = UIColor.clear
         scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?.geometry?.firstMaterial?.diffuse.contents =
@@ -368,13 +368,12 @@ private struct Companion3DStage: UIViewRepresentable {
 
             var boundsMin = SCNVector3Zero
             var boundsMax = SCNVector3Zero
-            if importedRoot.getBoundingBoxMin(&boundsMin, max: &boundsMax) {
-                let height = max(boundsMax.y - boundsMin.y, 0.001)
-                let targetHeight: Float = 2.8
-                let scale = targetHeight / height
-                importedRoot.scale = SCNVector3(scale, scale, scale)
-                importedRoot.position.y = -((boundsMin.y + boundsMax.y) * 0.5) * scale + 1.4
-            }
+            importedRoot.__getBoundingBoxMin(&boundsMin, max: &boundsMax)
+            let height = max(boundsMax.y - boundsMin.y, 0.001)
+            let targetHeight: Float = 2.8
+            let scale = targetHeight / height
+            importedRoot.scale = SCNVector3(scale, scale, scale)
+            importedRoot.position.y = -((boundsMin.y + boundsMax.y) * 0.5) * scale + 1.4
 
             scene.rootNode.addChildNode(importedRoot)
             return scene
@@ -421,7 +420,7 @@ private struct Companion3DStage: UIViewRepresentable {
         }
 
         // Oversized head, layered hair, large anime eyes, and a compact outfit.
-        sphere("body", 0.53, SCNVector3(0, 0.72, 0), dress, scale: SCNVector3(0.88, 1.25, 0.7))
+        _ = sphere("body", 0.53, SCNVector3(0, 0.72, 0), dress, scale: SCNVector3(0.88, 1.25, 0.7))
         capsule("neck", radius: 0.13, height: 0.28, position: SCNVector3(0, 1.28, 0), mat: skin)
         let head = sphere("head", 0.82, SCNVector3(0, 2.02, 0), skin, scale: SCNVector3(0.92, 1.05, 0.78))
         _ = sphere("backHair", 0.86, SCNVector3(0, 2.12, -0.12), hair, scale: SCNVector3(1.05, 1.12, 0.88)).renderingOrder = -1
@@ -438,14 +437,14 @@ private struct Companion3DStage: UIViewRepresentable {
             sphere("eyeSparkle" + suffix, 0.035, SCNVector3(x - 0.035, 2.13, 0.81), white)
             let blink = SCNAction.sequence([
                 .wait(duration: 2.7),
-                .scaleY(to: 0.08, duration: 0.07),
-                .scaleY(to: 1.12, duration: 0.09)
+                .scale(to: SCNVector3(1, 0.08, 1), duration: 0.07),
+                .scale(to: SCNVector3(1, 1.12, 1), duration: 0.09)
             ])
             eyeWhite.runAction(.repeatForever(blink), forKey: "blink")
             eyeIris.runAction(.repeatForever(.sequence([
                 .wait(duration: 2.7),
                 .scaleY(to: 0.08, duration: 0.07),
-                .scaleY(to: 1.15, duration: 0.09)
+                .scale(to: SCNVector3(1, 1.15, 1), duration: 0.09)
             ])), forKey: "blink")
         }
         _ = sphere("blushL", 0.1, SCNVector3(-0.51, 1.87, 0.61), pink, scale: SCNVector3(1.3, 0.45, 0.25))
@@ -461,8 +460,8 @@ private struct Companion3DStage: UIViewRepresentable {
         leftArm.eulerAngles.z = -0.45
         let rightArm = capsule("rightArm", radius: 0.12, height: 0.72, position: SCNVector3(0.56, 0.85, 0.02), mat: dress)
         rightArm.eulerAngles.z = 0.45
-        capsule("leftLeg", radius: 0.14, height: 0.62, position: SCNVector3(-0.23, 0.08, 0.03), mat: skin)
-        capsule("rightLeg", radius: 0.14, height: 0.62, position: SCNVector3(0.23, 0.08, 0.03), mat: skin)
+        _ = capsule("leftLeg", radius: 0.14, height: 0.62, position: SCNVector3(-0.23, 0.08, 0.03), mat: skin)
+        _ = capsule("rightLeg", radius: 0.14, height: 0.62, position: SCNVector3(0.23, 0.08, 0.03), mat: skin)
         capsule("leftSock", radius: 0.15, height: 0.18, position: SCNVector3(-0.23, -0.20, 0.03), mat: white)
         capsule("rightSock", radius: 0.15, height: 0.18, position: SCNVector3(0.23, -0.20, 0.03), mat: white)
 
