@@ -312,8 +312,18 @@ private struct Companion3DStage: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         guard let scene = view.scene, let character = scene.rootNode.childNode(withName: "companionRoot", recursively: true) else { return }
-        character.childNode(withName: "head", recursively: true)?.eulerAngles.z = emotion == "shy" ? 0.12 : 0
-        character.childNode(withName: "mouth", recursively: true)?.scale.y = isSpeaking ? 2.8 : (emotion == "surprised" ? 2.2 : 1.0)
+        let head = character.childNode(withName: "head", recursively: true)
+        head?.eulerAngles.z = emotion == "shy" ? 0.12 : (emotion == "thinking" ? -0.10 : 0)
+        head?.eulerAngles.y = emotion == "thinking" ? -0.12 : 0
+
+        let mouth = character.childNode(withName: "mouth", recursively: true)
+        mouth?.scale.y = isSpeaking ? 2.8 : (emotion == "surprised" ? 2.2 : 1.0)
+        mouth?.scale.x = emotion == "happy" ? 1.6 : 1.0
+
+        for suffix in ["L", "R"] {
+            character.childNode(withName: "iris" + suffix, recursively: true)?.position.x =
+                (suffix == "L" ? -0.31 : 0.31) + (emotion == "thinking" ? -0.045 : 0)
+        }
         scene.background.contents = UIColor.clear
         scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?.geometry?.firstMaterial?.diffuse.contents =
             (isNight ? UIColor(red: 0.36, green: 0.43, blue: 0.92, alpha: 0.28) : UIColor(red: 1, green: 0.70, blue: 0.48, alpha: 0.25))
