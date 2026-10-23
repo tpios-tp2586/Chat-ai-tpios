@@ -7,6 +7,7 @@ import UIKit
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var voiceManager = VoiceManager()
     @State private var emotion: CompanionEmotion = .idle
     @State private var showConversation = true
     @State private var touchMessage: String?
@@ -165,15 +166,23 @@ struct CompanionChatView: View {
 
             HStack(spacing: 14) {
                 Button {
-                    viewModel.inputText = ""
-                    viewModel.inputText = " "
+                    let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
+                    voiceManager.startListening(
+                        groqAPIKey: groqKey,
+                        onPartialResult: { _ in },
+                        onFinish: { text in
+                            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                            viewModel.inputText = text
+                            viewModel.send()
+                        }
+                    )
                 } label: {
-                    Image(systemName: "mic.fill")
+                    Image(systemName: voiceManager.isListening ? "stop.fill" : "mic.fill")
                         .font(.title3)
                         .frame(width: 50, height: 50)
-                        .background(.white.opacity(0.12), in: Circle())
+                        .background(voiceManager.isListening ? .red.opacity(0.8) : .white.opacity(0.12), in: Circle())
                 }
-                .accessibilityLabel("Điều khiển micro nằm ở màn hình chat chính")
+                .accessibilityLabel(voiceManager.isListening ? "Dừng ghi âm và gửi" : "Bắt đầu nói")
 
                 Button {
                     showConversation = true
