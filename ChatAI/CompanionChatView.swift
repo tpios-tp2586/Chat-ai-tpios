@@ -252,7 +252,7 @@ struct CompanionChatView: View {
             liveManager.sendText(prompt)
             touchMessage = nil
         } else {
-            touchMessage = "Bấm "Tiếp tục chat" để kết nối Gemini Live trước nhé."
+            touchMessage = "Bấm 'Tiếp tục chat' để kết nối Gemini Live trước nhé."
         }
     }
 
