@@ -227,6 +227,9 @@ private enum CompanionEmotion {
 private struct RobotHeadView: View {
     let emotion: CompanionEmotion
     let isSpeaking: Bool
+    @State private var isFloating = false
+    @State private var gazeShift: CGFloat = 0
+    @State private var glowPulse = false
 
     var body: some View {
         GeometryReader { geo in
@@ -295,9 +298,9 @@ private struct RobotHeadView: View {
                     .rotationEffect(.degrees(-25))
                     .position(x: 124 * scale, y: 178 * scale)
 
-                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset)
+                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset + gazeShift, glowPulse: glowPulse)
                     .position(x: 142 * scale, y: 232 * scale)
-                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset)
+                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset + gazeShift, glowPulse: glowPulse)
                     .position(x: 248 * scale, y: 232 * scale)
 
                 Capsule()
@@ -338,7 +341,20 @@ private struct RobotHeadView: View {
                 RobotFin(side: 1, scale: scale).position(x: 343 * scale, y: 293 * scale)
             }
             .frame(width: 390 * scale, height: 430 * scale)
+            .scaleEffect(glowPulse ? 1.006 : 0.994)
+            .offset(y: isFloating ? -4 * scale : 4 * scale)
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                    isFloating = true
+                }
+                withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) {
+                    gazeShift = 3.5
+                }
+                withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) {
+                    glowPulse = true
+                }
+            }
         }
         .accessibilityLabel("ChatAI robot companion")
     }
@@ -374,13 +390,14 @@ private struct RobotEye: View {
     let height: CGFloat
     let width: CGFloat
     let pupilOffset: CGFloat
+    let glowPulse: Bool
 
     var body: some View {
         ZStack {
             Ellipse()
-                .fill(Color.cyan.opacity(0.24))
-                .frame(width: width + 22, height: height + 22)
-                .blur(radius: 8)
+                .fill(Color.cyan.opacity(glowPulse ? 0.38 : 0.18))
+                .frame(width: width + (glowPulse ? 28 : 18), height: height + (glowPulse ? 28 : 18))
+                .blur(radius: glowPulse ? 11 : 6)
 
             Ellipse()
                 .fill(
@@ -391,7 +408,7 @@ private struct RobotEye: View {
                     )
                 )
                 .frame(width: width, height: height)
-                .shadow(color: .cyan.opacity(0.9), radius: 9)
+                .shadow(color: .cyan.opacity(glowPulse ? 1.0 : 0.55), radius: glowPulse ? 13 : 6)
 
             Ellipse()
                 .fill(Color(red: 0.05, green: 0.45, blue: 0.60))
