@@ -1,89 +1,64 @@
 import SwiftUI
-import UIKit
-import SceneKit
 
-/// ChatAI companion screen. The companion is intentionally a head-only 3D robot.
+/// Companion screen with a head-only kawaii robot face.
+/// The visual target intentionally follows the approved concept: white/pink shell,
+/// large black rounded visor, cyan expressive eyes, small mouth, antennae and ears/fins.
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var liveManager = LiveVoiceManager()
+
     @AppStorage("live_model") private var liveModel = "gemini-3.8-live"
     @AppStorage("live_voice") private var liveVoice = "Zephyr"
     @AppStorage("live_persona") private var livePersona = LivePersona.defaultText
     @AppStorage("live_barge_in") private var liveBargeIn = false
+
     @State private var emotion: CompanionEmotion = .idle
     @State private var showConversation = true
     @State private var touchMessage: String?
-    @State private var isNight = Calendar.current.component(.hour, from: Date()) >= 19 || Calendar.current.component(.hour, from: Date()) < 6
+    @State private var isNight = false
 
     var body: some View {
         ZStack {
             LinearGradient(
                 colors: isNight
-                    ? [Color(red: 0.025, green: 0.035, blue: 0.11), Color(red: 0.13, green: 0.08, blue: 0.22)]
-                    : [Color(red: 0.08, green: 0.12, blue: 0.20), Color(red: 0.30, green: 0.19, blue: 0.24)],
+                    ? [Color(red: 0.015, green: 0.025, blue: 0.075), Color(red: 0.12, green: 0.07, blue: 0.18)]
+                    : [Color(red: 0.035, green: 0.05, blue: 0.10), Color(red: 0.17, green: 0.08, blue: 0.15)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
-            ).ignoresSafeArea()
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 topBar
-                ZStack(alignment: .bottom) {
-                    GeometryReader { geo in
-                        Companion3DStage(
-                            emotion: emotionName,
-                            isNight: isNight,
+
+                GeometryReader { proxy in
+                    VStack(spacing: 0) {
+                        RobotHeadView(
+                            emotion: emotion,
                             isSpeaking: liveManager.aiSpeaking
                         )
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            SpatialTapGesture().onEnded { value in
-                                let xRatio = value.location.x / max(geo.size.width, 1)
-                                reactToTouch(xRatio < 0.38 || xRatio > 0.62 ? .cheek : .head)
-                            }
+                        .frame(
+                            width: min(proxy.size.width - 24, 390),
+                            height: min(proxy.size.height * 0.70, 430)
                         )
+                        .contentShape(Rectangle())
+                        .onTapGesture { emotion = .happy }
+
+                        Spacer(minLength: 6)
+                        statusPanel
                     }
-
-                    VStack(spacing: 12) {
-                        HStack {
-                            Label(statusText, systemImage: statusSymbol)
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(.ultraThinMaterial, in: Capsule())
-                            Spacer()
-                            Button { isNight.toggle() } label: {
-                                Image(systemName: isNight ? "moon.stars.fill" : "sun.max.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.white)
-                                    .frame(width: 42, height: 42)
-                                    .background(.ultraThinMaterial, in: Circle())
-                            }
-                        }
-
-                        if let touchMessage {
-                            Text(touchMessage)
-                                .font(.subheadline.weight(.medium))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        if showConversation { conversationPreview }
-                    }
-                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+
                 controls
             }
         }
         .preferredColorScheme(.dark)
         .onChange(of: liveManager.lines.count) { _ in
-            if let line = liveManager.lines.last {
-                touchMessage = line.text
-                emotion = line.role == .assistant ? .happy : .thinking
-            }
+            guard let line = liveManager.lines.last else { return }
+            touchMessage = line.text
+            emotion = line.role == .assistant ? .happy : .thinking
         }
         .onChange(of: liveManager.errorText) { message in
             if let message, !message.isEmpty { touchMessage = message }
@@ -99,20 +74,21 @@ struct CompanionChatView: View {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.down")
                     .font(.headline)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 42, height: 42)
                     .background(.ultraThinMaterial, in: Circle())
             }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text("ChatAI Companion").font(.headline)
                 Text(viewModel.selectedProvider.rawValue)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.68))
+                    .foregroundStyle(.white.opacity(0.65))
             }
+
             Spacer()
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { showConversation.toggle() }
-            } label: {
-                Image(systemName: showConversation ? "text.bubble" : "text.bubble.fill")
+
+            Button { isNight.toggle() } label: {
+                Image(systemName: isNight ? "moon.stars.fill" : "sun.max.fill")
                     .font(.title3)
                     .frame(width: 42, height: 42)
                     .background(.ultraThinMaterial, in: Circle())
@@ -121,114 +97,94 @@ struct CompanionChatView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.top, 8)
-        .padding(.bottom, 10)
+        .padding(.bottom, 4)
     }
 
-    private var conversationPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let lastUser = viewModel.messages.last(where: { $0.role == .user }) {
-                Text("ANH").font(.system(size: 10, weight: .bold)).foregroundStyle(.white.opacity(0.55))
-                Text(lastUser.content).font(.subheadline).lineLimit(2)
+    private var statusPanel: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Label(statusText, systemImage: statusSymbol)
+                    .font(.caption.weight(.semibold))
+                Spacer()
             }
-            if let lastReply = viewModel.messages.last(where: { $0.role == .assistant }) {
-                Text("CHATAI").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.cyan.opacity(0.9))
-                Text(lastReply.content).font(.subheadline).lineLimit(3)
-            } else if viewModel.isSending {
-                Label("Đang suy nghĩ...", systemImage: "sparkles").font(.subheadline)
-            } else if viewModel.messages.isEmpty {
-                Text("Chào anh! Mình trò chuyện nhé.").font(.subheadline)
+
+            if showConversation {
+                if let touchMessage {
+                    Text(touchMessage)
+                        .font(.subheadline)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if let reply = viewModel.messages.last(where: { $0.role == .assistant }) {
+                    Text(reply.content)
+                        .font(.subheadline)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Chào anh! Mình trò chuyện nhé.")
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .foregroundStyle(.white)
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.black.opacity(0.26), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.12), lineWidth: 1))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.10), lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
     }
 
     private var controls: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Button {
-                if liveManager.state == .idle {
-                    startGeminiLive()
-                } else {
-                    liveManager.end()
-                }
+                if liveManager.state == .idle { startLive() } else { liveManager.end() }
             } label: {
                 Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
                     .font(.title3)
-                    .frame(width: 50, height: 50)
-                    .background(liveManager.state == .idle ? .white.opacity(0.12) : .red.opacity(0.8), in: Circle())
+                    .frame(width: 52, height: 52)
+                    .background(.white.opacity(0.14), in: Circle())
             }
 
             Button {
                 showConversation = true
-                if liveManager.state == .idle { startGeminiLive() }
+                if liveManager.state == .idle { startLive() }
             } label: {
                 Label(
                     liveManager.state == .live
                         ? (liveManager.aiSpeaking ? "AI đang nói..." : "Đang nghe anh")
-                        : (liveManager.state == .connecting ? "Đang kết nối Gemini..." : "Tiếp tục chat"),
+                        : (liveManager.state == .connecting ? "Đang kết nối..." : "Tiếp tục chat"),
                     systemImage: "waveform"
                 )
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.bold))
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing), in: Capsule())
+                .frame(height: 52)
+                .background(
+                    LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing),
+                    in: Capsule()
+                )
             }
 
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.headline)
-                    .frame(width: 50, height: 50)
-                    .background(.red.opacity(0.8), in: Circle())
+                    .frame(width: 52, height: 52)
+                    .background(.red.opacity(0.85), in: Circle())
             }
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.black.opacity(0.22))
+        .background(.black.opacity(0.24))
     }
 
-    private func startGeminiLive() {
-        showConversation = true
-        liveManager.start(model: liveModel, voice: liveVoice, persona: livePersona, bargeIn: liveBargeIn)
-    }
-
-    private enum TouchTarget { case head, cheek }
-
-    private func reactToTouch(_ target: TouchTarget) {
-        let prompt: String
-        switch target {
-        case .head:
-            prompt = "Anh vừa chạm nhẹ vào đầu em. Hãy phản ứng ấm áp, tự nhiên bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
-            emotion = .happy
-        case .cheek:
-            prompt = "Anh vừa chạm nhẹ vào má em. Hãy phản ứng hơi ngại ngùng, dễ thương bằng tiếng Việt và trả lời bằng giọng nói ngay, chỉ một câu ngắn."
-            emotion = .shy
-        }
-        if liveManager.state == .live {
-            liveManager.sendText(prompt)
-            touchMessage = nil
-        } else {
-            touchMessage = "Bấm 'Tiếp tục chat' để kết nối Gemini Live trước nhé."
-        }
-    }
-
-    private var emotionName: String {
-        switch emotion {
-        case .idle: "idle"
-        case .listening: "listening"
-        case .thinking: "thinking"
-        case .speaking: "speaking"
-        case .happy: "happy"
-        case .surprised: "surprised"
-        case .confused: "confused"
-        case .sad: "sad"
-        case .angry: "angry"
-        case .sleepy: "sleepy"
-        case .shy: "shy"
-        }
+    private func startLive() {
+        liveManager.start(
+            model: liveModel,
+            voice: liveVoice,
+            persona: livePersona,
+            bargeIn: liveBargeIn
+        )
     }
 
     private var statusText: String {
@@ -238,7 +194,7 @@ struct CompanionChatView: View {
         case .thinking: "Đang suy nghĩ"
         case .speaking: "Em đang nói"
         case .happy: "Em đang vui"
-        case .surprised: "Ơ, bất ngờ quá!"
+        case .surprised: "Bất ngờ quá!"
         case .confused: "Để em nghĩ lại..."
         case .sad: "Em hơi buồn..."
         case .angry: "Em đang giận đó nha"
@@ -268,332 +224,254 @@ private enum CompanionEmotion {
     case idle, listening, thinking, speaking, happy, surprised, confused, sad, angry, sleepy, shy
 }
 
-/// Detailed head-only robot. No torso, arms, legs or clothing are generated.
-private struct Companion3DStage: UIViewRepresentable {
-    let emotion: String
-    let isNight: Bool
+private struct RobotHeadView: View {
+    let emotion: CompanionEmotion
     let isSpeaking: Bool
 
-    func makeUIView(context: Context) -> SCNView {
-        let view = SCNView()
-        view.scene = makeScene()
-        view.backgroundColor = .clear
-        view.isPlaying = true
-        view.antialiasingMode = .multisampling4X
-        view.allowsCameraControl = false
-        view.autoenablesDefaultLighting = false
-        view.rendersContinuously = true
-        return view
+    var body: some View {
+        GeometryReader { geo in
+            let scale = min(geo.size.width / 390, geo.size.height / 430)
+            let eyeHeight = eyeHeightForEmotion * scale
+            let eyeWidth = eyeWidthForEmotion * scale
+
+            ZStack {
+                Circle()
+                    .fill(Color.cyan.opacity(0.12))
+                    .frame(width: 320 * scale, height: 320 * scale)
+                    .blur(radius: 42)
+
+                RobotEar(side: -1, scale: scale)
+                    .position(x: 28 * scale, y: 220 * scale)
+                RobotEar(side: 1, scale: scale)
+                    .position(x: 362 * scale, y: 220 * scale)
+
+                RoundedRectangle(cornerRadius: 82 * scale, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [.white, Color(red: 0.98, green: 0.95, blue: 0.98)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 334 * scale, height: 286 * scale)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 82 * scale, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.white, Color(red: 1, green: 0.54, blue: 0.76), Color(red: 0.96, green: 0.68, blue: 0.84)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 11 * scale
+                            )
+                    )
+                    .shadow(color: .pink.opacity(0.18), radius: 16 * scale, y: 10 * scale)
+                    .position(x: 195 * scale, y: 235 * scale)
+
+                RoundedRectangle(cornerRadius: 67 * scale, style: .continuous)
+                    .stroke(Color(red: 1, green: 0.72, blue: 0.86).opacity(0.72), lineWidth: 5 * scale)
+                    .frame(width: 312 * scale, height: 264 * scale)
+                    .position(x: 195 * scale, y: 235 * scale)
+
+                RoundedRectangle(cornerRadius: 49 * scale, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 0.005, green: 0.008, blue: 0.015), Color(red: 0.018, green: 0.035, blue: 0.06), .black],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 282 * scale, height: 182 * scale)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 49 * scale, style: .continuous)
+                            .stroke(.white.opacity(0.13), lineWidth: 2 * scale)
+                    )
+                    .shadow(color: .black.opacity(0.35), radius: 9 * scale, y: 6 * scale)
+                    .position(x: 195 * scale, y: 238 * scale)
+
+                Capsule()
+                    .fill(.white.opacity(0.42))
+                    .frame(width: 72 * scale, height: 13 * scale)
+                    .rotationEffect(.degrees(-25))
+                    .position(x: 124 * scale, y: 178 * scale)
+
+                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset)
+                    .position(x: 142 * scale, y: 232 * scale)
+                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset)
+                    .position(x: 248 * scale, y: 232 * scale)
+
+                Capsule()
+                    .fill(Color(red: 1, green: 0.43, blue: 0.68).opacity(0.90))
+                    .frame(width: 31 * scale, height: 10 * scale)
+                    .position(x: 103 * scale, y: 291 * scale)
+                Capsule()
+                    .fill(Color(red: 1, green: 0.43, blue: 0.68).opacity(0.90))
+                    .frame(width: 31 * scale, height: 10 * scale)
+                    .position(x: 287 * scale, y: 291 * scale)
+
+                RobotMouth(emotion: emotion, isSpeaking: isSpeaking, scale: scale)
+                    .position(x: 195 * scale, y: 291 * scale)
+
+                Capsule()
+                    .fill(Color(red: 0.45, green: 0.83, blue: 1))
+                    .frame(width: 7 * scale, height: 54 * scale)
+                    .rotationEffect(.degrees(-9))
+                    .position(x: 136 * scale, y: 56 * scale)
+                Capsule()
+                    .fill(Color(red: 0.45, green: 0.83, blue: 1))
+                    .frame(width: 7 * scale, height: 54 * scale)
+                    .rotationEffect(.degrees(9))
+                    .position(x: 254 * scale, y: 56 * scale)
+
+                Circle()
+                    .fill(Color(red: 1, green: 0.61, blue: 0.78))
+                    .frame(width: 30 * scale, height: 30 * scale)
+                    .shadow(color: .pink.opacity(0.5), radius: 8 * scale)
+                    .position(x: 132 * scale, y: 29 * scale)
+                Circle()
+                    .fill(Color(red: 1, green: 0.61, blue: 0.78))
+                    .frame(width: 30 * scale, height: 30 * scale)
+                    .shadow(color: .pink.opacity(0.5), radius: 8 * scale)
+                    .position(x: 258 * scale, y: 29 * scale)
+
+                RobotFin(side: -1, scale: scale).position(x: 47 * scale, y: 293 * scale)
+                RobotFin(side: 1, scale: scale).position(x: 343 * scale, y: 293 * scale)
+            }
+            .frame(width: 390 * scale, height: 430 * scale)
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+        .accessibilityLabel("ChatAI robot companion")
     }
 
-    func updateUIView(_ view: SCNView, context: Context) {
-        guard let scene = view.scene,
-              let root = scene.rootNode.childNode(withName: "companionRoot", recursively: true) else { return }
-
-        let expression = emotion
-        let mouth = root.childNode(withName: "mouth", recursively: true)
-        let mouthInner = root.childNode(withName: "mouthInner", recursively: true)
-        let leftEye = root.childNode(withName: "eyeL", recursively: true)
-        let rightEye = root.childNode(withName: "eyeR", recursively: true)
-        let leftPupil = root.childNode(withName: "pupilL", recursively: true)
-        let rightPupil = root.childNode(withName: "pupilR", recursively: true)
-        let leftCheek = root.childNode(withName: "cheekL", recursively: true)
-        let rightCheek = root.childNode(withName: "cheekR", recursively: true)
-        let head = root.childNode(withName: "headShell", recursively: true)
-        let antennaL = root.childNode(withName: "antennaTipL", recursively: true)
-        let antennaR = root.childNode(withName: "antennaTipR", recursively: true)
-
-        var eyeY: Float = 1.0
-        var eyeX: Float = 1.0
-        var pupilShift: Float = 0
-        var mouthY: Float = 0.42
-        var mouthX: Float = 1.0
-        var headZ: Float = 0
-        var cheekScale: Float = 1.0
-        var glow: Float = 1.0
-
-        switch expression {
-        case "listening": eyeY = 1.08; pupilShift = 0.02; glow = 1.15
-        case "thinking": pupilShift = -0.13; headZ = -0.035; mouthY = 0.30
-        case "speaking": mouthY = 1.35; mouthX = 1.18; glow = 1.22
-        case "happy": eyeY = 0.72; mouthX = 1.45; mouthY = 0.55; cheekScale = 1.25
-        case "surprised": eyeY = 1.28; eyeX = 1.12; mouthY = 1.45; mouthX = 0.80; glow = 1.28
-        case "confused": pupilShift = -0.10; headZ = 0.08; mouthX = 0.72
-        case "sad": eyeY = 0.82; pupilShift = 0.02; mouthY = 0.22; headZ = -0.05
-        case "angry": eyeY = 0.62; eyeX = 0.92; mouthY = 0.28; headZ = 0.02
-        case "sleepy": eyeY = 0.30; mouthY = 0.25; glow = 0.75
-        case "shy": eyeY = 0.80; pupilShift = 0.02; cheekScale = 1.55; headZ = 0.04
-        default: break
+    private var eyeHeightForEmotion: CGFloat {
+        switch emotion {
+        case .happy: 46
+        case .sleepy: 28
+        case .surprised: 72
+        case .angry: 43
+        default: 62
         }
-
-        if isSpeaking { mouthY = max(mouthY, 1.25) }
-
-        setScaleY(leftEye, eyeY)
-        setScaleY(rightEye, eyeY)
-        setScaleX(leftEye, eyeX)
-        setScaleX(rightEye, eyeX)
-        leftPupil?.position.x = -0.54 + pupilShift
-        rightPupil?.position.x = 0.54 + pupilShift
-        setScaleX(mouth, mouthX)
-        setScaleY(mouth, mouthY)
-        setScaleY(mouthInner, mouthY)
-        setScaleX(leftCheek, cheekScale)
-        setScaleX(rightCheek, cheekScale)
-        head?.eulerAngles.z = headZ
-        head?.eulerAngles.y = expression == "thinking" ? -0.06 : 0
-        antennaL?.scale = SCNVector3(x: glow, y: glow, z: glow)
-        antennaR?.scale = SCNVector3(x: glow, y: glow, z: glow)
-
-        if let material = root.childNode(withName: "eyeL", recursively: true)?.geometry?.firstMaterial {
-            material.emission.contents = UIColor(red: 0.05, green: 0.92, blue: 1, alpha: 1)
-        }
-
-        scene.rootNode.childNode(withName: "environmentGlow", recursively: true)?.geometry?.firstMaterial?.diffuse.contents =
-            isNight
-                ? UIColor(red: 0.20, green: 0.35, blue: 1.0, alpha: 0.22)
-                : UIColor(red: 1.0, green: 0.62, blue: 0.80, alpha: 0.18)
     }
 
-    private func makeScene() -> SCNScene {
-        let scene = SCNScene()
-        scene.background.contents = UIColor.clear
-
-        let camera = SCNCamera()
-        camera.fieldOfView = 29
-        camera.zNear = 0.1
-        camera.zFar = 80
-        let cameraNode = SCNNode()
-        cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0.15, 8.8)
-        cameraNode.look(at: SCNVector3(0, 0.15, 0))
-        scene.rootNode.addChildNode(cameraNode)
-
-        addLight(to: scene, type: .omni, intensity: 1150,
-                 color: UIColor(red: 1, green: 0.90, blue: 0.96, alpha: 1),
-                 position: SCNVector3(-4, 4, 5))
-        addLight(to: scene, type: .omni, intensity: 900,
-                 color: UIColor(red: 0.28, green: 0.88, blue: 1, alpha: 1),
-                 position: SCNVector3(4, 1, 5))
-        addLight(to: scene, type: .omni, intensity: 650,
-                 color: UIColor(red: 1, green: 0.34, blue: 0.68, alpha: 1),
-                 position: SCNVector3(0, -3, 3))
-
-        let root = SCNNode()
-        root.name = "companionRoot"
-        scene.rootNode.addChildNode(root)
-
-        let pearl = mat(UIColor(red: 0.96, green: 0.985, blue: 1.0, alpha: 1), rough: 0.20, metal: 0.10)
-        let pink = mat(UIColor(red: 1.0, green: 0.56, blue: 0.76, alpha: 1), rough: 0.22, metal: 0.08)
-        let pinkLight = mat(UIColor(red: 1.0, green: 0.78, blue: 0.88, alpha: 1), rough: 0.25)
-        let blue = mat(UIColor(red: 0.40, green: 0.86, blue: 1.0, alpha: 1), rough: 0.18, metal: 0.05)
-        let visor = mat(UIColor(red: 0.006, green: 0.012, blue: 0.025, alpha: 1), rough: 0.08, metal: 0.42)
-        let cyan = mat(UIColor(red: 0.08, green: 0.95, blue: 1.0, alpha: 1), rough: 0.12)
-        cyan.emission.contents = UIColor(red: 0.02, green: 0.82, blue: 1.0, alpha: 1)
-        let cyanDark = mat(UIColor(red: 0.02, green: 0.38, blue: 0.58, alpha: 1), rough: 0.16)
-        let white = mat(.white, rough: 0.08)
-        let mouthMat = mat(UIColor(red: 1.0, green: 0.32, blue: 0.67, alpha: 1), rough: 0.18)
-        mouthMat.emission.contents = UIColor(red: 1.0, green: 0.12, blue: 0.48, alpha: 1)
-
-        let halo = sphere(root, "environmentGlow", radius: 2.35,
-                          position: SCNVector3(0, 0.05, -1.05),
-                          material: mat(UIColor(red: 0.30, green: 0.78, blue: 1.0, alpha: 0.16), rough: 1),
-                          scale: SCNVector3(1.22, 0.92, 0.10), segments: 64)
-        halo.geometry?.firstMaterial?.lightingModel = .constant
-
-        makeEar(root: root, side: -1, pink: pink, blue: blue, white: white)
-        makeEar(root: root, side: 1, pink: pink, blue: blue, white: white)
-
-        let outerGeo = SCNBox(width: 3.35, height: 2.72, length: 1.60, chamferRadius: 0.56)
-        outerGeo.widthSegmentCount = 10
-        outerGeo.heightSegmentCount = 10
-        outerGeo.lengthSegmentCount = 8
-        outerGeo.firstMaterial = pink
-        let outer = SCNNode(geometry: outerGeo)
-        outer.name = "headRim"
-        outer.position = SCNVector3(0, 0.12, 0)
-        root.addChildNode(outer)
-
-        let shellGeo = SCNBox(width: 3.18, height: 2.55, length: 1.50, chamferRadius: 0.52)
-        shellGeo.widthSegmentCount = 10
-        shellGeo.heightSegmentCount = 10
-        shellGeo.lengthSegmentCount = 8
-        shellGeo.firstMaterial = pearl
-        let shell = SCNNode(geometry: shellGeo)
-        shell.name = "headShell"
-        shell.position = SCNVector3(0, 0.13, 0.08)
-        root.addChildNode(shell)
-
-        let crown = roundedBox(root, name: "crown", width: 2.72, height: 0.62, length: 1.34,
-                               radius: 0.28, position: SCNVector3(0, 1.17, 0.15), material: pearl)
-        crown.eulerAngles.x = -0.04
-        roundedBox(root, name: "crownBand", width: 2.74, height: 0.10, length: 1.38,
-                   radius: 0.05, position: SCNVector3(0, 0.90, 0.22), material: pinkLight)
-
-        for (x, suffix) in [(-0.54, "L"), (0.54, "R")] as [(Float, String)] {
-            let stemGeo = SCNCylinder(radius: 0.045, height: 0.44)
-            stemGeo.firstMaterial = blue
-            let stem = SCNNode(geometry: stemGeo)
-            stem.name = "antennaStem" + suffix
-            stem.position = SCNVector3(x, 1.72, 0.10)
-            stem.eulerAngles.z = x < 0 ? -0.17 : 0.17
-            root.addChildNode(stem)
-
-            let tip = sphere(root, "antennaTip" + suffix, radius: 0.145,
-                             position: SCNVector3(x * 1.10, 1.98, 0.12), material: pink, segments: 36)
-            tip.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.30, blue: 0.66, alpha: 1)
-            sphere(root, "antennaHighlight" + suffix, radius: 0.048,
-                   position: SCNVector3(x * 1.10 - 0.035, 2.03, 0.25), material: white, segments: 16)
+    private var eyeWidthForEmotion: CGFloat {
+        switch emotion {
+        case .surprised: 54
+        case .sleepy: 56
+        default: 48
         }
-
-        let visorOuter = roundedBox(root, name: "visorFrame", width: 2.86, height: 1.76, length: 0.24,
-                                    radius: 0.40, position: SCNVector3(0, 0.13, 0.87), material: pinkLight)
-        visorOuter.scale = SCNVector3(1.01, 1.01, 1)
-        roundedBox(root, name: "visor", width: 2.70, height: 1.60, length: 0.20,
-                   radius: 0.36, position: SCNVector3(0, 0.13, 1.01), material: visor)
-
-        let reflection = roundedBox(root, name: "visorReflection", width: 0.72, height: 0.16, length: 0.035,
-                                    radius: 0.08, position: SCNVector3(-0.82, 0.72, 1.13), material: white)
-        reflection.eulerAngles.z = -0.42
-        reflection.opacity = 0.28
-
-        for (x, suffix) in [(-0.56, "L"), (0.56, "R")] as [(Float, String)] {
-            sphere(root, "eyeGlow" + suffix, radius: 0.37,
-                   position: SCNVector3(x, 0.17, 1.14), material: cyanDark,
-                   scale: SCNVector3(0.88, 1.18, 0.16), segments: 48)
-
-            let eye = sphere(root, "eye" + suffix, radius: 0.31,
-                             position: SCNVector3(x, 0.17, 1.20), material: cyan,
-                             scale: SCNVector3(0.83, 1.18, 0.22), segments: 48)
-            eye.geometry?.firstMaterial?.emission.contents = UIColor(red: 0.03, green: 0.92, blue: 1, alpha: 1)
-
-            sphere(root, "iris" + suffix, radius: 0.145,
-                   position: SCNVector3(x, 0.15, 1.28), material: cyanDark,
-                   scale: SCNVector3(0.94, 1.08, 0.24), segments: 36)
-            sphere(root, "pupil" + suffix, radius: 0.085,
-                   position: SCNVector3(x, 0.15, 1.32), material: visor,
-                   scale: SCNVector3(0.88, 1.08, 0.24), segments: 32)
-            sphere(root, "sparkle" + suffix, radius: 0.075,
-                   position: SCNVector3(x - 0.075, 0.29, 1.37), material: white, segments: 20)
-            sphere(root, "sparkleSmall" + suffix, radius: 0.032,
-                   position: SCNVector3(x + 0.075, 0.06, 1.37), material: white, segments: 14)
-        }
-
-        for x in [-0.92, 0.92] as [Float] {
-            let name = x < 0 ? "cheekL" : "cheekR"
-            let cheek = sphere(root, name, radius: 0.13,
-                               position: SCNVector3(x, -0.37, 1.16), material: pinkLight,
-                               scale: SCNVector3(1.35, 0.50, 0.16), segments: 32)
-            cheek.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.32, blue: 0.62, alpha: 1)
-        }
-
-        let mouth = roundedBox(root, name: "mouth", width: 0.42, height: 0.16, length: 0.10,
-                               radius: 0.07, position: SCNVector3(0, -0.35, 1.19), material: mouthMat)
-        mouth.scale = SCNVector3(1.0, 0.42, 1.0)
-        roundedBox(root, name: "mouthInner", width: 0.24, height: 0.08, length: 0.025,
-                   radius: 0.035, position: SCNVector3(0, -0.35, 1.255), material: visor)
-
-        makeSideFin(root: root, side: -1, pink: pink, blue: blue, white: white)
-        makeSideFin(root: root, side: 1, pink: pink, blue: blue, white: white)
-
-        let floatUp = SCNAction.customAction(duration: 1.8) { node, elapsed in
-            let p = Float(elapsed / 1.8)
-            node.position.y = sin(p * .pi * 2) * 0.018
-        }
-        let floatDown = SCNAction.customAction(duration: 1.8) { node, elapsed in
-            let p = Float(elapsed / 1.8)
-            node.position.y = sin((1 - p) * .pi * 2) * 0.018
-        }
-        root.runAction(.repeatForever(.sequence([floatUp, floatDown])), forKey: "idleFloat")
-
-        return scene
     }
 
-    private func makeEar(root: SCNNode, side: Float, pink: SCNMaterial, blue: SCNMaterial, white: SCNMaterial) {
-        let x = side * 1.70
-        let ear = sphere(root, side < 0 ? "earL" : "earR", radius: 0.42,
-                         position: SCNVector3(x, 0.12, 0.08), material: pink,
-                         scale: SCNVector3(0.58, 1.0, 0.48), segments: 40)
-        ear.eulerAngles.z = side < 0 ? -0.12 : 0.12
-        sphere(root, side < 0 ? "earBlueL" : "earBlueR", radius: 0.27,
-               position: SCNVector3(x - side * 0.03, 0.12, 0.30), material: blue,
-               scale: SCNVector3(0.52, 0.98, 0.30), segments: 32)
-        sphere(root, side < 0 ? "earWhiteL" : "earWhiteR", radius: 0.08,
-               position: SCNVector3(x + side * 0.02, 0.27, 0.42), material: white,
-               scale: SCNVector3(0.65, 0.65, 0.30), segments: 20)
+    private var pupilOffset: CGFloat {
+        switch emotion {
+        case .thinking: -7
+        case .confused: -5
+        default: 0
+        }
     }
+}
 
-    private func makeSideFin(root: SCNNode, side: Float, pink: SCNMaterial, blue: SCNMaterial, white: SCNMaterial) {
-        let x = side * 1.72
-        for i in 0..<3 {
-            let y = 0.48 - Float(i) * 0.38
-            let fin = sphere(root, "fin_\(side < 0 ? "L" : "R")_\(i)", radius: 0.33,
-                             position: SCNVector3(x + side * Float(i) * 0.08, y, -0.04),
-                             material: i == 1 ? blue : pink,
-                             scale: SCNVector3(0.28, 0.88, 0.42), segments: 32)
-            fin.eulerAngles.z = side * (-0.28 + Float(i) * 0.20)
-            if i == 1 {
-                sphere(root, "finHighlight_\(side < 0 ? "L" : "R")_\(i)", radius: 0.045,
-                       position: SCNVector3(x + side * 0.01, y + 0.12, 0.22), material: white, segments: 12)
+private struct RobotEye: View {
+    let height: CGFloat
+    let width: CGFloat
+    let pupilOffset: CGFloat
+
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .fill(Color.cyan.opacity(0.24))
+                .frame(width: width + 22, height: height + 22)
+                .blur(radius: 8)
+
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.86, green: 1, blue: 1), .cyan, Color(red: 0.05, green: 0.52, blue: 0.68)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: width, height: height)
+                .shadow(color: .cyan.opacity(0.9), radius: 9)
+
+            Ellipse()
+                .fill(Color(red: 0.05, green: 0.45, blue: 0.60))
+                .frame(width: width * 0.55, height: height * 0.58)
+                .offset(x: pupilOffset)
+
+            Ellipse()
+                .fill(Color.black.opacity(0.92))
+                .frame(width: width * 0.29, height: height * 0.44)
+                .offset(x: pupilOffset)
+
+            Circle()
+                .fill(.white)
+                .frame(width: 14, height: 14)
+                .offset(x: -width * 0.18, y: -height * 0.23)
+
+            Circle()
+                .fill(.white.opacity(0.65))
+                .frame(width: 6, height: 6)
+                .offset(x: width * 0.20, y: height * 0.20)
+        }
+    }
+}
+
+private struct RobotMouth: View {
+    let emotion: CompanionEmotion
+    let isSpeaking: Bool
+    let scale: CGFloat
+
+    var body: some View {
+        if emotion == .happy || emotion == .shy {
+            Capsule()
+                .fill(Color(red: 1, green: 0.44, blue: 0.72))
+                .frame(width: 31 * scale, height: 9 * scale)
+        } else if isSpeaking || emotion == .surprised {
+            Capsule()
+                .fill(Color.black)
+                .frame(width: (isSpeaking ? 34 : 22) * scale, height: (isSpeaking ? 22 : 27) * scale)
+                .overlay(Capsule().stroke(Color(red: 1, green: 0.44, blue: 0.72), lineWidth: 3 * scale))
+        } else {
+            HStack(spacing: -1 * scale) {
+                Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 13 * scale, height: 5 * scale).rotationEffect(.degrees(25))
+                Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 13 * scale, height: 5 * scale).rotationEffect(.degrees(-25))
             }
         }
     }
+}
 
-    private func roundedBox(_ parent: SCNNode, name: String, width: CGFloat, height: CGFloat, length: CGFloat,
-                            radius: CGFloat, position: SCNVector3, material: SCNMaterial) -> SCNNode {
-        let geometry = SCNBox(width: width, height: height, length: length, chamferRadius: radius)
-        geometry.widthSegmentCount = 10
-        geometry.heightSegmentCount = 10
-        geometry.lengthSegmentCount = 8
-        geometry.firstMaterial = material
-        let node = SCNNode(geometry: geometry)
-        node.name = name
-        node.position = position
-        parent.addChildNode(node)
-        return node
+private struct RobotEar: View {
+    let side: CGFloat
+    let scale: CGFloat
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(LinearGradient(colors: [.white, Color(red: 0.88, green: 0.95, blue: 1)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 76 * scale, height: 116 * scale)
+                .rotationEffect(.degrees(side < 0 ? -17 : 17))
+            Capsule()
+                .stroke(Color(red: 0.98, green: 0.65, blue: 0.82), lineWidth: 7 * scale)
+                .frame(width: 76 * scale, height: 116 * scale)
+                .rotationEffect(.degrees(side < 0 ? -17 : 17))
+            Capsule()
+                .fill(Color(red: 0.43, green: 0.82, blue: 1).opacity(0.8))
+                .frame(width: 31 * scale, height: 76 * scale)
+                .rotationEffect(.degrees(side < 0 ? -17 : 17))
+        }
     }
+}
 
-    @discardableResult
-    private func sphere(_ parent: SCNNode, _ name: String, radius: CGFloat, position: SCNVector3,
-                        material: SCNMaterial, scale: SCNVector3? = nil, segments: Int = 48) -> SCNNode {
-        let geometry = SCNSphere(radius: radius)
-        geometry.segmentCount = segments
-        geometry.firstMaterial = material
-        let node = SCNNode(geometry: geometry)
-        node.name = name
-        node.position = position
-        if let scale { node.scale = scale }
-        parent.addChildNode(node)
-        return node
-    }
+private struct RobotFin: View {
+    let side: CGFloat
+    let scale: CGFloat
 
-    private func setScaleX(_ node: SCNNode?, _ value: Float) {
-        guard let node else { return }
-        node.scale.x = value
-    }
-
-    private func setScaleY(_ node: SCNNode?, _ value: Float) {
-        guard let node else { return }
-        node.scale.y = value
-    }
-
-    private func mat(_ color: UIColor, rough: CGFloat = 0.48, metal: CGFloat = 0) -> SCNMaterial {
-        let material = SCNMaterial()
-        material.diffuse.contents = color
-        material.roughness.contents = rough
-        material.metalness.contents = metal
-        material.lightingModel = .physicallyBased
-        return material
-    }
-
-    private func addLight(to scene: SCNScene, type: SCNLight.LightType, intensity: CGFloat,
-                          color: UIColor, position: SCNVector3) {
-        let light = SCNLight()
-        light.type = type
-        light.intensity = intensity
-        light.color = color
-        let node = SCNNode()
-        node.light = light
-        node.position = position
-        scene.rootNode.addChildNode(node)
+    var body: some View {
+        VStack(spacing: 6 * scale) {
+            Capsule().fill(Color(red: 1, green: 0.70, blue: 0.84)).frame(width: 50 * scale, height: 20 * scale)
+            Capsule().fill(Color(red: 0.55, green: 0.86, blue: 1)).frame(width: 42 * scale, height: 18 * scale)
+            Capsule().fill(Color(red: 1, green: 0.78, blue: 0.88)).frame(width: 35 * scale, height: 16 * scale)
+        }
+        .rotationEffect(.degrees(side < 0 ? -18 : 18))
     }
 }
