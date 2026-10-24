@@ -163,12 +163,10 @@ private struct Companion3DStage: UIViewRepresentable {
         let visorMat = mat(UIColor(red: 0.012, green: 0.035, blue: 0.075, alpha: 1), rough: 0.12, metal: 0.32)
         let cyan = mat(UIColor(red: 0.12, green: 0.96, blue: 1, alpha: 1), rough: 0.16)
         cyan.emission.contents = UIColor(red: 0.04, green: 0.88, blue: 1, alpha: 1)
-        cyan.emissionIntensity = 1.8
         let deepCyan = mat(UIColor(red: 0.02, green: 0.48, blue: 0.66, alpha: 1), rough: 0.2)
         let white = mat(.white, rough: 0.12)
         let mouthMat = mat(UIColor(red: 1, green: 0.38, blue: 0.69, alpha: 1), rough: 0.24)
         mouthMat.emission.contents = UIColor(red: 1, green: 0.16, blue: 0.5, alpha: 1)
-        mouthMat.emissionIntensity = 0.45
 
         // Soft halo behind the head.
         let halo = sphere(root, "environmentGlow", radius: 1.95,
@@ -241,7 +239,6 @@ private struct Companion3DStage: UIViewRepresentable {
                              position: SCNVector3(x * 1.08, 1.91, 0.04),
                              material: pink, segments: 32)
             tip.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.24, blue: 0.65, alpha: 1)
-            tip.geometry?.firstMaterial?.emissionIntensity = 0.9
             sphere(root, "antennaHighlight" + suffix, radius: 0.045,
                    position: SCNVector3(x * 1.08 - 0.035, 1.96, 0.14), material: white, segments: 16)
         }
@@ -265,7 +262,6 @@ private struct Companion3DStage: UIViewRepresentable {
                              position: SCNVector3(x, 0.12, 1.29), material: cyan,
                              scale: SCNVector3(0.82, 1.18, 0.22), segments: 40)
             eye.geometry?.firstMaterial?.emission.contents = UIColor(red: 0.05, green: 0.92, blue: 1, alpha: 1)
-            eye.geometry?.firstMaterial?.emissionIntensity = 1.7
             sphere(root, "iris" + suffix, radius: 0.13,
                    position: SCNVector3(x, 0.10, 1.34), material: deepCyan,
                    scale: SCNVector3(0.9, 1.05, 0.3), segments: 32)
@@ -284,7 +280,6 @@ private struct Companion3DStage: UIViewRepresentable {
                                position: SCNVector3(x, -0.40, 1.15), material: palePink,
                                scale: SCNVector3(1.4, 0.55, 0.22), segments: 24)
             cheek.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.35, blue: 0.65, alpha: 1)
-            cheek.geometry?.firstMaterial?.emissionIntensity = 0.4
         }
         sphere(root, "mouth", radius: 0.10,
                position: SCNVector3(0, -0.48, 1.22), material: mouthMat,
