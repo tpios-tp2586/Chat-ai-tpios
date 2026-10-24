@@ -128,45 +128,182 @@ private struct Companion3DStage: UIViewRepresentable {
     }
 
     private func makeScene() -> SCNScene {
-        let scene = SCNScene(); scene.background.contents = UIColor.clear; scene.lightingEnvironment.contents = UIColor(white: 0.78, alpha: 1)
-        let camera = SCNCamera(); camera.fieldOfView = 24; camera.zNear = 0.1; camera.zFar = 60
-        let cameraNode = SCNNode(); cameraNode.camera = camera; cameraNode.position = SCNVector3(0, 0, 7.0); cameraNode.look(at: SCNVector3(0, 0, 0)); scene.rootNode.addChildNode(cameraNode)
-        addLight(to: scene, type: .omni, intensity: 950, color: UIColor(red: 1.0, green: 0.95, blue: 0.90, alpha: 1), position: SCNVector3(-3.5, 4.0, 5.0))
-        addLight(to: scene, type: .omni, intensity: 450, color: UIColor(red: 0.78, green: 0.88, blue: 1.0, alpha: 1), position: SCNVector3(3.5, 1.5, 3.0))
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
+        scene.lightingEnvironment.contents = UIColor(white: 0.82, alpha: 1)
 
-        let root = SCNNode(); root.name = "companionRoot"; scene.rootNode.addChildNode(root)
-        let skin = mat(UIColor(red: 0.98, green: 0.82, blue: 0.74, alpha: 1), rough: 0.58)
-        let dark = mat(UIColor(red: 0.045, green: 0.025, blue: 0.065, alpha: 1), rough: 0.55)
-        let iris = mat(UIColor(red: 0.22, green: 0.50, blue: 0.82, alpha: 1), rough: 0.18)
-        let white = mat(.white, rough: 0.50)
-        let mouthMat = mat(UIColor(red: 0.18, green: 0.025, blue: 0.055, alpha: 1), rough: 0.62)
-        let blush = mat(UIColor(red: 1.0, green: 0.42, blue: 0.58, alpha: 0.65), rough: 0.70)
+        let camera = SCNCamera()
+        camera.fieldOfView = 30
+        camera.zNear = 0.1
+        camera.zFar = 60
+        let cameraNode = SCNNode()
+        cameraNode.camera = camera
+        cameraNode.position = SCNVector3(0, 0, 8.4)
+        cameraNode.look(at: SCNVector3(0, 0, 0))
+        scene.rootNode.addChildNode(cameraNode)
 
-        let faceGeo = SCNSphere(radius: 1.55); faceGeo.segmentCount = 64; faceGeo.firstMaterial = skin
-        let face = SCNNode(geometry: faceGeo); face.name = "face"; face.scale = SCNVector3(1.00, 1.08, 0.68); root.addChildNode(face)
-        let hairGeo = SCNSphere(radius: 1.60); hairGeo.segmentCount = 64; hairGeo.firstMaterial = dark
-        let hair = SCNNode(geometry: hairGeo); hair.name = "hairCap"; hair.position = SCNVector3(0, 0.28, -0.10); hair.scale = SCNVector3(1.02, 0.72, 0.70); hair.renderingOrder = -1; root.addChildNode(hair)
+        addLight(to: scene, type: .omni, intensity: 1050,
+                 color: UIColor(red: 1, green: 0.91, blue: 0.96, alpha: 1),
+                 position: SCNVector3(-3, 4, 5))
+        addLight(to: scene, type: .omni, intensity: 850,
+                 color: UIColor(red: 0.25, green: 0.88, blue: 1, alpha: 1),
+                 position: SCNVector3(3, 1, 4))
+        addLight(to: scene, type: .omni, intensity: 550,
+                 color: UIColor(red: 1, green: 0.38, blue: 0.68, alpha: 1),
+                 position: SCNVector3(0, -3, 2))
 
-        for (x, suffix) in [(-0.52, "L"), (0.52, "R")] as [(Float, String)] {
-            let eye = sphere(root, "eyeWhite" + suffix, radius: 0.34, position: SCNVector3(x, 0.20, 1.00), material: white, scale: SCNVector3(0.78, 1.28, 0.24), segments: 48)
-            let irisNode = sphere(root, "iris" + suffix, radius: 0.235, position: SCNVector3(x, 0.18, 1.10), material: iris, scale: SCNVector3(0.82, 1.18, 0.24), segments: 48)
-            sphere(root, "pupil" + suffix, radius: 0.115, position: SCNVector3(x, 0.18, 1.16), material: dark, scale: SCNVector3(0.82, 1.24, 0.24), segments: 32)
-            sphere(root, "sparkle" + suffix, radius: 0.055, position: SCNVector3(x - 0.055, 0.29, 1.19), material: white, segments: 16)
-            let lashGeo = SCNBox(width: 0.55, height: 0.055, length: 0.035, chamferRadius: 0.02); lashGeo.firstMaterial = dark
-            let lash = SCNNode(geometry: lashGeo); lash.name = "lash" + suffix; lash.position = SCNVector3(x, 0.56, 1.05); lash.eulerAngles.z = suffix == "L" ? -0.06 : 0.06; root.addChildNode(lash)
-            let blink = SCNAction.sequence([.wait(duration: suffix == "L" ? 3.0 : 3.15), .customAction(duration: 0.06) { node, _ in node.scale.y = 0.06 }, .customAction(duration: 0.10) { node, _ in node.scale.y = node.name?.hasPrefix("eyeWhite") == true ? 1.28 : 1.18 }])
-            eye.runAction(.repeatForever(blink), forKey: "blink"); irisNode.runAction(.repeatForever(blink), forKey: "blink")
+        let root = SCNNode()
+        root.name = "companionRoot"
+        scene.rootNode.addChildNode(root)
+
+        let pearl = mat(UIColor(red: 0.94, green: 0.97, blue: 1, alpha: 1), rough: 0.22, metal: 0.12)
+        let pink = mat(UIColor(red: 1, green: 0.43, blue: 0.72, alpha: 1), rough: 0.25, metal: 0.12)
+        let palePink = mat(UIColor(red: 1, green: 0.72, blue: 0.84, alpha: 1), rough: 0.3)
+        let blue = mat(UIColor(red: 0.28, green: 0.82, blue: 1, alpha: 1), rough: 0.18, metal: 0.08)
+        let visorMat = mat(UIColor(red: 0.012, green: 0.035, blue: 0.075, alpha: 1), rough: 0.12, metal: 0.32)
+        let cyan = mat(UIColor(red: 0.12, green: 0.96, blue: 1, alpha: 1), rough: 0.16)
+        cyan.emission.contents = UIColor(red: 0.04, green: 0.88, blue: 1, alpha: 1)
+        cyan.emissionIntensity = 1.8
+        let deepCyan = mat(UIColor(red: 0.02, green: 0.48, blue: 0.66, alpha: 1), rough: 0.2)
+        let white = mat(.white, rough: 0.12)
+        let mouthMat = mat(UIColor(red: 1, green: 0.38, blue: 0.69, alpha: 1), rough: 0.24)
+        mouthMat.emission.contents = UIColor(red: 1, green: 0.16, blue: 0.5, alpha: 1)
+        mouthMat.emissionIntensity = 0.45
+
+        // Soft halo behind the head.
+        let halo = sphere(root, "environmentGlow", radius: 1.95,
+                          position: SCNVector3(0, 0, -0.95),
+                          material: mat(UIColor(red: 0.16, green: 0.73, blue: 1, alpha: 0.20), rough: 1),
+                          scale: SCNVector3(1.12, 1.05, 0.12), segments: 64)
+        halo.geometry?.firstMaterial?.lightingModel = .constant
+
+        // Two round ears with blue inner discs and pink outer trim.
+        for (x, suffix) in [(-1.42, "L"), (1.42, "R")] as [(Float, String)] {
+            let ear = sphere(root, "ear" + suffix, radius: 0.39,
+                             position: SCNVector3(x, 0.02, -0.02), material: pink,
+                             scale: SCNVector3(1, 1, 0.45), segments: 40)
+            ear.geometry?.firstMaterial = pink
+            sphere(root, "earInner" + suffix, radius: 0.27,
+                   position: SCNVector3(x, 0.02, 0.16), material: blue,
+                   scale: SCNVector3(1, 1, 0.42), segments: 40)
+            sphere(root, "earCore" + suffix, radius: 0.12,
+                   position: SCNVector3(x, 0.02, 0.28), material: palePink,
+                   scale: SCNVector3(1, 1, 0.35), segments: 24)
         }
 
-        sphere(root, "blushL", radius: 0.16, position: SCNVector3(-0.72, -0.35, 1.00), material: blush, scale: SCNVector3(1.45, 0.45, 0.18), segments: 24)
-        sphere(root, "blushR", radius: 0.16, position: SCNVector3(0.72, -0.35, 1.00), material: blush, scale: SCNVector3(1.45, 0.45, 0.18), segments: 24)
-        sphere(root, "mouth", radius: 0.11, position: SCNVector3(0, -0.72, 1.05), material: mouthMat, scale: SCNVector3(1.45, 0.48, 0.20), segments: 32)
+        // Pearl-white rounded robot shell, outlined with a pastel-pink rim.
+        let rimGeo = SCNSphere(radius: 1.58)
+        rimGeo.segmentCount = 64
+        rimGeo.firstMaterial = pink
+        let rim = SCNNode(geometry: rimGeo)
+        rim.name = "headRim"
+        rim.scale = SCNVector3(1.12, 1.08, 0.68)
+        rim.position = SCNVector3(0, 0, 0.02)
+        root.addChildNode(rim)
 
-        let glowGeo = SCNSphere(radius: 2.0); glowGeo.firstMaterial = mat(UIColor(red: 0.50, green: 0.58, blue: 1.0, alpha: 0.10), rough: 1); glowGeo.firstMaterial?.isDoubleSided = true
-        let glow = SCNNode(geometry: glowGeo); glow.name = "environmentGlow"; glow.position = SCNVector3(0, 0, -1.5); glow.scale = SCNVector3(1.10, 1.10, 0.08); root.addChildNode(glow)
-        root.runAction(.repeatForever(.sequence([.scale(to: 1.012, duration: 1.8), .scale(to: 1.000, duration: 1.8)])), forKey: "breathing")
-        face.runAction(.repeatForever(.sequence([.rotateTo(x: 0, y: 0, z: 0.018, duration: 1.7), .rotateTo(x: 0, y: 0, z: -0.018, duration: 1.7)])), forKey: "faceIdle")
+        let shellGeo = SCNSphere(radius: 1.53)
+        shellGeo.segmentCount = 64
+        shellGeo.firstMaterial = pearl
+        let shell = SCNNode(geometry: shellGeo)
+        shell.name = "face"
+        shell.scale = SCNVector3(1.12, 1.08, 0.70)
+        shell.position = SCNVector3(0, 0.035, 0.10)
+        root.addChildNode(shell)
+
+        // Rounded cap crown and pastel seam.
+        let capGeo = SCNSphere(radius: 1.40)
+        capGeo.segmentCount = 64
+        capGeo.firstMaterial = pearl
+        let cap = SCNNode(geometry: capGeo)
+        cap.name = "robotCap"
+        cap.scale = SCNVector3(1.10, 0.55, 0.67)
+        cap.position = SCNVector3(0, 0.83, 0.08)
+        root.addChildNode(cap)
+
+        let seamGeo = SCNTorus(ringRadius: 1.16, pipeRadius: 0.045)
+        seamGeo.firstMaterial = pink
+        let seam = SCNNode(geometry: seamGeo)
+        seam.name = "capSeam"
+        seam.position = SCNVector3(0, 0.53, 0.88)
+        seam.scale = SCNVector3(1.04, 0.56, 0.6)
+        root.addChildNode(seam)
+
+        // Two short antennae with glowing pink tips.
+        for (x, suffix) in [(-0.48, "L"), (0.48, "R")] as [(Float, String)] {
+            let stemGeo = SCNCylinder(radius: 0.045, height: 0.42)
+            stemGeo.firstMaterial = blue
+            let stem = SCNNode(geometry: stemGeo)
+            stem.name = "antennaStem" + suffix
+            stem.position = SCNVector3(x, 1.68, 0.02)
+            stem.eulerAngles.z = x < 0 ? -0.16 : 0.16
+            root.addChildNode(stem)
+            let tip = sphere(root, "antennaTip" + suffix, radius: 0.14,
+                             position: SCNVector3(x * 1.08, 1.91, 0.04),
+                             material: pink, segments: 32)
+            tip.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.24, blue: 0.65, alpha: 1)
+            tip.geometry?.firstMaterial?.emissionIntensity = 0.9
+            sphere(root, "antennaHighlight" + suffix, radius: 0.045,
+                   position: SCNVector3(x * 1.08 - 0.035, 1.96, 0.14), material: white, segments: 16)
+        }
+
+        // Glossy black glass visor across the front.
+        let visorGeo = SCNSphere(radius: 1)
+        visorGeo.segmentCount = 64
+        visorGeo.firstMaterial = visorMat
+        let visor = SCNNode(geometry: visorGeo)
+        visor.name = "visor"
+        visor.position = SCNVector3(0, 0.05, 1.05)
+        visor.scale = SCNVector3(1.24, 0.68, 0.18)
+        root.addChildNode(visor)
+
+        // Cyan luminous eyes, deep pupils and white specular highlights.
+        for (x, suffix) in [(-0.53, "L"), (0.53, "R")] as [(Float, String)] {
+            sphere(root, "eyeGlow" + suffix, radius: 0.34,
+                   position: SCNVector3(x, 0.12, 1.24), material: deepCyan,
+                   scale: SCNVector3(0.78, 1.18, 0.20), segments: 40)
+            let eye = sphere(root, "eyeWhite" + suffix, radius: 0.29,
+                             position: SCNVector3(x, 0.12, 1.29), material: cyan,
+                             scale: SCNVector3(0.82, 1.18, 0.22), segments: 40)
+            eye.geometry?.firstMaterial?.emission.contents = UIColor(red: 0.05, green: 0.92, blue: 1, alpha: 1)
+            eye.geometry?.firstMaterial?.emissionIntensity = 1.7
+            sphere(root, "iris" + suffix, radius: 0.13,
+                   position: SCNVector3(x, 0.10, 1.34), material: deepCyan,
+                   scale: SCNVector3(0.9, 1.05, 0.3), segments: 32)
+            sphere(root, "pupil" + suffix, radius: 0.075,
+                   position: SCNVector3(x, 0.10, 1.37), material: visorMat,
+                   scale: SCNVector3(0.9, 1.08, 0.25), segments: 24)
+            sphere(root, "sparkle" + suffix, radius: 0.065,
+                   position: SCNVector3(x - 0.055, 0.22, 1.40), material: white, segments: 16)
+            sphere(root, "sparkleSmall" + suffix, radius: 0.027,
+                   position: SCNVector3(x + 0.06, 0.04, 1.405), material: white, segments: 12)
+        }
+
+        // Small pink cheeks and an expressive mouth.
+        for x in [-0.86, 0.86] as [Float] {
+            let cheek = sphere(root, x < 0 ? "blushL" : "blushR", radius: 0.13,
+                               position: SCNVector3(x, -0.40, 1.15), material: palePink,
+                               scale: SCNVector3(1.4, 0.55, 0.22), segments: 24)
+            cheek.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.35, blue: 0.65, alpha: 1)
+            cheek.geometry?.firstMaterial?.emissionIntensity = 0.4
+        }
+        sphere(root, "mouth", radius: 0.10,
+               position: SCNVector3(0, -0.48, 1.22), material: mouthMat,
+               scale: SCNVector3(1.15, 0.38, 0.20), segments: 32)
+
+        root.runAction(.repeatForever(.sequence([
+            .scale(to: 1.008, duration: 1.6),
+            .scale(to: 1.000, duration: 1.6)
+        ])), forKey: "breathing")
+        faceIdleAction(root: root)
         return scene
+    }
+
+    private func faceIdleAction(root: SCNNode) {
+        guard let face = root.childNode(withName: "face", recursively: true) else { return }
+        face.runAction(.repeatForever(.sequence([
+            .rotateTo(x: 0, y: 0, z: 0.012, duration: 1.8),
+            .rotateTo(x: 0, y: 0, z: -0.012, duration: 1.8)
+        ])), forKey: "faceIdle")
     }
 
     @discardableResult
