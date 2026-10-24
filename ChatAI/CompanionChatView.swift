@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Companion screen with a head-only kawaii robot face.
-/// The visual target intentionally follows the approved concept: white/pink shell,
-/// large black rounded visor, cyan expressive eyes, small mouth, antennae and ears/fins.
+/// The visual target follows the approved concept: pearl-white shell, pastel-pink rim,
+/// black glossy visor, large cyan glass eyes, pink cheeks, antennae, ear modules and fins.
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
@@ -34,16 +34,10 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        RobotHeadView(
-                            emotion: emotion,
-                            isSpeaking: liveManager.aiSpeaking
-                        )
-                        .frame(
-                            width: min(proxy.size.width - 24, 390),
-                            height: min(proxy.size.height * 0.70, 430)
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture { emotion = .happy }
+                        RobotHeadView(emotion: emotion, isSpeaking: liveManager.aiSpeaking)
+                            .frame(width: min(proxy.size.width - 24, 390), height: min(proxy.size.height * 0.70, 430))
+                            .contentShape(Rectangle())
+                            .onTapGesture { emotion = .happy }
 
                         Spacer(minLength: 6)
                         statusPanel
@@ -171,10 +165,7 @@ struct CompanionChatView: View {
                 .font(.subheadline.weight(.bold))
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
-                .background(
-                    LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing),
-                    in: Capsule()
-                )
+                .background(LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing), in: Capsule())
             }
 
             Button { dismiss() } label: {
@@ -191,12 +182,7 @@ struct CompanionChatView: View {
     }
 
     private func startLive() {
-        liveManager.start(
-            model: liveModel,
-            voice: liveVoice,
-            persona: livePersona,
-            bargeIn: liveBargeIn
-        )
+        liveManager.start(model: liveModel, voice: liveVoice, persona: livePersona, bargeIn: liveBargeIn)
     }
 
     private var statusText: String {
@@ -239,169 +225,160 @@ private enum CompanionEmotion {
 private struct RobotHeadView: View {
     let emotion: CompanionEmotion
     let isSpeaking: Bool
-    @State private var isFloating = false
-    @State private var gazeShift: CGFloat = 0
-    @State private var glowPulse = false
+    @State private var floatUp = false
+    @State private var gaze: CGFloat = 0
+    @State private var glow = false
     @State private var blink = false
     @State private var mouthPulse = false
 
     var body: some View {
         GeometryReader { geo in
             let scale = min(geo.size.width / 390, geo.size.height / 430)
-            let eyeHeight = (blink ? 5 : eyeHeightForEmotion) * scale
-            let eyeWidth = eyeWidthForEmotion * scale
+            let eyeH = (blink ? 5 : eyeHeight) * scale
+            let eyeW = eyeWidth * scale
 
             ZStack {
                 Circle()
-                    .fill(Color.cyan.opacity(0.12))
-                    .frame(width: 320 * scale, height: 320 * scale)
-                    .blur(radius: 42)
+                    .fill(Color.cyan.opacity(0.10))
+                    .frame(width: 330 * scale, height: 330 * scale)
+                    .blur(radius: 46)
 
-                RobotEar(side: -1, scale: scale)
-                    .position(x: 28 * scale, y: 220 * scale)
-                RobotEar(side: 1, scale: scale)
-                    .position(x: 362 * scale, y: 220 * scale)
+                // Transparent butterfly-like side fins sit behind the ear modules.
+                RobotFin(side: -1, scale: scale).position(x: 47 * scale, y: 278 * scale)
+                RobotFin(side: 1, scale: scale).position(x: 343 * scale, y: 278 * scale)
 
-                RoundedRectangle(cornerRadius: 82 * scale, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.white, Color(red: 0.98, green: 0.95, blue: 0.98)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 334 * scale, height: 286 * scale)
+                // Pearl shell: three layers create the rounded concept-art silhouette.
+                RoundedRectangle(cornerRadius: 103 * scale, style: .continuous)
+                    .fill(LinearGradient(colors: [.white, Color(red: 0.99, green: 0.96, blue: 0.99)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 330 * scale, height: 286 * scale)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 82 * scale, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.white, Color(red: 1, green: 0.54, blue: 0.76), Color(red: 0.96, green: 0.68, blue: 0.84)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 11 * scale
-                            )
+                        RoundedRectangle(cornerRadius: 103 * scale, style: .continuous)
+                            .stroke(Color(red: 1, green: 0.66, blue: 0.84), lineWidth: 10 * scale)
                     )
-                    .shadow(color: .pink.opacity(0.18), radius: 16 * scale, y: 10 * scale)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 94 * scale, style: .continuous)
+                            .stroke(Color.white.opacity(0.95), lineWidth: 3 * scale)
+                            .padding(8 * scale)
+                    )
+                    .shadow(color: Color(red: 1, green: 0.38, blue: 0.68).opacity(0.24), radius: 18 * scale, y: 10 * scale)
                     .position(x: 195 * scale, y: 235 * scale)
 
-                RoundedRectangle(cornerRadius: 67 * scale, style: .continuous)
-                    .stroke(Color(red: 1, green: 0.72, blue: 0.86).opacity(0.72), lineWidth: 5 * scale)
-                    .frame(width: 312 * scale, height: 264 * scale)
-                    .position(x: 195 * scale, y: 235 * scale)
+                // Subtle shell seam lines.
+                Capsule().fill(Color(red: 0.43, green: 0.82, blue: 1).opacity(0.65))
+                    .frame(width: 4 * scale, height: 34 * scale)
+                    .rotationEffect(.degrees(20))
+                    .position(x: 104 * scale, y: 91 * scale)
+                Capsule().fill(Color(red: 0.43, green: 0.82, blue: 1).opacity(0.65))
+                    .frame(width: 4 * scale, height: 34 * scale)
+                    .rotationEffect(.degrees(-20))
+                    .position(x: 286 * scale, y: 91 * scale)
 
-                RoundedRectangle(cornerRadius: 49 * scale, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(red: 0.005, green: 0.008, blue: 0.015), Color(red: 0.018, green: 0.035, blue: 0.06), .black],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 282 * scale, height: 182 * scale)
+                // Glossy black OLED visor.
+                RoundedRectangle(cornerRadius: 72 * scale, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(red: 0.015, green: 0.02, blue: 0.035), Color(red: 0.005, green: 0.01, blue: 0.018), .black], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 286 * scale, height: 190 * scale)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 49 * scale, style: .continuous)
-                            .stroke(.white.opacity(0.13), lineWidth: 2 * scale)
+                        RoundedRectangle(cornerRadius: 72 * scale, style: .continuous)
+                            .stroke(Color(red: 1, green: 0.67, blue: 0.84), lineWidth: 5 * scale)
                     )
-                    .shadow(color: .black.opacity(0.35), radius: 9 * scale, y: 6 * scale)
-                    .position(x: 195 * scale, y: 238 * scale)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 68 * scale, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 2 * scale)
+                            .padding(6 * scale)
+                    )
+                    .shadow(color: .black.opacity(0.45), radius: 10 * scale, y: 6 * scale)
+                    .position(x: 195 * scale, y: 239 * scale)
 
-                Capsule()
-                    .fill(.white.opacity(0.42))
-                    .frame(width: 72 * scale, height: 13 * scale)
-                    .rotationEffect(.degrees(-25))
-                    .position(x: 124 * scale, y: 178 * scale)
+                // Visor glass reflections.
+                Capsule().fill(.white.opacity(0.22))
+                    .frame(width: 64 * scale, height: 12 * scale)
+                    .rotationEffect(.degrees(-28))
+                    .position(x: 118 * scale, y: 178 * scale)
+                Capsule().fill(.white.opacity(0.10))
+                    .frame(width: 30 * scale, height: 7 * scale)
+                    .rotationEffect(.degrees(28))
+                    .position(x: 271 * scale, y: 190 * scale)
 
-                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset + gazeShift, glowPulse: glowPulse)
-                    .position(x: 142 * scale, y: 232 * scale)
-                RobotEye(height: eyeHeight, width: eyeWidth, pupilOffset: pupilOffset + gazeShift, glowPulse: glowPulse)
-                    .position(x: 248 * scale, y: 232 * scale)
+                // Large glassy cyan eyes: ring + iris + dark pupil + two reflections.
+                RobotEye(height: eyeH, width: eyeW, pupilOffset: pupilOffset + gaze, glowPulse: glow)
+                    .position(x: 139 * scale, y: 232 * scale)
+                RobotEye(height: eyeH, width: eyeW, pupilOffset: pupilOffset + gaze, glowPulse: glow)
+                    .position(x: 251 * scale, y: 232 * scale)
 
-                Capsule()
-                    .fill(Color(red: 1, green: 0.43, blue: 0.68).opacity(0.90))
+                // Small expressive brow strokes are part of the approved face language.
+                RobotBrow(emotion: emotion, side: -1, scale: scale).position(x: 140 * scale, y: 194 * scale)
+                RobotBrow(emotion: emotion, side: 1, scale: scale).position(x: 250 * scale, y: 194 * scale)
+
+                // Pink cheeks.
+                Capsule().fill(Color(red: 1, green: 0.39, blue: 0.68).opacity(0.92))
                     .frame(width: 31 * scale, height: 10 * scale)
-                    .position(x: 103 * scale, y: 291 * scale)
-                Capsule()
-                    .fill(Color(red: 1, green: 0.43, blue: 0.68).opacity(0.90))
+                    .rotationEffect(.degrees(-5))
+                    .shadow(color: .pink.opacity(0.35), radius: 4 * scale)
+                    .position(x: 94 * scale, y: 292 * scale)
+                Capsule().fill(Color(red: 1, green: 0.39, blue: 0.68).opacity(0.92))
                     .frame(width: 31 * scale, height: 10 * scale)
-                    .position(x: 287 * scale, y: 291 * scale)
+                    .rotationEffect(.degrees(5))
+                    .shadow(color: .pink.opacity(0.35), radius: 4 * scale)
+                    .position(x: 296 * scale, y: 292 * scale)
 
                 RobotMouth(emotion: emotion, isSpeaking: isSpeaking, scale: scale, mouthPulse: mouthPulse)
-                    .position(x: 195 * scale, y: 291 * scale)
+                    .position(x: 195 * scale, y: 292 * scale)
 
-                Capsule()
-                    .fill(Color(red: 0.45, green: 0.83, blue: 1))
-                    .frame(width: 7 * scale, height: 54 * scale)
-                    .rotationEffect(.degrees(-9))
-                    .position(x: 136 * scale, y: 56 * scale)
-                Capsule()
-                    .fill(Color(red: 0.45, green: 0.83, blue: 1))
-                    .frame(width: 7 * scale, height: 54 * scale)
-                    .rotationEffect(.degrees(9))
-                    .position(x: 254 * scale, y: 56 * scale)
+                // Antennae with pink luminous tips.
+                Capsule().fill(Color(red: 0.42, green: 0.83, blue: 1))
+                    .frame(width: 6 * scale, height: 48 * scale)
+                    .rotationEffect(.degrees(-12))
+                    .position(x: 132 * scale, y: 57 * scale)
+                Capsule().fill(Color(red: 0.42, green: 0.83, blue: 1))
+                    .frame(width: 6 * scale, height: 48 * scale)
+                    .rotationEffect(.degrees(12))
+                    .position(x: 258 * scale, y: 57 * scale)
+                RobotAntennaTip(scale: scale).position(x: 126 * scale, y: 31 * scale)
+                RobotAntennaTip(scale: scale).position(x: 264 * scale, y: 31 * scale)
 
-                Circle()
-                    .fill(Color(red: 1, green: 0.61, blue: 0.78))
-                    .frame(width: 30 * scale, height: 30 * scale)
-                    .shadow(color: .pink.opacity(0.5), radius: 8 * scale)
-                    .position(x: 132 * scale, y: 29 * scale)
-                Circle()
-                    .fill(Color(red: 1, green: 0.61, blue: 0.78))
-                    .frame(width: 30 * scale, height: 30 * scale)
-                    .shadow(color: .pink.opacity(0.5), radius: 8 * scale)
-                    .position(x: 258 * scale, y: 29 * scale)
-
-                RobotFin(side: -1, scale: scale).position(x: 47 * scale, y: 293 * scale)
-                RobotFin(side: 1, scale: scale).position(x: 343 * scale, y: 293 * scale)
+                RobotEar(side: -1, scale: scale).position(x: 35 * scale, y: 222 * scale)
+                RobotEar(side: 1, scale: scale).position(x: 355 * scale, y: 222 * scale)
             }
             .frame(width: 390 * scale, height: 430 * scale)
-            .scaleEffect(glowPulse ? 1.006 : 0.994)
-            .offset(y: isFloating ? -4 * scale : 4 * scale)
+            .scaleEffect(glow ? 1.004 : 0.998)
+            .offset(y: floatUp ? -3 * scale : 3 * scale)
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
             .onAppear {
-                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                    isFloating = true
-                }
-                withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) {
-                    gazeShift = 3.5
-                }
-                withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) {
-                    glowPulse = true
-                }
+                withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) { floatUp = true }
+                withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) { gaze = 2.5 }
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) { glow = true }
                 Task { @MainActor in
                     while !Task.isCancelled {
-                        try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 2.4...4.8) * 1_000_000_000))
-                        withAnimation(.easeInOut(duration: 0.09)) { blink = true }
-                        try? await Task.sleep(nanoseconds: 110_000_000)
-                        withAnimation(.spring(response: 0.18, dampingFraction: 0.55)) { blink = false }
+                        try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 2.6...4.8) * 1_000_000_000))
+                        withAnimation(.easeInOut(duration: 0.08)) { blink = true }
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                        withAnimation(.spring(response: 0.16, dampingFraction: 0.55)) { blink = false }
                     }
                 }
             }
             .onChange(of: isSpeaking) { speaking in
                 guard speaking else { mouthPulse = false; return }
-                withAnimation(.easeInOut(duration: 0.14).repeatForever(autoreverses: true)) {
-                    mouthPulse = true
-                }
+                withAnimation(.easeInOut(duration: 0.14).repeatForever(autoreverses: true)) { mouthPulse = true }
             }
         }
         .accessibilityLabel("ChatAI robot companion")
     }
 
-    private var eyeHeightForEmotion: CGFloat {
+    private var eyeHeight: CGFloat {
         switch emotion {
-        case .happy: 46
-        case .sleepy: 28
-        case .surprised: 72
-        case .angry: 43
-        default: 62
+        case .happy: 55
+        case .sleepy: 31
+        case .surprised: 73
+        case .angry: 45
+        default: 66
         }
     }
 
-    private var eyeWidthForEmotion: CGFloat {
+    private var eyeWidth: CGFloat {
         switch emotion {
-        case .surprised: 54
-        case .sleepy: 56
-        default: 48
+        case .surprised: 57
+        case .sleepy: 59
+        default: 53
         }
     }
 
@@ -423,40 +400,66 @@ private struct RobotEye: View {
     var body: some View {
         ZStack {
             Ellipse()
-                .fill(Color.cyan.opacity(glowPulse ? 0.38 : 0.18))
-                .frame(width: width + (glowPulse ? 28 : 18), height: height + (glowPulse ? 28 : 18))
-                .blur(radius: glowPulse ? 11 : 6)
+                .fill(Color.cyan.opacity(glowPulse ? 0.34 : 0.18))
+                .frame(width: width + 25, height: height + 25)
+                .blur(radius: glowPulse ? 10 : 6)
 
             Ellipse()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.86, green: 1, blue: 1), .cyan, Color(red: 0.05, green: 0.52, blue: 0.68)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .fill(LinearGradient(colors: [Color(red: 0.82, green: 1, blue: 1), Color(red: 0.16, green: 0.96, blue: 1), Color(red: 0, green: 0.55, blue: 0.74)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: width, height: height)
-                .shadow(color: .cyan.opacity(glowPulse ? 1.0 : 0.55), radius: glowPulse ? 13 : 6)
+                .overlay(Ellipse().stroke(Color(red: 0.55, green: 1, blue: 1), lineWidth: 2))
+                .shadow(color: .cyan.opacity(glowPulse ? 0.95 : 0.60), radius: glowPulse ? 12 : 6)
 
             Ellipse()
-                .fill(Color(red: 0.05, green: 0.45, blue: 0.60))
-                .frame(width: width * 0.55, height: height * 0.58)
+                .fill(LinearGradient(colors: [Color(red: 0.06, green: 0.72, blue: 0.80), Color(red: 0.01, green: 0.28, blue: 0.38)], startPoint: .top, endPoint: .bottom))
+                .frame(width: width * 0.70, height: height * 0.78)
                 .offset(x: pupilOffset)
 
             Ellipse()
-                .fill(Color.black.opacity(0.92))
-                .frame(width: width * 0.29, height: height * 0.44)
-                .offset(x: pupilOffset)
+                .fill(Color(red: 0.002, green: 0.025, blue: 0.035))
+                .frame(width: width * 0.39, height: height * 0.58)
+                .offset(x: pupilOffset + width * 0.02)
 
             Circle()
                 .fill(.white)
-                .frame(width: 14, height: 14)
-                .offset(x: -width * 0.18, y: -height * 0.23)
+                .frame(width: width * 0.27, height: width * 0.27)
+                .shadow(color: .white.opacity(0.65), radius: 2)
+                .offset(x: -width * 0.19, y: -height * 0.25)
 
             Circle()
-                .fill(.white.opacity(0.65))
-                .frame(width: 6, height: 6)
-                .offset(x: width * 0.20, y: height * 0.20)
+                .fill(.white.opacity(0.92))
+                .frame(width: width * 0.12, height: width * 0.12)
+                .offset(x: width * 0.17, y: height * 0.20)
+
+            Capsule()
+                .fill(.white.opacity(0.46))
+                .frame(width: width * 0.24, height: height * 0.07)
+                .rotationEffect(.degrees(-30))
+                .offset(x: -width * 0.18, y: -height * 0.39)
+        }
+    }
+}
+
+private struct RobotBrow: View {
+    let emotion: CompanionEmotion
+    let side: CGFloat
+    let scale: CGFloat
+
+    var body: some View {
+        Capsule()
+            .fill(Color(red: 0.35, green: 0.92, blue: 1).opacity(emotion == .angry ? 1 : 0.72))
+            .frame(width: 42 * scale, height: 5 * scale)
+            .rotationEffect(.degrees(angle))
+            .shadow(color: .cyan.opacity(0.65), radius: 4 * scale)
+    }
+
+    private var angle: Double {
+        switch emotion {
+        case .angry: return side < 0 ? 24 : -24
+        case .sad: return side < 0 ? -15 : 15
+        case .confused: return side < 0 ? -10 : 15
+        case .thinking: return side < 0 ? -8 : 8
+        default: return side < 0 ? -5 : 5
         }
     }
 }
@@ -469,19 +472,25 @@ private struct RobotMouth: View {
 
     var body: some View {
         if emotion == .happy || emotion == .shy {
-            Capsule()
-                .fill(Color(red: 1, green: 0.44, blue: 0.72))
-                .frame(width: 31 * scale, height: 9 * scale)
+            HStack(spacing: -2 * scale) {
+                Capsule().fill(Color(red: 1, green: 0.48, blue: 0.73)).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(24))
+                Capsule().fill(Color(red: 1, green: 0.48, blue: 0.73)).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(-24))
+            }
+        } else if emotion == .sad {
+            HStack(spacing: -2 * scale) {
+                Capsule().fill(Color(red: 1, green: 0.48, blue: 0.73)).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(-24))
+                Capsule().fill(Color(red: 1, green: 0.48, blue: 0.73)).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(24))
+            }
         } else if isSpeaking || emotion == .surprised {
             Capsule()
                 .fill(Color.black)
-                .frame(width: (isSpeaking ? (mouthPulse ? 37 : 29) : 22) * scale, height: (isSpeaking ? (mouthPulse ? 25 : 12) : 27) * scale)
+                .frame(width: (isSpeaking ? (mouthPulse ? 39 : 29) : 25) * scale, height: (isSpeaking ? (mouthPulse ? 24 : 11) : 28) * scale)
                 .overlay(Capsule().stroke(Color(red: 1, green: 0.44, blue: 0.72), lineWidth: 3 * scale))
-                .shadow(color: .pink.opacity(isSpeaking ? 0.75 : 0.25), radius: isSpeaking ? 7 * scale : 2 * scale)
+                .shadow(color: .pink.opacity(isSpeaking ? 0.75 : 0.30), radius: isSpeaking ? 7 * scale : 3 * scale)
         } else {
-            HStack(spacing: -1 * scale) {
-                Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 13 * scale, height: 5 * scale).rotationEffect(.degrees(25))
-                Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 13 * scale, height: 5 * scale).rotationEffect(.degrees(-25))
+            HStack(spacing: -2 * scale) {
+                Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 14 * scale, height: 5 * scale).rotationEffect(.degrees(25))
+                Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 14 * scale, height: 5 * scale).rotationEffect(.degrees(-25))
             }
         }
     }
@@ -493,19 +502,22 @@ private struct RobotEar: View {
 
     var body: some View {
         ZStack {
-            Capsule()
-                .fill(LinearGradient(colors: [.white, Color(red: 0.88, green: 0.95, blue: 1)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 76 * scale, height: 116 * scale)
-                .rotationEffect(.degrees(side < 0 ? -17 : 17))
-            Capsule()
-                .stroke(Color(red: 0.98, green: 0.65, blue: 0.82), lineWidth: 7 * scale)
-                .frame(width: 76 * scale, height: 116 * scale)
-                .rotationEffect(.degrees(side < 0 ? -17 : 17))
-            Capsule()
-                .fill(Color(red: 0.43, green: 0.82, blue: 1).opacity(0.8))
-                .frame(width: 31 * scale, height: 76 * scale)
-                .rotationEffect(.degrees(side < 0 ? -17 : 17))
+            Circle()
+                .fill(LinearGradient(colors: [.white, Color(red: 0.86, green: 0.95, blue: 1)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 82 * scale, height: 82 * scale)
+                .overlay(Circle().stroke(Color(red: 1, green: 0.58, blue: 0.80), lineWidth: 7 * scale))
+                .shadow(color: .pink.opacity(0.20), radius: 7 * scale)
+
+            Circle()
+                .fill(LinearGradient(colors: [Color(red: 0.48, green: 0.88, blue: 1), Color(red: 0.26, green: 0.66, blue: 0.95)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 54 * scale, height: 54 * scale)
+                .overlay(Circle().stroke(Color(red: 1, green: 0.76, blue: 0.89), lineWidth: 4 * scale))
+
+            Image(systemName: "sparkle")
+                .font(.system(size: 20 * scale, weight: .bold))
+                .foregroundStyle(.white)
         }
+        .rotationEffect(.degrees(side < 0 ? -8 : 8))
     }
 }
 
@@ -514,11 +526,47 @@ private struct RobotFin: View {
     let scale: CGFloat
 
     var body: some View {
-        VStack(spacing: 6 * scale) {
-            Capsule().fill(Color(red: 1, green: 0.70, blue: 0.84)).frame(width: 50 * scale, height: 20 * scale)
-            Capsule().fill(Color(red: 0.55, green: 0.86, blue: 1)).frame(width: 42 * scale, height: 18 * scale)
-            Capsule().fill(Color(red: 1, green: 0.78, blue: 0.88)).frame(width: 35 * scale, height: 16 * scale)
+        ZStack {
+            RobotFinShape()
+                .fill(LinearGradient(colors: [Color.white.opacity(0.96), Color(red: 0.56, green: 0.86, blue: 1).opacity(0.80)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 92 * scale, height: 118 * scale)
+                .overlay(RobotFinShape().stroke(Color(red: 1, green: 0.70, blue: 0.87), lineWidth: 4 * scale))
+
+            VStack(spacing: 13 * scale) {
+                Capsule().fill(.white.opacity(0.80)).frame(width: 55 * scale, height: 2 * scale)
+                Capsule().fill(.white.opacity(0.80)).frame(width: 62 * scale, height: 2 * scale)
+                Capsule().fill(.white.opacity(0.80)).frame(width: 48 * scale, height: 2 * scale)
+            }
+            .rotationEffect(.degrees(side < 0 ? -14 : 14))
         }
-        .rotationEffect(.degrees(side < 0 ? -18 : 18))
+        .rotationEffect(.degrees(side < 0 ? -10 : 10))
+    }
+}
+
+private struct RobotFinShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.width * 0.50, y: rect.height * 0.04))
+        p.addCurve(to: CGPoint(x: rect.width * 0.94, y: rect.height * 0.40), control1: CGPoint(x: rect.width * 0.96, y: rect.height * 0.00), control2: CGPoint(x: rect.width * 1.02, y: rect.height * 0.24))
+        p.addCurve(to: CGPoint(x: rect.width * 0.50, y: rect.height * 0.96), control1: CGPoint(x: rect.width * 0.92, y: rect.height * 0.82), control2: CGPoint(x: rect.width * 0.70, y: rect.height * 1.03))
+        p.addCurve(to: CGPoint(x: rect.width * 0.06, y: rect.height * 0.48), control1: CGPoint(x: rect.width * 0.13, y: rect.height * 0.91), control2: CGPoint(x: rect.width * -0.03, y: rect.height * 0.62))
+        p.addCurve(to: CGPoint(x: rect.width * 0.50, y: rect.height * 0.04), control1: CGPoint(x: rect.width * 0.18, y: rect.height * 0.12), control2: CGPoint(x: rect.width * 0.35, y: rect.height * 0.00))
+        p.closeSubpath()
+        return p
+    }
+}
+
+private struct RobotAntennaTip: View {
+    let scale: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Color.pink.opacity(0.25)).frame(width: 38 * scale, height: 38 * scale).blur(radius: 6 * scale)
+            Circle()
+                .fill(LinearGradient(colors: [.white, Color(red: 1, green: 0.54, blue: 0.78)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 28 * scale, height: 28 * scale)
+                .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 2 * scale))
+            Circle().fill(.white.opacity(0.75)).frame(width: 8 * scale, height: 8 * scale).offset(x: -5 * scale, y: -5 * scale)
+        }
     }
 }
