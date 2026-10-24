@@ -326,9 +326,7 @@ private struct Companion3DStage: UIViewRepresentable {
         default: break
         }
 
-        if isSpeaking {
-            mouthY = max(mouthY, 1.25)
-        }
+        if isSpeaking { mouthY = max(mouthY, 1.25) }
 
         setScaleY(leftEye, eyeY)
         setScaleY(rightEye, eyeY)
@@ -343,8 +341,8 @@ private struct Companion3DStage: UIViewRepresentable {
         setScaleX(rightCheek, cheekScale)
         head?.eulerAngles.z = headZ
         head?.eulerAngles.y = expression == "thinking" ? -0.06 : 0
-        antennaL?.scale = SCNVector3(repeating: glow)
-        antennaR?.scale = SCNVector3(repeating: glow)
+        antennaL?.scale = SCNVector3(x: glow, y: glow, z: glow)
+        antennaR?.scale = SCNVector3(x: glow, y: glow, z: glow)
 
         if let material = root.childNode(withName: "eyeL", recursively: true)?.geometry?.firstMaterial {
             material.emission.contents = UIColor(red: 0.05, green: 0.92, blue: 1, alpha: 1)
@@ -396,18 +394,15 @@ private struct Companion3DStage: UIViewRepresentable {
         let mouthMat = mat(UIColor(red: 1.0, green: 0.32, blue: 0.67, alpha: 1), rough: 0.18)
         mouthMat.emission.contents = UIColor(red: 1.0, green: 0.12, blue: 0.48, alpha: 1)
 
-        // Ambient glow behind the robot head.
         let halo = sphere(root, "environmentGlow", radius: 2.35,
                           position: SCNVector3(0, 0.05, -1.05),
                           material: mat(UIColor(red: 0.30, green: 0.78, blue: 1.0, alpha: 0.16), rough: 1),
                           scale: SCNVector3(1.22, 0.92, 0.10), segments: 64)
         halo.geometry?.firstMaterial?.lightingModel = .constant
 
-        // Decorative side ears/fins. These stay attached to the head; there is no body.
         makeEar(root: root, side: -1, pink: pink, blue: blue, white: white)
         makeEar(root: root, side: 1, pink: pink, blue: blue, white: white)
 
-        // Outer pastel-pink rounded shell.
         let outerGeo = SCNBox(width: 3.35, height: 2.72, length: 1.60, chamferRadius: 0.56)
         outerGeo.widthSegmentCount = 10
         outerGeo.heightSegmentCount = 10
@@ -418,7 +413,6 @@ private struct Companion3DStage: UIViewRepresentable {
         outer.position = SCNVector3(0, 0.12, 0)
         root.addChildNode(outer)
 
-        // Pearl-white inner shell creates a real visible pink rim around the entire head.
         let shellGeo = SCNBox(width: 3.18, height: 2.55, length: 1.50, chamferRadius: 0.52)
         shellGeo.widthSegmentCount = 10
         shellGeo.heightSegmentCount = 10
@@ -429,14 +423,12 @@ private struct Companion3DStage: UIViewRepresentable {
         shell.position = SCNVector3(0, 0.13, 0.08)
         root.addChildNode(shell)
 
-        // Top crown panel and small pink seam, matching the reference's soft toy-like construction.
         let crown = roundedBox(root, name: "crown", width: 2.72, height: 0.62, length: 1.34,
                                radius: 0.28, position: SCNVector3(0, 1.17, 0.15), material: pearl)
         crown.eulerAngles.x = -0.04
         roundedBox(root, name: "crownBand", width: 2.74, height: 0.10, length: 1.38,
                    radius: 0.05, position: SCNVector3(0, 0.90, 0.22), material: pinkLight)
 
-        // Two short antenna stems and glossy pink tips.
         for (x, suffix) in [(-0.54, "L"), (0.54, "R")] as [(Float, String)] {
             let stemGeo = SCNCylinder(radius: 0.045, height: 0.44)
             stemGeo.firstMaterial = blue
@@ -453,20 +445,17 @@ private struct Companion3DStage: UIViewRepresentable {
                    position: SCNVector3(x * 1.10 - 0.035, 2.03, 0.25), material: white, segments: 16)
         }
 
-        // Large glossy black visor inset into the shell.
         let visorOuter = roundedBox(root, name: "visorFrame", width: 2.86, height: 1.76, length: 0.24,
                                     radius: 0.40, position: SCNVector3(0, 0.13, 0.87), material: pinkLight)
         visorOuter.scale = SCNVector3(1.01, 1.01, 1)
         roundedBox(root, name: "visor", width: 2.70, height: 1.60, length: 0.20,
                    radius: 0.36, position: SCNVector3(0, 0.13, 1.01), material: visor)
 
-        // Glass reflection across the upper-left of the visor.
         let reflection = roundedBox(root, name: "visorReflection", width: 0.72, height: 0.16, length: 0.035,
-                                     radius: 0.08, position: SCNVector3(-0.82, 0.72, 1.13), material: white)
+                                    radius: 0.08, position: SCNVector3(-0.82, 0.72, 1.13), material: white)
         reflection.eulerAngles.z = -0.42
         reflection.opacity = 0.28
 
-        // Detailed cyan eyes: outer glow, luminous oval, iris, pupil and two highlights.
         for (x, suffix) in [(-0.56, "L"), (0.56, "R")] as [(Float, String)] {
             sphere(root, "eyeGlow" + suffix, radius: 0.37,
                    position: SCNVector3(x, 0.17, 1.14), material: cyanDark,
@@ -489,7 +478,6 @@ private struct Companion3DStage: UIViewRepresentable {
                    position: SCNVector3(x + 0.075, 0.06, 1.37), material: white, segments: 14)
         }
 
-        // Pink cheeks, positioned inside the visor for the same cute visual language as the reference.
         for x in [-0.92, 0.92] as [Float] {
             let name = x < 0 ? "cheekL" : "cheekR"
             let cheek = sphere(root, name, radius: 0.13,
@@ -498,28 +486,24 @@ private struct Companion3DStage: UIViewRepresentable {
             cheek.geometry?.firstMaterial?.emission.contents = UIColor(red: 1, green: 0.32, blue: 0.62, alpha: 1)
         }
 
-        // Tiny smiling mouth, built from an outer pink lip and dark inner opening.
         let mouth = roundedBox(root, name: "mouth", width: 0.42, height: 0.16, length: 0.10,
                                radius: 0.07, position: SCNVector3(0, -0.35, 1.19), material: mouthMat)
         mouth.scale = SCNVector3(1.0, 0.42, 1.0)
         roundedBox(root, name: "mouthInner", width: 0.24, height: 0.08, length: 0.025,
                    radius: 0.035, position: SCNVector3(0, -0.35, 1.255), material: visor)
 
-        // Side fin layers add the soft wing-like silhouette from the reference without creating a body.
         makeSideFin(root: root, side: -1, pink: pink, blue: blue, white: white)
         makeSideFin(root: root, side: 1, pink: pink, blue: blue, white: white)
 
-        // Gentle idle motion. All geometry remains a single head-only companion.
-        root.runAction(.repeatForever(.sequence([
-            .customAction(withDuration: 1.8) { node, elapsed in
-                let p = Float(elapsed / 1.8)
-                node.position.y = sin(p * .pi * 2) * 0.018
-            },
-            .customAction(withDuration: 1.8) { node, elapsed in
-                let p = Float(elapsed / 1.8)
-                node.position.y = sin((1 - p) * .pi * 2) * 0.018
-            }
-        ])), forKey: "idleFloat")
+        let floatUp = SCNAction.customAction(duration: 1.8) { node, elapsed in
+            let p = Float(elapsed / 1.8)
+            node.position.y = sin(p * .pi * 2) * 0.018
+        }
+        let floatDown = SCNAction.customAction(duration: 1.8) { node, elapsed in
+            let p = Float(elapsed / 1.8)
+            node.position.y = sin((1 - p) * .pi * 2) * 0.018
+        }
+        root.runAction(.repeatForever(.sequence([floatUp, floatDown])), forKey: "idleFloat")
 
         return scene
     }
