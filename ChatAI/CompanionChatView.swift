@@ -64,7 +64,19 @@ struct CompanionChatView: View {
             if let message, !message.isEmpty { touchMessage = message }
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
-            emotion = speaking ? .speaking : (emotion == .speaking ? .idle : emotion)
+            withAnimation(.easeInOut(duration: 0.16)) {
+                emotion = speaking ? .speaking : (emotion == .speaking ? .idle : emotion)
+            }
+        }
+        .onChange(of: liveManager.state) { state in
+            guard !liveManager.aiSpeaking else { return }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
+                switch state {
+                case .idle: emotion = .idle
+                case .connecting: emotion = .thinking
+                case .live: emotion = .listening
+                }
+            }
         }
         .onDisappear { liveManager.end() }
     }
@@ -230,11 +242,13 @@ private struct RobotHeadView: View {
     @State private var isFloating = false
     @State private var gazeShift: CGFloat = 0
     @State private var glowPulse = false
+    @State private var blink = false
+    @State private var mouthPulse = false
 
     var body: some View {
         GeometryReader { geo in
             let scale = min(geo.size.width / 390, geo.size.height / 430)
-            let eyeHeight = eyeHeightForEmotion * scale
+            let eyeHeight = (blink ? 5 : eyeHeightForEmotion) * scale
             let eyeWidth = eyeWidthForEmotion * scale
 
             ZStack {
@@ -312,7 +326,7 @@ private struct RobotHeadView: View {
                     .frame(width: 31 * scale, height: 10 * scale)
                     .position(x: 287 * scale, y: 291 * scale)
 
-                RobotMouth(emotion: emotion, isSpeaking: isSpeaking, scale: scale)
+                RobotMouth(emotion: emotion, isSpeaking: isSpeaking, scale: scale, mouthPulse: mouthPulse)
                     .position(x: 195 * scale, y: 291 * scale)
 
                 Capsule()
@@ -353,6 +367,20 @@ private struct RobotHeadView: View {
                 }
                 withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) {
                     glowPulse = true
+                }
+                Task { @MainActor in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: UInt64(Double.random(in: 2.4...4.8) * 1_000_000_000))
+                        withAnimation(.easeInOut(duration: 0.09)) { blink = true }
+                        try? await Task.sleep(nanoseconds: 110_000_000)
+                        withAnimation(.spring(response: 0.18, dampingFraction: 0.55)) { blink = false }
+                    }
+                }
+            }
+            .onChange(of: isSpeaking) { speaking in
+                guard speaking else { mouthPulse = false; return }
+                withAnimation(.easeInOut(duration: 0.14).repeatForever(autoreverses: true)) {
+                    mouthPulse = true
                 }
             }
         }
@@ -437,6 +465,7 @@ private struct RobotMouth: View {
     let emotion: CompanionEmotion
     let isSpeaking: Bool
     let scale: CGFloat
+    let mouthPulse: Bool
 
     var body: some View {
         if emotion == .happy || emotion == .shy {
@@ -446,8 +475,9 @@ private struct RobotMouth: View {
         } else if isSpeaking || emotion == .surprised {
             Capsule()
                 .fill(Color.black)
-                .frame(width: (isSpeaking ? 34 : 22) * scale, height: (isSpeaking ? 22 : 27) * scale)
+                .frame(width: (isSpeaking ? (mouthPulse ? 37 : 29) : 22) * scale, height: (isSpeaking ? (mouthPulse ? 25 : 12) : 27) * scale)
                 .overlay(Capsule().stroke(Color(red: 1, green: 0.44, blue: 0.72), lineWidth: 3 * scale))
+                .shadow(color: .pink.opacity(isSpeaking ? 0.75 : 0.25), radius: isSpeaking ? 7 * scale : 2 * scale)
         } else {
             HStack(spacing: -1 * scale) {
                 Capsule().fill(Color(red: 1, green: 0.52, blue: 0.74)).frame(width: 13 * scale, height: 5 * scale).rotationEffect(.degrees(25))
