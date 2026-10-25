@@ -39,10 +39,16 @@ struct ChatAIHead3DView: UIViewRepresentable {
             position: [0, 0.45, -0.4]
         ))
 
-        if let modelURL = Bundle.main.url(
+        let modelURL = Bundle.main.url(
+            forResource: "companion",
+            withExtension: "glb",
+            subdirectory: "Companion"
+        ) ?? Bundle.main.url(
             forResource: "companion",
             withExtension: "glb"
-        ) {
+        )
+
+        if let modelURL {
             do {
                 let model = try Entity.load(contentsOf: modelURL)
                 model.name = "ChatAICompanionGLB"
