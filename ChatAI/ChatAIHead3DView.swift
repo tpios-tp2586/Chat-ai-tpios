@@ -126,9 +126,11 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 0.82 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // GLB uses a different up-axis convention from the USD scene exported by Blender.
-            // Try the opposite quarter-turn, then offset the rotated center (not the old center).
-            let axisCorrection = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
+            // Convert the GLB up-axis, then flip 180° in the camera plane because the
+            // imported head currently appears upside down (crown below the neck).
+            let upAxisCorrection = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
+            let uprightCorrection = simd_quatf(angle: .pi, axis: [0, 0, 1])
+            let axisCorrection = uprightCorrection * upAxisCorrection
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
