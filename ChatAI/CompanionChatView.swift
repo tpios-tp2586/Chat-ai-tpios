@@ -84,11 +84,21 @@ struct CompanionChatView: View {
         .onChange(of: liveManager.lines.count) { _ in
             guard let line = liveManager.lines.last else { return }
             message = line.text
-            emotion = line.role == .assistant ? .happy : .thinking
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
+                // Keep the conversational emotion while the mouth animation runs.
+                emotion = line.role == .assistant ? .happy : .thinking
+            }
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                emotion = speaking ? .speaking : (emotion == .speaking ? .idle : emotion)
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
+                if speaking {
+                    // Speech is a mouth animation, not a facial emotion.
+                    if emotion == .idle || emotion == .listening || emotion == .thinking {
+                        emotion = .speaking
+                    }
+                } else if emotion == .speaking {
+                    emotion = liveManager.state == .live ? .listening : .idle
+                }
             }
         }
         .onChange(of: liveManager.state) { state in
@@ -352,16 +362,18 @@ private struct ApprovedRobotHead: View {
                 ConceptEye(
                     scale: scale,
                     height: blink ? 4 : eyeHeight,
-                    pupilOffset: gaze
+                    pupilOffset: gaze,
+                    emotion: emotion
                 )
-                .position(x: 142 * scale, y: 232 * scale)
+                .position(x: 142 * scale, y: 232 * scale + eyeOffsetY)
 
                 ConceptEye(
                     scale: scale,
                     height: blink ? 4 : eyeHeight,
-                    pupilOffset: gaze
+                    pupilOffset: gaze,
+                    emotion: emotion
                 )
-                .position(x: 268 * scale, y: 232 * scale)
+                .position(x: 268 * scale, y: 232 * scale + eyeOffsetY)
 
                 Brow(scale: scale, side: -1, emotion: emotion)
                     .position(x: 142 * scale, y: 191 * scale)
@@ -369,19 +381,19 @@ private struct ApprovedRobotHead: View {
                 Brow(scale: scale, side: 1, emotion: emotion)
                     .position(x: 268 * scale, y: 191 * scale)
 
-                // Pink cheeks.
+                // Cheeks react visibly to the current emotion.
                 Capsule()
-                    .fill(Color(red: 1, green: 0.38, blue: 0.67))
-                    .frame(width: 31 * scale, height: 10 * scale)
+                    .fill(cheekColor)
+                    .frame(width: (emotion == .happy ? 39 : 31) * scale, height: (emotion == .happy ? 15 : 10) * scale)
                     .rotationEffect(.degrees(-6))
-                    .shadow(color: .pink.opacity(0.35), radius: 4 * scale)
+                    .shadow(color: cheekColor.opacity(0.55), radius: (emotion == .happy ? 8 : 4) * scale)
                     .position(x: 94 * scale, y: 294 * scale)
 
                 Capsule()
-                    .fill(Color(red: 1, green: 0.38, blue: 0.67))
-                    .frame(width: 31 * scale, height: 10 * scale)
+                    .fill(cheekColor)
+                    .frame(width: (emotion == .happy ? 39 : 31) * scale, height: (emotion == .happy ? 15 : 10) * scale)
                     .rotationEffect(.degrees(6))
-                    .shadow(color: .pink.opacity(0.35), radius: 4 * scale)
+                    .shadow(color: cheekColor.opacity(0.55), radius: (emotion == .happy ? 8 : 4) * scale)
                     .position(x: 316 * scale, y: 294 * scale)
 
                 RobotMouth(
@@ -455,16 +467,37 @@ private struct ApprovedRobotHead: View {
 
     private var eyeHeight: CGFloat {
         switch emotion {
-        case .surprised: 76
-        case .sleepy: 28
-        case .happy: 48
-        case .angry: 43
-        case .sad: 54
-        case .confused: 61
+        case .surprised: 82
+        case .sleepy: 24
+        case .happy: 43
+        case .angry: 48
+        case .sad: 58
+        case .confused: 64
         case .thinking: 58
-        case .listening: 68
+        case .listening: 70
         case .speaking: 66
         case .idle: 64
+        }
+    }
+
+    private var eyeOffsetY: CGFloat {
+        switch emotion {
+        case .happy: 5
+        case .sad: 5
+        case .sleepy: 10
+        case .surprised: -4
+        default: 0
+        }
+    }
+
+    private var cheekColor: Color {
+        switch emotion {
+        case .sad: Color(red: 0.48, green: 0.62, blue: 1).opacity(0.95)
+        case .angry: Color(red: 1, green: 0.20, blue: 0.34)
+        case .surprised: Color(red: 1, green: 0.58, blue: 0.72)
+        case .happy: Color(red: 1, green: 0.25, blue: 0.63)
+        case .sleepy: Color(red: 0.76, green: 0.47, blue: 0.80)
+        default: Color(red: 1, green: 0.38, blue: 0.67)
         }
     }
 }
@@ -577,13 +610,21 @@ private struct ConceptEye: View {
     let scale: CGFloat
     let height: CGFloat
     let pupilOffset: CGFloat
+    let emotion: CompanionEmotion
 
     var body: some View {
-        let width: CGFloat = 57
+        let width: CGFloat = emotion == .surprised ? 64 : (emotion == .sleepy ? 53 : 57)
+        let eyeColor: Color = emotion == .sad
+            ? Color(red: 0.35, green: 0.58, blue: 1)
+            : (emotion == .angry
+                ? Color(red: 1, green: 0.22, blue: 0.42)
+                : (emotion == .happy
+                    ? Color(red: 0.28, green: 1, blue: 0.82)
+                    : Color(red: 0.12, green: 0.96, blue: 1)))
 
         ZStack {
             Ellipse()
-                .fill(Color.cyan.opacity(0.25))
+                .fill(eyeColor.opacity(0.30))
                 .frame(width: (width + 28) * scale, height: (height + 28) * scale)
                 .blur(radius: 9 * scale)
 
@@ -591,9 +632,9 @@ private struct ConceptEye: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.88, green: 1, blue: 1),
-                            Color(red: 0.12, green: 0.96, blue: 1),
-                            Color(red: 0, green: 0.48, blue: 0.72)
+                            .white,
+                            eyeColor,
+                            Color(red: 0, green: 0.30, blue: 0.55)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -602,9 +643,9 @@ private struct ConceptEye: View {
                 .frame(width: width * scale, height: height * scale)
                 .overlay(
                     Ellipse()
-                        .stroke(Color(red: 0.55, green: 1, blue: 1), lineWidth: 2 * scale)
+                        .stroke(eyeColor.opacity(0.95), lineWidth: 2 * scale)
                 )
-                .shadow(color: .cyan.opacity(0.80), radius: 8 * scale)
+                .shadow(color: eyeColor.opacity(0.90), radius: emotion == .surprised ? 15 * scale : 8 * scale)
 
             Ellipse()
                 .fill(
@@ -656,10 +697,13 @@ private struct Brow: View {
 
     private var angle: Double {
         switch emotion {
-        case .angry: return side < 0 ? 24 : -24
-        case .sad: return side < 0 ? -15 : 15
-        case .confused: return side < 0 ? -10 : 15
-        case .thinking: return side < 0 ? -8 : 8
+        case .angry: return side < 0 ? 32 : -32
+        case .sad: return side < 0 ? -22 : 22
+        case .confused: return side < 0 ? -20 : 22
+        case .thinking: return side < 0 ? -15 : 10
+        case .surprised: return side < 0 ? -12 : 12
+        case .happy: return side < 0 ? 9 : -9
+        case .sleepy: return side < 0 ? 12 : -12
         default: return side < 0 ? -5 : 5
         }
     }
@@ -673,7 +717,7 @@ private struct RobotMouth: View {
 
     var body: some View {
         Group {
-            if speaking {
+            if speaking && emotion != .surprised {
                 Capsule()
                     .fill(Color.black)
                     .frame(width: (open ? 38 : 28) * scale, height: (open ? 23 : 10) * scale)
