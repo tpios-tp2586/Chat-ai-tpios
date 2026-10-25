@@ -94,7 +94,7 @@ workflows:
           "$BLENDER" --version
 
           echo "=== Import GLB and export USD ==="
-          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); r=bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); print('GLB_IMPORT_RESULT', r); print('OBJECT_COUNT', len(bpy.context.scene.objects)); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; e=bpy.ops.wm.usd_export(filepath='$USD_FILE', export_textures=True, overwrite=True); print('USD_EXPORT_RESULT', e)" 
+          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); r=bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); print('GLB_IMPORT_RESULT', r); print('OBJECT_COUNT', len(bpy.context.scene.objects)); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; print('USD_EXPORT_OPTIONS', [p.identifier for p in bpy.ops.wm.usd_export.get_rna_type().properties]); e=bpy.ops.wm.usd_export(filepath='$USD_FILE', overwrite=True); print('USD_EXPORT_RESULT', e)" 
 
           if [ ! -s "$USD_FILE" ]; then
             echo "ERROR: Blender did not create USD file: $USD_FILE"
