@@ -8,7 +8,8 @@ import Combine
 struct ChatAIHead3DView: View {
     var headRotation: Float = 0
     var speaking: Bool = false
-    var emotion: CompanionEmotion = .idle
+    var isSurprised: Bool = false
+    var isHappy: Bool = false
 
     @State private var modelLoaded = false
     @State private var loadMessage = "Đang tải mô hình 3D…"
@@ -44,9 +45,8 @@ struct ChatAIHead3DView: View {
             // Draw a lightweight animated mouth over the lower face so speech is visible
             // even when the source model has no mouth blend shapes.
             if modelLoaded {
-                CompanionMouthOverlay(speaking: speaking, emotion: emotion)
+                CompanionMouthOverlay(speaking: speaking, isSurprised: isSurprised, isHappy: isHappy)
                     .allowsHitTesting(false)
-                    .transition(.opacity)
             }
 
             if !modelLoaded {
@@ -227,7 +227,8 @@ private struct CompanionRealityView: UIViewRepresentable {
 
 private struct CompanionMouthOverlay: View {
     let speaking: Bool
-    let emotion: CompanionEmotion
+    let isSurprised: Bool
+    let isHappy: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -235,7 +236,7 @@ private struct CompanionMouthOverlay: View {
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 let pulse = speaking ? (0.5 + 0.5 * sin(time * 15.5)) : 0
                 let width = max(24, min(geometry.size.width * 0.115, 48))
-                let restingHeight: CGFloat = emotion == .surprised ? 21 : (emotion == .happy ? 7 : 5)
+                let restingHeight: CGFloat = isSurprised ? 21 : (isHappy ? 7 : 5)
                 let openHeight = speaking ? 9 + pulse * 21 : restingHeight
 
                 ZStack {
