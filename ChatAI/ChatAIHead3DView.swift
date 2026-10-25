@@ -1,6 +1,7 @@
 import SwiftUI
 import RealityKit
 import UIKit
+import Combine
 
 /// Loads the USDZ generated from the uploaded GLB during CI. If RealityKit cannot load it,
 /// a visible SwiftUI robot remains on screen instead of leaving an empty dark rectangle.
@@ -143,7 +144,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                 to: SceneEvents.Update.self
             ) { [weak coordinator = context.coordinator] event in
                 guard let coordinator, let animatedHead = coordinator.head else { return }
-                coordinator.elapsed += event.deltaTime
+                coordinator.elapsed += Float(event.deltaTime)
                 let bob = sin(coordinator.elapsed * 1.8) * 0.025
                 animatedHead.position = coordinator.basePosition + SIMD3<Float>(0, bob, 0)
                 let yaw = simd_quatf(angle: coordinator.currentHeadRotation, axis: [0, 1, 0])
@@ -178,7 +179,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentHeadRotation: Float = 0
         var elapsed: Float = 0
-        var animationSubscription: EventSubscription?
+        var animationSubscription: AnyCancellable?
         weak var view: ARView?
     }
 
