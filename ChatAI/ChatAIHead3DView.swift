@@ -93,8 +93,8 @@ struct ChatAIHead3DView: UIViewRepresentable {
     ) -> PhysicallyBasedMaterial {
         var result = PhysicallyBasedMaterial()
         result.baseColor = .init(tint: color)
-        result.metallic = metallic
-        result.roughness = roughness
+        result.metallic = .init(floatLiteral: metallic)
+        result.roughness = .init(floatLiteral: roughness)
         return result
     }
 
@@ -163,7 +163,7 @@ struct ChatAIHead3DView: UIViewRepresentable {
 
         // Glowing collar ring
         let ring = ModelEntity(
-            mesh: .generateCylinder(height: 0.018, radius: 0.235),
+            mesh: .generateBox(size: [0.42, 0.018, 0.32]),
             materials: [SimpleMaterial(
                 color: cyan,
                 roughness: 0.2,
