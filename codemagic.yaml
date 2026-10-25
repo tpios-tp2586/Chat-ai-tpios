@@ -6,54 +6,16 @@ workflows:
       xcode: 16.4
       cocoapods: default
     scripts:
-      - name: Check files
+      - name: Check required source files
         script: |
-          echo "=== Root files ==="
-          ls -la
-          echo "=== ChatAI folder ==="
-          ls -la ChatAI/
-          echo "=== project.yml ==="
-          cat project.yml
+          set -e
+          test -s project.yml
+          test -s IMG_0290.png
+          test -s ChatAI/Resources/Companion/model-1792924579279.glb
+          echo "Required project, icon, and 3D model files are present."
 
       - name: Install XcodeGen
         script: brew install xcodegen
-
-      - name: Check GLB-to-USDZ conversion tools
-        script: |
-          echo "=== macOS / Xcode ==="
-          sw_vers
-          xcodebuild -version
-          echo "=== Potential USD / USDZ tools ==="
-          for tool in usdz_converter realitytool usdzip usdcat blender; do
-            if command -v "$tool" >/dev/null 2>&1; then
-              echo "FOUND $tool: $(command -v "$tool")"
-            else
-              echo "NOT FOUND: $tool"
-            fi
-          done
-          echo "=== Xcode toolchain lookup ==="
-          for tool in usdz_converter realitytool; do
-            if xcrun --find "$tool" >/dev/null 2>&1; then
-              echo "XCRUN FOUND $tool: $(xcrun --find "$tool")"
-            else
-              echo "XCRUN NOT FOUND: $tool"
-            fi
-          done
-          echo "=== realitytool command help ==="
-          xcrun realitytool --help 2>&1 || true
-          echo "=== realitytool subcommand discovery ==="
-          xcrun realitytool help 2>&1 || true
-          echo "=== usdzip help ==="
-          usdzip --help 2>&1 || true
-          echo "=== GLB input ==="
-          GLB_SOURCE="ChatAI/Resources/Companion/model-1792924579279.glb"
-          if [ -s "$GLB_SOURCE" ]; then
-            ls -lh "$GLB_SOURCE"
-            file "$GLB_SOURCE"
-          else
-            echo "ERROR: GLB input missing or empty: $GLB_SOURCE"
-            exit 1
-          fi
 
       - name: Generate app icon
         script: |
@@ -70,7 +32,7 @@ workflows:
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
           sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
 
-      - name: Convert GLB to USDZ with Blender
+      - name: Convert GLB to USDZ when needed
         script: |
           set -e
           GLB_SOURCE="ChatAI/Resources/Companion/model-1792924579279.glb"
@@ -78,38 +40,31 @@ workflows:
           USD_FILE="$USD_DIR/model-1792924579279.usd"
           USDZ_FILE="$USD_DIR/model-1792924579279.usdz"
 
-          if [ ! -s "$GLB_SOURCE" ]; then
-            echo "ERROR: GLB source missing: $GLB_SOURCE"
-            exit 1
+          test -s "$GLB_SOURCE"
+
+          # Reuse a valid USDZ when it is already present and at least as new as the GLB.
+          # On a clean checkout without a committed/cached USDZ, conversion is still required.
+          if [ -s "$USDZ_FILE" ] && [ "$USDZ_FILE" -nt "$GLB_SOURCE" ]; then
+            echo "Reusing existing USDZ: $USDZ_FILE"
+            ls -lh "$USDZ_FILE"
+            exit 0
           fi
 
-          echo "=== Install Blender ==="
+          echo "Installing Blender because USDZ must be regenerated..."
           brew install --cask blender
           BLENDER="/Applications/Blender.app/Contents/MacOS/Blender"
           if [ ! -x "$BLENDER" ]; then
-            echo "ERROR: Blender executable not found at $BLENDER"
-            find /Applications -maxdepth 4 -iname '*blender*' -print || true
+            echo "ERROR: Blender executable not found."
             exit 1
           fi
-          "$BLENDER" --version
 
-          echo "=== Import GLB and export USD ==="
-          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); r=bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); print('GLB_IMPORT_RESULT', r); print('OBJECT_COUNT', len(bpy.context.scene.objects)); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; print('USD_EXPORT_OPTIONS', [p.identifier for p in bpy.ops.wm.usd_export.get_rna_type().properties]); e=bpy.ops.wm.usd_export(filepath='$USD_FILE', check_existing=False, export_materials=True, export_textures_mode='NEW', generate_preview_surface=True); print('USD_EXPORT_RESULT', e)" 
+          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; bpy.ops.wm.usd_export(filepath='$USD_FILE', check_existing=False, export_materials=True, export_textures_mode='NEW', generate_preview_surface=True)"
 
-          if [ ! -s "$USD_FILE" ]; then
-            echo "ERROR: Blender did not create USD file: $USD_FILE"
-            exit 1
-          fi
-          echo "=== Package USD and dependencies into USDZ ==="
+          test -s "$USD_FILE"
           usdzip --arkitAsset "$USD_FILE" "$USDZ_FILE"
-          if [ ! -s "$USDZ_FILE" ]; then
-            echo "ERROR: USDZ package missing or empty: $USDZ_FILE"
-            exit 1
-          fi
-          echo "=== USDZ created ==="
+          test -s "$USDZ_FILE"
+          echo "USDZ ready:"
           ls -lh "$USDZ_FILE"
-          echo "=== USDZ archive contents ==="
-          unzip -l "$USDZ_FILE"
 
       - name: Generate Xcode project
         script: xcodegen generate
