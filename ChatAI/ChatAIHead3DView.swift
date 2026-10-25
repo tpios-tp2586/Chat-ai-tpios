@@ -134,6 +134,8 @@ private struct CompanionRealityView: UIViewRepresentable {
             context.coordinator.basePosition = model.position
 
             let animations = Self.collectAnimations(from: model)
+            Self.dumpModelStructure(from: model, resourceURL: url, animationCount: animations.count)
+
             if let animation = animations.first {
                 context.coordinator.authoredAnimation = model.playAnimation(
                     animation.repeat(duration: .infinity),
@@ -229,6 +231,28 @@ private struct CompanionRealityView: UIViewRepresentable {
             result.append(contentsOf: collectAnimations(from: child))
         }
         return result
+    }
+
+    /// Temporary runtime diagnostic: records the imported hierarchy and component summaries
+    /// so we can determine whether the USDZ exposes a jaw node, skeleton-related component,
+    /// or authored animation before changing lip-sync behavior.
+    private static func dumpModelStructure(from entity: Entity, resourceURL: URL, animationCount: Int) {
+        print("[ChatAI-RIG-DIAGNOSTIC] resource=\(resourceURL.lastPathComponent)")
+        print("[ChatAI-RIG-DIAGNOSTIC] rootAnimations=\(animationCount)")
+        dumpEntity(entity, depth: 0)
+        print("[ChatAI-RIG-DIAGNOSTIC] end")
+    }
+
+    private static func dumpEntity(_ entity: Entity, depth: Int) {
+        let indent = String(repeating: "  ", count: min(depth, 20))
+        let componentSummary = String(describing: entity.components)
+            .replacingOccurrences(of: "\n", with: " ")
+        print(
+            "[ChatAI-RIG-DIAGNOSTIC] \(indent)entity=\(entity.name.isEmpty ? "<unnamed>" : entity.name) type=\(String(describing: type(of: entity))) animations=\(entity.availableAnimations.count) components=\(componentSummary)"
+        )
+        for child in entity.children {
+            dumpEntity(child, depth: depth + 1)
+        }
     }
 
     private static func findMouthControl(in entity: Entity) -> Entity? {
