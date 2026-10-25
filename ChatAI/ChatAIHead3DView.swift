@@ -86,13 +86,24 @@ private struct CompanionRealityView: UIViewRepresentable {
         ))
         scene.addChild(makeLight(color: .white, intensity: 1000, position: [0, 0.45, -0.4]))
 
-        guard let url = Bundle.main.url(
-            forResource: modelResourceName,
-            withExtension: "glb",
-            subdirectory: "Companion"
-        ) ?? Bundle.main.url(forResource: modelResourceName, withExtension: "glb") else {
+        // XcodeGen may place an explicitly declared resource at the bundle root.
+        // Try both the root and the historical Companion subdirectory.
+        let bundle = Bundle.main
+        let directURL = bundle.url(forResource: modelResourceName, withExtension: "glb")
+            ?? bundle.url(
+                forResource: modelResourceName,
+                withExtension: "glb",
+                subdirectory: "Companion"
+            )
+
+        guard let url = directURL else {
+            let resourceRoot = bundle.resourceURL
+            let bundledFileExists = resourceRoot?.appendingPathComponent(
+                "\(modelResourceName).glb"
+            ).path
+            let detail = bundledFileExists.map { "Đã kiểm tra: \($0)" } ?? "Không đọc được thư mục tài nguyên ứng dụng."
             DispatchQueue.main.async {
-                onResult(false, "Không tìm thấy file GLB trong ứng dụng")
+                onResult(false, "Không tìm thấy GLB trong app bundle. \(detail)")
             }
             return view
         }
