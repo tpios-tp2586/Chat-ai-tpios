@@ -11,8 +11,8 @@ workflows:
           set -e
           test -s project.yml
           test -s IMG_0290.png
-          test -s ChatAI/Resources/Companion/model-1792924579279.glb
-          echo "Required project, icon, and 3D model files are present."
+          test -s ChatAI/Resources/Companion/Model-01.glb
+          echo "Required project, icon, and Model-01.glb files are present."
 
       - name: Install XcodeGen
         script: brew install xcodegen
@@ -28,29 +28,26 @@ workflows:
           sips -z 87 87   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@3x.png"
           sips -z 80 80   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@2x.png"
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@3x.png"
-          sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@3x.png"
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
           sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
 
       - name: Convert GLB to USDZ when needed
         script: |
           set -e
-          GLB_SOURCE="ChatAI/Resources/Companion/model-1792924579279.glb"
+          GLB_SOURCE="ChatAI/Resources/Companion/Model-01.glb"
           USD_DIR="ChatAI/Resources/Companion"
-          USD_FILE="$USD_DIR/model-1792924579279.usd"
-          USDZ_FILE="$USD_DIR/model-1792924579279.usdz"
+          USD_FILE="$USD_DIR/Model-01.usd"
+          USDZ_FILE="$USD_DIR/Model-01.usdz"
 
           test -s "$GLB_SOURCE"
 
-          # Reuse a valid USDZ when it is already present and at least as new as the GLB.
-          # On a clean checkout without a committed/cached USDZ, conversion is still required.
           if [ -s "$USDZ_FILE" ] && [ "$USDZ_FILE" -nt "$GLB_SOURCE" ]; then
             echo "Reusing existing USDZ: $USDZ_FILE"
             ls -lh "$USDZ_FILE"
             exit 0
           fi
 
-          echo "Installing Blender because USDZ must be regenerated..."
+          echo "Installing Blender to convert Model-01.glb to USDZ..."
           brew install --cask blender
           BLENDER="/Applications/Blender.app/Contents/MacOS/Blender"
           if [ ! -x "$BLENDER" ]; then
@@ -63,7 +60,7 @@ workflows:
           test -s "$USD_FILE"
           usdzip --arkitAsset "$USD_FILE" "$USDZ_FILE"
           test -s "$USDZ_FILE"
-          echo "USDZ ready:"
+          echo "Model-01 USDZ ready:"
           ls -lh "$USDZ_FILE"
 
       - name: Generate Xcode project
@@ -96,30 +93,25 @@ workflows:
             exit 1
           fi
 
-          # Ensure the GLB is physically inside ChatAI.app, even if XcodeGen's
-          # resource phase changes how it handles the file path.
-          GLB_SOURCE="ChatAI/Resources/Companion/model-1792924579279.glb"
+          GLB_SOURCE="ChatAI/Resources/Companion/Model-01.glb"
           if [ ! -f "$GLB_SOURCE" ]; then
             echo "ERROR: Source GLB missing: $GLB_SOURCE"
             find ChatAI -iname "*.glb" -print
             exit 1
           fi
-          cp "$GLB_SOURCE" "$APP_PATH/model-1792924579279.glb"
-          if [ ! -s "$APP_PATH/model-1792924579279.glb" ]; then
-            echo "ERROR: GLB copy into app bundle failed"
-            exit 1
-          fi
-          echo "=== GLB bundled successfully ==="
-          ls -lh "$APP_PATH/model-1792924579279.glb"
+          cp "$GLB_SOURCE" "$APP_PATH/Model-01.glb"
+          test -s "$APP_PATH/Model-01.glb"
+          echo "=== Model-01.glb bundled successfully ==="
+          ls -lh "$APP_PATH/Model-01.glb"
 
-          USDZ_SOURCE="ChatAI/Resources/Companion/model-1792924579279.usdz"
+          USDZ_SOURCE="ChatAI/Resources/Companion/Model-01.usdz"
           if [ ! -s "$USDZ_SOURCE" ]; then
             echo "ERROR: Converted USDZ missing: $USDZ_SOURCE"
             exit 1
           fi
-          cp "$USDZ_SOURCE" "$APP_PATH/model-1792924579279.usdz"
-          echo "=== USDZ bundled successfully ==="
-          ls -lh "$APP_PATH/model-1792924579279.usdz"
+          cp "$USDZ_SOURCE" "$APP_PATH/Model-01.usdz"
+          echo "=== Model-01.usdz bundled successfully ==="
+          ls -lh "$APP_PATH/Model-01.usdz"
 
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
