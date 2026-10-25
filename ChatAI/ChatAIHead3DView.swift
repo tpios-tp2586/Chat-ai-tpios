@@ -2,8 +2,8 @@ import SwiftUI
 import RealityKit
 import UIKit
 
-/// Loads the uploaded GLB. If RealityKit cannot load it, a visible SwiftUI robot
-/// remains on screen instead of leaving an empty dark rectangle.
+/// Loads the USDZ generated from the uploaded GLB during CI. If RealityKit cannot load it,
+/// a visible SwiftUI robot remains on screen instead of leaving an empty dark rectangle.
 struct ChatAIHead3DView: View {
     var headRotation: Float = 0
     var speaking: Bool = false
@@ -89,21 +89,21 @@ private struct CompanionRealityView: UIViewRepresentable {
         // XcodeGen may place an explicitly declared resource at the bundle root.
         // Try both the root and the historical Companion subdirectory.
         let bundle = Bundle.main
-        let directURL = bundle.url(forResource: modelResourceName, withExtension: "glb")
+        let directURL = bundle.url(forResource: modelResourceName, withExtension: "usdz")
             ?? bundle.url(
                 forResource: modelResourceName,
-                withExtension: "glb",
+                withExtension: "usdz",
                 subdirectory: "Companion"
             )
 
         guard let url = directURL else {
             let resourceRoot = bundle.resourceURL
             let bundledFileExists = resourceRoot?.appendingPathComponent(
-                "\(modelResourceName).glb"
+                "\(modelResourceName).usdz"
             ).path
             let detail = bundledFileExists.map { "Đã kiểm tra: \($0)" } ?? "Không đọc được thư mục tài nguyên ứng dụng."
             DispatchQueue.main.async {
-                onResult(false, "Không tìm thấy GLB trong app bundle. \(detail)")
+                onResult(false, "Không tìm thấy USDZ trong app bundle. \(detail)")
             }
             return view
         }
@@ -134,7 +134,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
         } catch {
             DispatchQueue.main.async {
-                onResult(false, "Không tải được GLB: \(error.localizedDescription)")
+                onResult(false, "Không tải được USDZ: \(error.localizedDescription)")
             }
         }
 
