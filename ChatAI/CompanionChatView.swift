@@ -33,7 +33,8 @@ struct CompanionChatView: View {
                     VStack(spacing: 0) {
                         ChatAIHead3DView(
                             headRotation: headRotation,
-                            speaking: liveManager.aiSpeaking
+                            speaking: liveManager.aiSpeaking,
+                            emotion: emotion
                         )
                         .frame(
                             width: min(proxy.size.width - 12, 410),
