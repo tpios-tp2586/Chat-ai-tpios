@@ -397,11 +397,16 @@ private struct ApprovedRobotHead: View {
 
     private var eyeHeight: CGFloat {
         switch emotion {
-        case .surprised: 74
-        case .sleepy: 32
-        case .happy: 55
-        case .angry: 47
-        default: 66
+        case .surprised: 76
+        case .sleepy: 28
+        case .happy: 48
+        case .angry: 43
+        case .sad: 54
+        case .confused: 61
+        case .thinking: 58
+        case .listening: 68
+        case .speaking: 66
+        case .idle: 64
         }
     }
 }
@@ -624,15 +629,44 @@ private struct RobotMouth: View {
                     .fill(Color.black)
                     .frame(width: 25 * scale, height: 29 * scale)
                     .overlay(Circle().stroke(Color(red: 1, green: 0.44, blue: 0.72), lineWidth: 3 * scale))
-            } else if emotion == .sad {
-                HStack(spacing: -2 * scale) {
-                    Capsule().fill(Color.pink).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(-24))
-                    Capsule().fill(Color.pink).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(24))
-                }
             } else {
-                HStack(spacing: -2 * scale) {
-                    Capsule().fill(Color.pink).frame(width: 14 * scale, height: 5 * scale).rotationEffect(.degrees(25))
-                    Capsule().fill(Color.pink).frame(width: 14 * scale, height: 5 * scale).rotationEffect(.degrees(-25))
+                switch emotion {
+                case .surprised:
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 25 * scale, height: 29 * scale)
+                        .overlay(Circle().stroke(Color(red: 1, green: 0.44, blue: 0.72), lineWidth: 3 * scale))
+                case .sad:
+                    HStack(spacing: -2 * scale) {
+                        Capsule().fill(Color.pink).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(-24))
+                        Capsule().fill(Color.pink).frame(width: 15 * scale, height: 5 * scale).rotationEffect(.degrees(24))
+                    }
+                case .happy:
+                    Capsule()
+                        .fill(Color.pink)
+                        .frame(width: 34 * scale, height: 9 * scale)
+                        .overlay(Capsule().stroke(Color(red: 1, green: 0.44, blue: 0.72), lineWidth: 2 * scale))
+                case .angry:
+                    HStack(spacing: -3 * scale) {
+                        Capsule().fill(Color.pink).frame(width: 18 * scale, height: 5 * scale).rotationEffect(.degrees(-12))
+                        Capsule().fill(Color.pink).frame(width: 18 * scale, height: 5 * scale).rotationEffect(.degrees(12))
+                    }
+                case .confused:
+                    Capsule()
+                        .fill(Color.pink)
+                        .frame(width: 23 * scale, height: 5 * scale)
+                        .rotationEffect(.degrees(-12))
+                case .sleepy:
+                    Capsule().fill(Color.pink.opacity(0.8)).frame(width: 25 * scale, height: 4 * scale)
+                case .thinking:
+                    Circle().fill(Color.pink).frame(width: 8 * scale, height: 8 * scale)
+                case .listening:
+                    Capsule().fill(Color.pink).frame(width: 22 * scale, height: 5 * scale)
+                case .idle, .speaking:
+                    HStack(spacing: -2 * scale) {
+                        Capsule().fill(Color.pink).frame(width: 14 * scale, height: 5 * scale).rotationEffect(.degrees(25))
+                        Capsule().fill(Color.pink).frame(width: 14 * scale, height: 5 * scale).rotationEffect(.degrees(-25))
+                    }
                 }
             }
         }
