@@ -94,7 +94,7 @@ workflows:
           "$BLENDER" --version
 
           echo "=== Import GLB and export USD ==="
-          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); r=bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); print('GLB_IMPORT_RESULT', r); print('OBJECT_COUNT', len(bpy.context.scene.objects)); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; print('USD_EXPORT_OPTIONS', [p.identifier for p in bpy.ops.wm.usd_export.get_rna_type().properties]); e=bpy.ops.wm.usd_export(filepath='$USD_FILE', overwrite=True); print('USD_EXPORT_RESULT', e)" 
+          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); r=bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); print('GLB_IMPORT_RESULT', r); print('OBJECT_COUNT', len(bpy.context.scene.objects)); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; print('USD_EXPORT_OPTIONS', [p.identifier for p in bpy.ops.wm.usd_export.get_rna_type().properties]); e=bpy.ops.wm.usd_export(filepath='$USD_FILE', check_existing=False); print('USD_EXPORT_RESULT', e)" 
 
           if [ ! -s "$USD_FILE" ]; then
             echo "ERROR: Blender did not create USD file: $USD_FILE"
@@ -155,6 +155,15 @@ workflows:
           fi
           echo "=== GLB bundled successfully ==="
           ls -lh "$APP_PATH/model-1792924579279.glb"
+
+          USDZ_SOURCE="ChatAI/Resources/Companion/model-1792924579279.usdz"
+          if [ ! -s "$USDZ_SOURCE" ]; then
+            echo "ERROR: Converted USDZ missing: $USDZ_SOURCE"
+            exit 1
+          fi
+          cp "$USDZ_SOURCE" "$APP_PATH/model-1792924579279.usdz"
+          echo "=== USDZ bundled successfully ==="
+          ls -lh "$APP_PATH/model-1792924579279.usdz"
 
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
