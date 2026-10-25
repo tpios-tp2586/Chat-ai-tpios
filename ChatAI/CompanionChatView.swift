@@ -32,7 +32,18 @@ struct CompanionChatView: View {
                     VStack(spacing: 0) {
                         ApprovedRobotHead(
                             emotion: emotion,
-                            isSpeaking: liveManager.aiSpeaking
+                            isSpeaking: liveManager.aiSpeaking,
+                            onTap: {
+                                let sequence: [CompanionEmotion] = [
+                                    .idle, .listening, .thinking, .speaking, .happy,
+                                    .surprised, .confused, .sad, .angry, .sleepy
+                                ]
+                                let current = sequence.firstIndex(of: emotion) ?? 0
+                                withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
+                                    emotion = sequence[(current + 1) % sequence.count]
+                                }
+                                message = "Biểu cảm: " + emotion.label
+                            }
                         )
                         .frame(
                             width: min(proxy.size.width - 12, 410),
@@ -210,18 +221,36 @@ struct CompanionChatView: View {
     }
 }
 
-private enum CompanionEmotion {
+private enum CompanionEmotion: CaseIterable {
     case idle, listening, thinking, speaking, happy, surprised, confused, sad, angry, sleepy
+
+    var label: String {
+        switch self {
+        case .idle: "Bình thường"
+        case .listening: "Đang nghe"
+        case .thinking: "Đang suy nghĩ"
+        case .speaking: "Đang nói"
+        case .happy: "Vui"
+        case .surprised: "Ngạc nhiên"
+        case .confused: "Bối rối"
+        case .sad: "Buồn"
+        case .angry: "Tức giận"
+        case .sleepy: "Buồn ngủ"
+        }
+    }
 }
 
 private struct ApprovedRobotHead: View {
     let emotion: CompanionEmotion
     let isSpeaking: Bool
+    let onTap: () -> Void
 
     @State private var blink = false
     @State private var floating = false
     @State private var gaze: CGFloat = 0
     @State private var mouthOpen = false
+    @State private var rotationAngle: CGFloat = 0
+    @State private var dragStartAngle: CGFloat?
 
     var body: some View {
         GeometryReader { geo in
@@ -365,7 +394,32 @@ private struct ApprovedRobotHead: View {
             }
             .frame(width: 410 * scale, height: 450 * scale)
             .offset(y: floating ? -3 * scale : 3 * scale)
+            .rotation3DEffect(
+                .degrees(Double(rotationAngle)),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.55
+            )
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onTap)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 8)
+                    .onChanged { value in
+                        if isSpeaking {
+                            rotationAngle = 0
+                            dragStartAngle = nil
+                            return
+                        }
+                        if dragStartAngle == nil {
+                            dragStartAngle = rotationAngle
+                        }
+                        let start = dragStartAngle ?? rotationAngle
+                        rotationAngle = min(38, max(-38, start + value.translation.width * 0.7))
+                    }
+                    .onEnded { _ in
+                        dragStartAngle = nil
+                    }
+            )
             .onAppear {
                 withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
                     floating = true
@@ -385,6 +439,10 @@ private struct ApprovedRobotHead: View {
             }
             .onChange(of: isSpeaking) { speaking in
                 if speaking {
+                    dragStartAngle = nil
+                    withAnimation(.spring(response: 0.48, dampingFraction: 0.82)) {
+                        rotationAngle = 0
+                    }
                     withAnimation(.easeInOut(duration: 0.13).repeatForever(autoreverses: true)) {
                         mouthOpen = true
                     }
