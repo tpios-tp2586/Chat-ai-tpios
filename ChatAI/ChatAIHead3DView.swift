@@ -124,7 +124,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                     userInfo: [NSLocalizedDescriptionKey: "Mô hình GLB không có kích thước hiển thị hợp lệ."]
                 )
             }
-            let normalizedScale: Float = 0.82 / largestDimension
+            let normalizedScale: Float = 1.08 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
             // Convert the GLB up-axis, then flip 180° in the camera plane because the
             // imported head currently appears upside down (crown below the neck).
@@ -136,6 +136,19 @@ private struct CompanionRealityView: UIViewRepresentable {
             scene.addChild(model)
             context.coordinator.baseOrientation = axisCorrection
             context.coordinator.head = model
+            context.coordinator.basePosition = model.position
+
+            // Gentle idle motion so the companion feels alive rather than like a still image.
+            context.coordinator.animationSubscription = view.scene.subscribe(
+                to: SceneEvents.Update.self
+            ) { [weak coordinator = context.coordinator] event in
+                guard let coordinator, let animatedHead = coordinator.head else { return }
+                coordinator.elapsed += event.deltaTime
+                let bob = sin(coordinator.elapsed * 1.8) * 0.025
+                animatedHead.position = coordinator.basePosition + SIMD3<Float>(0, bob, 0)
+                let yaw = simd_quatf(angle: coordinator.currentHeadRotation, axis: [0, 1, 0])
+                animatedHead.transform.rotation = yaw * coordinator.baseOrientation
+            }
             DispatchQueue.main.async {
                 onResult(true, "Đã tải mô hình 3D")
             }
@@ -151,6 +164,7 @@ private struct CompanionRealityView: UIViewRepresentable {
 
     func updateUIView(_ uiView: ARView, context: Context) {
         guard let head = context.coordinator.head else { return }
+        context.coordinator.currentHeadRotation = headRotation
         let yaw = simd_quatf(angle: headRotation, axis: [0, 1, 0])
         // Keep the import-axis correction when SwiftUI updates the view.
         head.transform.rotation = yaw * context.coordinator.baseOrientation
@@ -161,6 +175,10 @@ private struct CompanionRealityView: UIViewRepresentable {
     final class Coordinator {
         var head: Entity?
         var baseOrientation = simd_quatf()
+        var basePosition = SIMD3<Float>(repeating: 0)
+        var currentHeadRotation: Float = 0
+        var elapsed: Float = 0
+        var animationSubscription: EventSubscription?
         weak var view: ARView?
     }
 
