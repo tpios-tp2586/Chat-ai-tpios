@@ -126,6 +126,9 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 0.82 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
+            // Blender USD export can change the source GLB forward/up-axis convention.
+            // Rotate the imported model so its face points toward the front camera.
+            model.orientation = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
             model.position = -bounds.center * normalizedScale
             scene.addChild(model)
             context.coordinator.head = model
