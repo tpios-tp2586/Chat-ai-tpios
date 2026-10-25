@@ -3,7 +3,7 @@ import RealityKit
 import UIKit
 import Combine
 
-/// Loads the USDZ generated from the uploaded GLB during CI. If RealityKit cannot load it,
+/// Loads the USDZ generated from Model-01.glb during CI. If RealityKit cannot load it,
 /// a visible SwiftUI robot remains on screen instead of leaving an empty dark rectangle.
 struct ChatAIHead3DView: View {
     var headRotation: Float = 0
@@ -39,7 +39,6 @@ struct ChatAIHead3DView: View {
             .allowsHitTesting(modelLoaded)
             .accessibilityHidden(!modelLoaded)
 
-
             if !modelLoaded {
                 VStack {
                     Spacer()
@@ -52,7 +51,6 @@ struct ChatAIHead3DView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .onAppear {
-            // The RealityKit view performs the real load attempt once it is mounted.
             modelLoaded = false
         }
     }
@@ -63,7 +61,7 @@ private struct CompanionRealityView: UIViewRepresentable {
     let speaking: Bool
     let onResult: (Bool, String) -> Void
 
-    private let modelResourceName = "model-1792924579279"
+    private let modelResourceName = "Model-01"
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero)
@@ -88,8 +86,6 @@ private struct CompanionRealityView: UIViewRepresentable {
         ))
         scene.addChild(makeLight(color: .white, intensity: 1000, position: [0, 0.45, -0.4]))
 
-        // XcodeGen may place an explicitly declared resource at the bundle root.
-        // Try both the root and the historical Companion subdirectory.
         let bundle = Bundle.main
         let directURL = bundle.url(forResource: modelResourceName, withExtension: "usdz")
             ?? bundle.url(
@@ -99,23 +95,17 @@ private struct CompanionRealityView: UIViewRepresentable {
             )
 
         guard let url = directURL else {
-            let resourceRoot = bundle.resourceURL
-            let bundledFileExists = resourceRoot?.appendingPathComponent(
-                "\(modelResourceName).usdz"
-            ).path
-            let detail = bundledFileExists.map { "Đã kiểm tra: \($0)" } ?? "Không đọc được thư mục tài nguyên ứng dụng."
             DispatchQueue.main.async {
-                onResult(false, "Không tìm thấy USDZ trong app bundle. \(detail)")
+                onResult(false, "Không tìm thấy Model-01.usdz trong app bundle.")
             }
             return view
         }
 
         do {
             let model = try Entity.load(contentsOf: url)
-            model.name = "ChatAICompanionGLB"
+            model.name = "ChatAICompanionModel01"
 
-            // Normalize unknown model dimensions and center the visible geometry
-            // so assets exported at different scales still fit the portrait camera.
+            // Normalize unknown model dimensions and center the visible geometry.
             let bounds = model.visualBounds(relativeTo: model)
             let extents = bounds.extents
             let largestDimension = max(extents.x, max(extents.y, extents.z))
@@ -123,26 +113,26 @@ private struct CompanionRealityView: UIViewRepresentable {
                 throw NSError(
                     domain: "ChatAICompanion",
                     code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "Mô hình GLB không có kích thước hiển thị hợp lệ."]
+                    userInfo: [NSLocalizedDescriptionKey: "Mô hình 3D không có kích thước hiển thị hợp lệ."]
                 )
             }
+
             let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // Convert the GLB up-axis, then flip 180° in the camera plane because the
-            // imported head currently appears upside down (crown below the neck).
+
+            // Preserve the existing import-axis correction used by the previous model.
             let upAxisCorrection = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
             let uprightCorrection = simd_quatf(angle: .pi, axis: [0, 0, 1])
             let axisCorrection = uprightCorrection * upAxisCorrection
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
+
             context.coordinator.baseOrientation = axisCorrection
             context.coordinator.head = model
             context.coordinator.basePosition = model.position
 
-            // Inspect the imported asset for authored animation clips. If the GLB
-            // contains a rig/animation (including facial motion), play it instead
-            // of pretending a static mesh can open its mouth.
+            // Play authored clips when the new asset contains any.
             let animations = Self.collectAnimations(from: model)
             if let animation = animations.first {
                 context.coordinator.authoredAnimation = model.playAnimation(
@@ -152,7 +142,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                 )
             }
 
-            // Gentle idle motion so the companion feels alive rather than like a still image.
+            // Gentle idle bob and user-controlled head yaw.
             context.coordinator.animationSubscription = view.scene.subscribe(
                 to: SceneEvents.Update.self
             ) { [weak coordinator = context.coordinator] event in
@@ -163,12 +153,16 @@ private struct CompanionRealityView: UIViewRepresentable {
                 let yaw = simd_quatf(angle: coordinator.currentHeadRotation, axis: [0, 1, 0])
                 animatedHead.transform.rotation = yaw * coordinator.baseOrientation
             }
+
             DispatchQueue.main.async {
-                onResult(true, animations.isEmpty ? "Mô hình 3D lớn hơn • file không có animation dựng sẵn" : "Mô hình 3D lớn hơn • đã tìm thấy \(animations.count) animation")
+                let message = animations.isEmpty
+                    ? "Model-01 đã tải • không tìm thấy animation dựng sẵn"
+                    : "Model-01 đã tải • tìm thấy \(animations.count) animation"
+                onResult(true, message)
             }
         } catch {
             DispatchQueue.main.async {
-                onResult(false, "Không tải được USDZ: \(error.localizedDescription)")
+                onResult(false, "Không tải được Model-01.usdz: \(error.localizedDescription)")
             }
         }
 
@@ -180,7 +174,6 @@ private struct CompanionRealityView: UIViewRepresentable {
         guard let head = context.coordinator.head else { return }
         context.coordinator.currentHeadRotation = headRotation
         let yaw = simd_quatf(angle: headRotation, axis: [0, 1, 0])
-        // Keep the import-axis correction when SwiftUI updates the view.
         head.transform.rotation = yaw * context.coordinator.baseOrientation
     }
 
