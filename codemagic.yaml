@@ -39,6 +39,12 @@ workflows:
               echo "XCRUN NOT FOUND: $tool"
             fi
           done
+          echo "=== realitytool command help ==="
+          xcrun realitytool --help 2>&1 || true
+          echo "=== realitytool subcommand discovery ==="
+          xcrun realitytool help 2>&1 || true
+          echo "=== usdzip help ==="
+          usdzip --help 2>&1 || true
           echo "=== GLB input ==="
           GLB_SOURCE="ChatAI/Resources/Companion/model-1792924579279.glb"
           if [ -s "$GLB_SOURCE" ]; then
