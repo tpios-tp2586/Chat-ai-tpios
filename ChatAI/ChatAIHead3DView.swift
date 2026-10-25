@@ -132,6 +132,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
+            context.coordinator.baseOrientation = axisCorrection
             context.coordinator.head = model
             DispatchQueue.main.async {
                 onResult(true, "Đã tải mô hình 3D")
@@ -148,13 +149,16 @@ private struct CompanionRealityView: UIViewRepresentable {
 
     func updateUIView(_ uiView: ARView, context: Context) {
         guard let head = context.coordinator.head else { return }
-        head.transform.rotation = simd_quatf(angle: headRotation, axis: [0, 1, 0])
+        let yaw = simd_quatf(angle: headRotation, axis: [0, 1, 0])
+        // Keep the import-axis correction when SwiftUI updates the view.
+        head.transform.rotation = yaw * context.coordinator.baseOrientation
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     final class Coordinator {
         var head: Entity?
+        var baseOrientation = simd_quatf()
         weak var view: ARView?
     }
 
