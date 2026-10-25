@@ -39,7 +39,6 @@ struct ChatAIHead3DView: View {
             .allowsHitTesting(modelLoaded)
             .accessibilityHidden(!modelLoaded)
 
-
             if !modelLoaded {
                 VStack {
                     Spacer()
@@ -52,7 +51,6 @@ struct ChatAIHead3DView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .onAppear {
-            // The RealityKit view performs the real load attempt once it is mounted.
             modelLoaded = false
         }
     }
@@ -88,8 +86,6 @@ private struct CompanionRealityView: UIViewRepresentable {
         ))
         scene.addChild(makeLight(color: .white, intensity: 1000, position: [0, 0.45, -0.4]))
 
-        // XcodeGen may place an explicitly declared resource at the bundle root.
-        // Try both the root and the historical Companion subdirectory.
         let bundle = Bundle.main
         let directURL = bundle.url(forResource: modelResourceName, withExtension: "usdz")
             ?? bundle.url(
@@ -114,8 +110,6 @@ private struct CompanionRealityView: UIViewRepresentable {
             let model = try Entity.load(contentsOf: url)
             model.name = "ChatAICompanionGLB"
 
-            // Normalize unknown model dimensions and center the visible geometry
-            // so assets exported at different scales still fit the portrait camera.
             let bounds = model.visualBounds(relativeTo: model)
             let extents = bounds.extents
             let largestDimension = max(extents.x, max(extents.y, extents.z))
@@ -128,8 +122,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // Convert the GLB up-axis, then flip 180° in the camera plane because the
-            // imported head currently appears upside down (crown below the neck).
+
             let upAxisCorrection = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
             let uprightCorrection = simd_quatf(angle: .pi, axis: [0, 0, 1])
             let axisCorrection = uprightCorrection * upAxisCorrection
@@ -140,9 +133,6 @@ private struct CompanionRealityView: UIViewRepresentable {
             context.coordinator.head = model
             context.coordinator.basePosition = model.position
 
-            // Inspect the imported asset for authored animation clips. If the GLB
-            // contains a rig/animation (including facial motion), play it instead
-            // of pretending a static mesh can open its mouth.
             let animations = Self.collectAnimations(from: model)
             if let animation = animations.first {
                 context.coordinator.authoredAnimation = model.playAnimation(
@@ -152,19 +142,36 @@ private struct CompanionRealityView: UIViewRepresentable {
                 )
             }
 
-            // Gentle idle motion so the companion feels alive rather than like a still image.
+            // Use a real jaw/mouth node from the imported rig when one exists.
+            // No SwiftUI mouth is drawn over the 3D model. If the asset has no jaw/mouth
+            // control, the companion remains visually unchanged and we report that fact.
+            context.coordinator.jaw = Self.findMouthControl(in: model)
+            if let jaw = context.coordinator.jaw {
+                context.coordinator.jawBaseTransform = jaw.transform
+            }
+
             context.coordinator.animationSubscription = view.scene.subscribe(
                 to: SceneEvents.Update.self
             ) { [weak coordinator = context.coordinator] event in
                 guard let coordinator, let animatedHead = coordinator.head else { return }
                 coordinator.elapsed += Float(event.deltaTime)
+
                 let bob = sin(coordinator.elapsed * 1.8) * 0.025
                 animatedHead.position = coordinator.basePosition + SIMD3<Float>(0, bob, 0)
                 let yaw = simd_quatf(angle: coordinator.currentHeadRotation, axis: [0, 1, 0])
                 animatedHead.transform.rotation = yaw * coordinator.baseOrientation
+
+                coordinator.updateJaw(deltaTime: Float(event.deltaTime))
             }
+
             DispatchQueue.main.async {
-                onResult(true, animations.isEmpty ? "Mô hình 3D lớn hơn • file không có animation dựng sẵn" : "Mô hình 3D lớn hơn • đã tìm thấy \(animations.count) animation")
+                let mouthStatus = context.coordinator.jaw == nil
+                    ? " • chưa tìm thấy jaw/mouth rig"
+                    : " • đã tìm thấy jaw/mouth rig"
+                let animationStatus = animations.isEmpty
+                    ? "Mô hình 3D lớn hơn • không có animation dựng sẵn"
+                    : "Mô hình 3D lớn hơn • đã tìm thấy \(animations.count) animation"
+                onResult(true, animationStatus + mouthStatus)
             }
         } catch {
             DispatchQueue.main.async {
@@ -179,8 +186,8 @@ private struct CompanionRealityView: UIViewRepresentable {
     func updateUIView(_ uiView: ARView, context: Context) {
         guard let head = context.coordinator.head else { return }
         context.coordinator.currentHeadRotation = headRotation
+        context.coordinator.speaking = speaking
         let yaw = simd_quatf(angle: headRotation, axis: [0, 1, 0])
-        // Keep the import-axis correction when SwiftUI updates the view.
         head.transform.rotation = yaw * context.coordinator.baseOrientation
     }
 
@@ -188,13 +195,32 @@ private struct CompanionRealityView: UIViewRepresentable {
 
     final class Coordinator {
         var head: Entity?
+        var jaw: Entity?
+        var jawBaseTransform = Transform()
         var baseOrientation = simd_quatf()
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentHeadRotation: Float = 0
         var elapsed: Float = 0
+        var jawPhase: Float = 0
+        var speaking = false
         var animationSubscription: (any Cancellable)?
         var authoredAnimation: AnimationPlaybackController?
         weak var view: ARView?
+
+        func updateJaw(deltaTime: Float) {
+            guard let jaw else { return }
+
+            if speaking {
+                // A small irregular rhythm looks closer to speech than a constant open mouth.
+                jawPhase += deltaTime * 12.0
+                let pulse = max(0, sin(jawPhase) * 0.5 + sin(jawPhase * 1.73) * 0.25)
+                let amount = 0.055 * pulse
+                let rotation = simd_quatf(angle: amount, axis: [1, 0, 0])
+                jaw.transform.rotation = rotation * jawBaseTransform.rotation
+            } else {
+                jaw.transform.rotation = jawBaseTransform.rotation
+            }
+        }
     }
 
     private static func collectAnimations(from entity: Entity) -> [AnimationResource] {
@@ -203,6 +229,30 @@ private struct CompanionRealityView: UIViewRepresentable {
             result.append(contentsOf: collectAnimations(from: child))
         }
         return result
+    }
+
+    private static func findMouthControl(in entity: Entity) -> Entity? {
+        let normalizedName = entity.name
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
+
+        let candidates = [
+            "jaw", "lowerjaw", "mandible", "mouth", "lowerlip", "liplower",
+            "mixamorigrigjaw", "mixamorigjaw"
+        ]
+
+        if candidates.contains(where: { normalizedName == $0 || normalizedName.contains($0) }) {
+            return entity
+        }
+
+        for child in entity.children {
+            if let match = findMouthControl(in: child) {
+                return match
+            }
+        }
+        return nil
     }
 
     private func makeLight(color: UIColor, intensity: Float, position: SIMD3<Float>) -> Entity {
