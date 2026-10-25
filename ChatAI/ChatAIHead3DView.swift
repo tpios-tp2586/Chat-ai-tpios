@@ -100,8 +100,22 @@ private struct CompanionRealityView: UIViewRepresentable {
         do {
             let model = try Entity.load(contentsOf: url)
             model.name = "ChatAICompanionGLB"
-            model.scale = SIMD3<Float>(repeating: 0.82)
-            model.position = [0, -0.015, 0]
+
+            // Normalize unknown model dimensions and center the visible geometry
+            // so assets exported at different scales still fit the portrait camera.
+            let bounds = model.visualBounds(relativeTo: model)
+            let extents = bounds.extents
+            let largestDimension = max(extents.x, max(extents.y, extents.z))
+            guard largestDimension.isFinite, largestDimension > 0 else {
+                throw NSError(
+                    domain: "ChatAICompanion",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Mô hình GLB không có kích thước hiển thị hợp lệ."]
+                )
+            }
+            let normalizedScale: Float = 1.18 / largestDimension
+            model.scale = SIMD3<Float>(repeating: normalizedScale)
+            model.position = -bounds.center * normalizedScale
             scene.addChild(model)
             context.coordinator.head = model
             DispatchQueue.main.async {
