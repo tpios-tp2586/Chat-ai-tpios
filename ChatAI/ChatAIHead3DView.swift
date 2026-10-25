@@ -3,10 +3,12 @@ import RealityKit
 import UIKit
 
 /// Displays the real GLB companion asset bundled with the app.
-/// Place the generated model at ChatAI/Resources/Companion/companion.glb.
+/// Asset path: ChatAI/Resources/Companion/model-1792924579279.glb.
 struct ChatAIHead3DView: UIViewRepresentable {
     var headRotation: Float = 0
     var speaking: Bool = false
+
+    private let modelResourceName = "model-1792924579279"
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero)
@@ -40,11 +42,11 @@ struct ChatAIHead3DView: UIViewRepresentable {
         ))
 
         let modelURL = Bundle.main.url(
-            forResource: "companion",
+            forResource: modelResourceName,
             withExtension: "glb",
             subdirectory: "Companion"
         ) ?? Bundle.main.url(
-            forResource: "companion",
+            forResource: modelResourceName,
             withExtension: "glb"
         )
 
@@ -52,8 +54,6 @@ struct ChatAIHead3DView: UIViewRepresentable {
             do {
                 let model = try Entity.load(contentsOf: modelURL)
                 model.name = "ChatAICompanionGLB"
-                // The supplied GLB is approximately 0.88 units tall. Keep its
-                // proportions and normalize to a consistent portrait scale.
                 model.scale = SIMD3<Float>(repeating: 0.82)
                 model.position = [0, -0.015, 0]
                 scene.addChild(model)
@@ -64,7 +64,7 @@ struct ChatAIHead3DView: UIViewRepresentable {
             }
         } else {
             context.coordinator.loadError =
-                "Missing companion.glb. Add it to ChatAI/Resources/Companion and bundle it with the target."
+                "Missing model-1792924579279.glb. Ensure it is bundled in ChatAI/Resources/Companion."
         }
 
         context.coordinator.view = view
