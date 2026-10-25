@@ -8,6 +8,7 @@ import Combine
 struct ChatAIHead3DView: View {
     var headRotation: Float = 0
     var speaking: Bool = false
+    var emotion: CompanionEmotion = .idle
 
     @State private var modelLoaded = false
     @State private var loadMessage = "Đang tải mô hình 3D…"
@@ -38,6 +39,15 @@ struct ChatAIHead3DView: View {
             .opacity(modelLoaded ? 1 : 0)
             .allowsHitTesting(modelLoaded)
             .accessibilityHidden(!modelLoaded)
+
+            // The imported GLB/USDZ is a static mesh without a dependable facial rig.
+            // Draw a lightweight animated mouth over the lower face so speech is visible
+            // even when the source model has no mouth blend shapes.
+            if modelLoaded {
+                CompanionMouthOverlay(speaking: speaking, emotion: emotion)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
 
             if !modelLoaded {
                 VStack {
@@ -212,6 +222,47 @@ private struct CompanionRealityView: UIViewRepresentable {
         light.components.set(component)
         light.position = position
         return light
+    }
+}
+
+private struct CompanionMouthOverlay: View {
+    let speaking: Bool
+    let emotion: CompanionEmotion
+
+    var body: some View {
+        GeometryReader { geometry in
+            TimelineView(.animation(minimumInterval: 1.0 / 18.0, paused: !speaking)) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let pulse = speaking ? (0.5 + 0.5 * sin(time * 15.5)) : 0
+                let width = max(24, min(geometry.size.width * 0.115, 48))
+                let restingHeight: CGFloat = emotion == .surprised ? 21 : (emotion == .happy ? 7 : 5)
+                let openHeight = speaking ? 9 + pulse * 21 : restingHeight
+
+                ZStack {
+                    Capsule()
+                        .fill(Color.pink.opacity(speaking ? 0.22 : 0.10))
+                        .frame(width: width + 15, height: openHeight + 12)
+                        .blur(radius: 7)
+
+                    Capsule()
+                        .fill(Color(red: 0.025, green: 0.008, blue: 0.025))
+                        .frame(width: width, height: openHeight)
+                        .overlay {
+                            Capsule().stroke(
+                                LinearGradient(
+                                    colors: [Color.cyan.opacity(0.95), Color.pink.opacity(0.98)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                lineWidth: speaking ? 2.8 : 2.2
+                            )
+                        }
+                        .shadow(color: .pink.opacity(speaking ? 0.8 : 0.42), radius: speaking ? 9 : 4)
+                }
+                // The overlay is anchored in the lower-middle face area.
+                .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.665)
+            }
+        }
     }
 }
 
