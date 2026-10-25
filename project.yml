@@ -9,8 +9,7 @@ targets:
     sources:
       - path: ChatAI
         excludes:
-          - Resources/README.md
-          - Resources/Koban Chibi Base Mesh VRM export.vrm
+          - Resources/**
     resources:
       - path: ChatAI/Resources/Companion
     info:
