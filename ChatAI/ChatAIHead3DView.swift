@@ -75,7 +75,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         view.scene.addAnchor(scene)
 
         let camera = PerspectiveCamera()
-        camera.position = [0, 0.02, 2.2]
+        camera.position = [0, 0.02, 1.75]
         camera.look(at: [0, 0, 0], from: camera.position, relativeTo: nil)
         scene.addChild(camera)
 
@@ -125,7 +125,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                     userInfo: [NSLocalizedDescriptionKey: "Mô hình GLB không có kích thước hiển thị hợp lệ."]
                 )
             }
-            let normalizedScale: Float = 1.08 / largestDimension
+            let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
             // Convert the GLB up-axis, then flip 180° in the camera plane because the
             // imported head currently appears upside down (crown below the neck).
@@ -139,6 +139,18 @@ private struct CompanionRealityView: UIViewRepresentable {
             context.coordinator.head = model
             context.coordinator.basePosition = model.position
 
+            // Inspect the imported asset for authored animation clips. If the GLB
+            // contains a rig/animation (including facial motion), play it instead
+            // of pretending a static mesh can open its mouth.
+            let animations = Self.collectAnimations(from: model)
+            if let animation = animations.first {
+                context.coordinator.authoredAnimation = model.playAnimation(
+                    animation.repeat(duration: .infinity),
+                    transitionDuration: 0.25,
+                    startsPaused: false
+                )
+            }
+
             // Gentle idle motion so the companion feels alive rather than like a still image.
             context.coordinator.animationSubscription = view.scene.subscribe(
                 to: SceneEvents.Update.self
@@ -151,7 +163,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                 animatedHead.transform.rotation = yaw * coordinator.baseOrientation
             }
             DispatchQueue.main.async {
-                onResult(true, "Đã tải mô hình 3D")
+                onResult(true, animations.isEmpty ? "Mô hình 3D lớn hơn • file không có animation dựng sẵn" : "Mô hình 3D lớn hơn • đã tìm thấy \(animations.count) animation")
             }
         } catch {
             DispatchQueue.main.async {
@@ -180,7 +192,16 @@ private struct CompanionRealityView: UIViewRepresentable {
         var currentHeadRotation: Float = 0
         var elapsed: Float = 0
         var animationSubscription: (any Cancellable)?
+        var authoredAnimation: AnimationPlaybackController?
         weak var view: ARView?
+    }
+
+    private static func collectAnimations(from entity: Entity) -> [AnimationResource] {
+        var result = entity.availableAnimations
+        for child in entity.children {
+            result.append(contentsOf: collectAnimations(from: child))
+        }
+        return result
     }
 
     private func makeLight(color: UIColor, intensity: Float, position: SIMD3<Float>) -> Entity {
