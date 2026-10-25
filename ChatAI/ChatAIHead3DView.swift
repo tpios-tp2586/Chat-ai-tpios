@@ -74,7 +74,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         view.scene.addAnchor(scene)
 
         let camera = PerspectiveCamera()
-        camera.position = [0, 0.02, 1.65]
+        camera.position = [0, 0.02, 2.2]
         camera.look(at: [0, 0, 0], from: camera.position, relativeTo: nil)
         scene.addChild(camera)
 
@@ -124,7 +124,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                     userInfo: [NSLocalizedDescriptionKey: "Mô hình GLB không có kích thước hiển thị hợp lệ."]
                 )
             }
-            let normalizedScale: Float = 1.18 / largestDimension
+            let normalizedScale: Float = 0.82 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
             model.position = -bounds.center * normalizedScale
             scene.addChild(model)
