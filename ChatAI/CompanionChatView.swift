@@ -13,6 +13,7 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
     @State private var nightMode = false
+    @State private var headRotation: Float = 0
 
     var body: some View {
         ZStack {
@@ -30,25 +31,38 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        ApprovedRobotHead(
-                            emotion: emotion,
-                            isSpeaking: liveManager.aiSpeaking,
-                            onTap: {
-                                let sequence: [CompanionEmotion] = [
-                                    .idle, .listening, .thinking, .speaking, .happy,
-                                    .surprised, .confused, .sad, .angry, .sleepy
-                                ]
-                                let current = sequence.firstIndex(of: emotion) ?? 0
-                                withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
-                                    emotion = sequence[(current + 1) % sequence.count]
-                                }
-                                message = "Biểu cảm: " + emotion.label
-                            }
+                        ChatAIHead3DView(
+                            headRotation: headRotation,
+                            speaking: liveManager.aiSpeaking
                         )
                         .frame(
                             width: min(proxy.size.width - 12, 410),
                             height: min(proxy.size.height * 0.72, 450)
                         )
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 8)
+                                .onChanged { value in
+                                    let rotation = Float(value.translation.width / 180)
+                                    headRotation = max(-0.66, min(0.66, rotation))
+                                }
+                                .onEnded { _ in
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
+                                        headRotation = 0
+                                    }
+                                }
+                        )
+                        .onTapGesture {
+                            let sequence: [CompanionEmotion] = [
+                                .idle, .listening, .thinking, .speaking, .happy,
+                                .surprised, .confused, .sad, .angry, .sleepy
+                            ]
+                            let current = sequence.firstIndex(of: emotion) ?? 0
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
+                                emotion = sequence[(current + 1) % sequence.count]
+                            }
+                            message = "Biểu cảm: " + emotion.label
+                        }
 
                         Spacer(minLength: 6)
 
