@@ -101,7 +101,7 @@ workflows:
             exit 1
           fi
           echo "=== Package USD and dependencies into USDZ ==="
-          usdzip --arkitAsset "$USD_FILE" "$USDZ_FILE" "$USD_FILE"
+          usdzip "$USDZ_FILE" "$USD_FILE"
           if [ ! -s "$USDZ_FILE" ]; then
             echo "ERROR: USDZ package missing or empty: $USDZ_FILE"
             exit 1
