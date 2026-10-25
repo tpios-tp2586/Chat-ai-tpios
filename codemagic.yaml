@@ -18,6 +18,37 @@ workflows:
       - name: Install XcodeGen
         script: brew install xcodegen
 
+      - name: Check GLB-to-USDZ conversion tools
+        script: |
+          echo "=== macOS / Xcode ==="
+          sw_vers
+          xcodebuild -version
+          echo "=== Potential USD / USDZ tools ==="
+          for tool in usdz_converter realitytool usdzip usdcat blender; do
+            if command -v "$tool" >/dev/null 2>&1; then
+              echo "FOUND $tool: $(command -v "$tool")"
+            else
+              echo "NOT FOUND: $tool"
+            fi
+          done
+          echo "=== Xcode toolchain lookup ==="
+          for tool in usdz_converter realitytool; do
+            if xcrun --find "$tool" >/dev/null 2>&1; then
+              echo "XCRUN FOUND $tool: $(xcrun --find "$tool")"
+            else
+              echo "XCRUN NOT FOUND: $tool"
+            fi
+          done
+          echo "=== GLB input ==="
+          GLB_SOURCE="ChatAI/Resources/Companion/model-1792924579279.glb"
+          if [ -s "$GLB_SOURCE" ]; then
+            ls -lh "$GLB_SOURCE"
+            file "$GLB_SOURCE"
+          else
+            echo "ERROR: GLB input missing or empty: $GLB_SOURCE"
+            exit 1
+          fi
+
       - name: Generate app icon
         script: |
           ICON_DIR="ChatAI/Assets.xcassets/AppIcon.appiconset"
@@ -28,6 +59,7 @@ workflows:
           sips -z 58 58   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@2x.png"
           sips -z 87 87   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@3x.png"
           sips -z 80 80   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@2x.png"
+          sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@3x.png"
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@3x.png"
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
           sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
