@@ -179,7 +179,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentHeadRotation: Float = 0
         var elapsed: Float = 0
-        var animationSubscription: AnyCancellable?
+        var animationSubscription: (any Cancellable)?
         weak var view: ARView?
     }
 
