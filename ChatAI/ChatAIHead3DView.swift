@@ -22,24 +22,30 @@ struct ChatAIHead3DView: View {
                 endPoint: .bottom
             )
 
-            if modelLoaded {
-                CompanionRealityView(
-                    headRotation: headRotation,
-                    speaking: speaking,
-                    onResult: { success, message in
-                        modelLoaded = success
-                        loadMessage = message
-                    }
-                )
-            } else {
-                FallbackCompanionRobot(speaking: speaking)
-                    .padding(.vertical, 8)
-                    .overlay(alignment: .bottom) {
-                        Text(loadMessage)
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.65))
-                            .padding(.bottom, 6)
-                    }
+            FallbackCompanionRobot(speaking: speaking)
+                .padding(.vertical, 8)
+                .opacity(modelLoaded ? 0 : 1)
+
+            CompanionRealityView(
+                headRotation: headRotation,
+                speaking: speaking,
+                onResult: { success, message in
+                    modelLoaded = success
+                    loadMessage = message
+                }
+            )
+            .opacity(modelLoaded ? 1 : 0)
+            .allowsHitTesting(modelLoaded)
+            .accessibilityHidden(!modelLoaded)
+
+            if !modelLoaded {
+                VStack {
+                    Spacer()
+                    Text(loadMessage)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.72))
+                        .padding(.bottom, 6)
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 22))
