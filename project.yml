@@ -11,6 +11,8 @@ targets:
         excludes:
           - Resources/README.md
           - Resources/Koban Chibi Base Mesh VRM export.vrm
+    resources:
+      - path: ChatAI/Resources/Companion
     info:
       path: ChatAI-Info.plist
       properties:
