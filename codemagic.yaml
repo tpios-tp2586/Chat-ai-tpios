@@ -108,7 +108,8 @@ workflows:
           fi
           echo "=== USDZ created ==="
           ls -lh "$USDZ_FILE"
-          usdzip --list "$USDZ_FILE"
+          echo "=== USDZ archive contents ==="
+          unzip -l "$USDZ_FILE"
 
       - name: Generate Xcode project
         script: xcodegen generate
