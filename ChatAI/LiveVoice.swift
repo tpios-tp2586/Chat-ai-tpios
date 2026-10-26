@@ -759,7 +759,9 @@ final class LiveVoiceManager: ObservableObject {
     }
 }
 
-// MARK: - Nút trên thanh tiêu đề (tự chứa mọi thứ, chỉ cần chèn 1 dòng vào Cstruct LiveCallButton: View {
+// MARK: - Nút trên thanh tiêu đề
+
+struct LiveCallButton: View {
     @ObservedObject var viewModel: ChatViewModel
     @StateObject private var manager = LiveVoiceManager()
     @State private var showSheet = false
@@ -870,7 +872,7 @@ struct LiveCallView: View {
             .navigationTitle("Trò chuyện chibi")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showOptions = true } label: { Image(systemName: "gearshape") }
                         .accessibilityLabel("Cài đặt giọng nói")
                 }
@@ -946,10 +948,6 @@ struct LiveCallView: View {
             Toggle("Cho phép ngắt lời", isOn: $bargeIn)
         }
         .disabled(manager.state != .idle)
-    }
-}
-
-  }
     }
 }
 
