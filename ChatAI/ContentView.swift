@@ -448,29 +448,39 @@ struct HistoryView: View {
 struct MemoryView: View {
     @StateObject private var historyManager = HistoryManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var editingItem: MemoryItem?
+    @State private var editingText = ""
+    @State private var showMemoryEditor = false
 
     var body: some View {
         NavigationStack {
             List {
                 if historyManager.memories.isEmpty {
-                    Text("Chưa có thông tin nào được ghi nhớ.\nAI sẽ tự động ghi nhớ thông tin quan trọng trong lúc chat.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 8)
+                    Text("Chưa có thông tin nào được ghi nhớ. Anh có thể thêm thông tin bằng nút +.")
+                        .font(.footnote).foregroundColor(.secondary).padding(.vertical, 8)
                 } else {
                     ForEach(historyManager.memories) { item in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.content)
-                            Text(item.savedAt, style: .date)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                        Button {
+                            editingItem = item
+                            editingText = item.content
+                            showMemoryEditor = true
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.content).foregroundColor(.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(item.savedAt, style: .date).font(.caption2).foregroundColor(.secondary)
+                            }.contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                         .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                historyManager.deleteMemory(item)
-                            } label: {
+                            Button(role: .destructive) { historyManager.deleteMemory(item) } label: {
                                 Label("Xóa", systemImage: "trash")
                             }
+                            Button {
+                                editingItem = item
+                                editingText = item.content
+                                showMemoryEditor = true
+                            } label: { Label("Sửa", systemImage: "pencil") }.tint(.orange)
                         }
                     }
                 }
@@ -478,18 +488,34 @@ struct MemoryView: View {
             .navigationTitle("AI Memory")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if !historyManager.memories.isEmpty {
-                        Button(role: .destructive) {
-                            historyManager.clearAllMemory()
-                        } label: {
-                            Image(systemName: "trash")
+                    HStack {
+                        Button {
+                            editingItem = nil
+                            editingText = ""
+                            showMemoryEditor = true
+                        } label: { Image(systemName: "plus") }
+                        if !historyManager.memories.isEmpty {
+                            Button(role: .destructive) { historyManager.clearAllMemory() } label: {
+                                Image(systemName: "trash")
+                            }
                         }
                     }
                 }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Đóng") { dismiss() }
-                }
+                ToolbarItem(placement: .navigationBarLeading) { Button("Đóng") { dismiss() } }
             }
+            .alert(editingItem == nil ? "Thêm ghi nhớ" : "Chỉnh sửa ghi nhớ", isPresented: $showMemoryEditor) {
+                TextField("Thông tin cần nhớ", text: $editingText)
+                Button("Lưu") {
+                    if let item = editingItem {
+                        historyManager.updateMemory(item, content: editingText)
+                    } else {
+                        historyManager.addMemory(editingText)
+                    }
+                    editingItem = nil
+                }
+                Button("Hủy", role: .cancel) { editingItem = nil }
+            }
+            .onAppear { historyManager.loadMemory() }
         }
     }
 }
