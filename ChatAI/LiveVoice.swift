@@ -1055,7 +1055,7 @@ struct LiveLineRow: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(ChatDesignTokens.contentPadding - 4)
                 .frame(maxWidth: 300, alignment: .leading)
-                .background(line.role == .user ? Color.blue.opacity(0.85) : Color(.secondarySystemBackground))
+                .background(line.role == .user ? ChatDesignTokens.userBubbleColor : ChatDesignTokens.assistantBubbleColor)
                 .foregroundColor(line.role == .user ? .white : .primary)
                 .clipShape(RoundedRectangle(cornerRadius: ChatDesignTokens.bubbleRadius))
 
