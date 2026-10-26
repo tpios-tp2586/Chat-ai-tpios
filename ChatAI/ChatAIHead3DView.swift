@@ -1,5 +1,6 @@
 import SwiftUI
 import RealityKit
+import SceneKit
 import UIKit
 import Combine
 
@@ -138,6 +139,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             context.coordinator.head = model
             context.coordinator.basePosition = model.position
             let animations = Self.collectAnimations(from: model)
+            let rigDetails = Self.inspectSceneKitRig(url: url)
             Self.dumpModelStructure(from: model, resourceURL: url, animationCount: animations.count)
             if let animation = animations.first {
                 context.coordinator.authoredAnimation = model.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.25, startsPaused: false)
@@ -157,7 +159,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                 let mouthStatus = context.coordinator.jaw == nil ? "KHÔNG TÌM THẤY jaw/mouth node theo tên" : "ĐÃ TÌM THẤY jaw/mouth node: \(context.coordinator.jaw?.name ?? "<unnamed>")"
                 let animationStatus = animations.isEmpty ? "animations=0" : "animations=\(animations.count)"
                 let entityLines = Self.collectEntityDiagnostics(from: model)
-                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\nENTITIES:\n\(entityLines)"
+                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\n\(rigDetails)\nENTITIES:\n\(entityLines)"
                 onResult(true, diagnostic)
             }
         } catch {
@@ -226,7 +228,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             let indent = String(repeating: "  ", count: min(depth, 6))
             let name = entity.name.isEmpty ? "<unnamed>" : entity.name
             let kind = String(describing: type(of: entity))
-            let components = String(describing: entity.components).replacingOccurrences(of: "\\n", with: " ")
+            let components = String(describing: entity.components).replacingOccurrences(of: "\n", with: " ")
             lines.append("\(indent)• \(name) | type=\(kind) | model=\(hasModel ? "YES" : "no") | animations=\(animationCount)")
             lines.append("\(indent)  components: \(components)")
             for child in entity.children {
@@ -238,6 +240,56 @@ private struct CompanionRealityView: UIViewRepresentable {
         let summary = "SUMMARY: entities=\(visited), ModelComponent=\(modelEntityCount), entitiesWithAnimations=\(animatedEntityCount)"
         if lines.count >= 40 { lines.append("… danh sách chẩn đoán giới hạn ở 40 dòng") }
         return ([summary] + lines).joined(separator: "\n")
+    }
+
+    private static func inspectSceneKitRig(url: URL) -> String {
+        guard let scene = SCNScene(url: url, options: nil) else {
+            return "SCENEKIT_RIG: không đọc được USDZ bằng SceneKit"
+        }
+
+        var skinnerNodes = 0
+        var boneNames: [String] = []
+        var morpherNodes = 0
+        var morphNames: [String] = []
+        var geometryNodes = 0
+        var sceneAnimationCount = 0
+
+        func walk(_ node: SCNNode) {
+            if node.geometry != nil { geometryNodes += 1 }
+            if let skinner = node.skinner {
+                skinnerNodes += 1
+                for bone in skinner.bones {
+                    if let name = bone.name, !name.isEmpty { boneNames.append(name) }
+                }
+            }
+            if let morpher = node.morpher {
+                morpherNodes += 1
+                for target in morpher.targets {
+                    if let name = target.name, !name.isEmpty { morphNames.append(name) }
+                }
+            }
+            sceneAnimationCount += node.animationKeys.count
+            for child in node.childNodes { walk(child) }
+        }
+
+        walk(scene.rootNode)
+        boneNames = Array(NSOrderedSet(array: boneNames)) as? [String] ?? boneNames
+        morphNames = Array(NSOrderedSet(array: morphNames)) as? [String] ?? morphNames
+
+        var lines = [
+            "SCENEKIT_RIG: geometryNodes=\(geometryNodes), skinnerNodes=\(skinnerNodes), morpherNodes=\(morpherNodes), animations=\(sceneAnimationCount)"
+        ]
+        if boneNames.isEmpty {
+            lines.append("BONES: none")
+        } else {
+            lines.append("BONES(\(boneNames.count)): \(boneNames.prefix(120).joined(separator: ", "))")
+        }
+        if morphNames.isEmpty {
+            lines.append("MORPHS: none")
+        } else {
+            lines.append("MORPHS(\(morphNames.count)): \(morphNames.prefix(120).joined(separator: ", "))")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private static func dumpModelStructure(from entity: Entity, resourceURL: URL, animationCount: Int) {
