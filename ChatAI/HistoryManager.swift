@@ -32,7 +32,7 @@ struct ChatSession: Identifiable, Codable {
 
 // MARK: - Memory Item (thông tin AI ghi nhớ)
 
-struct MemoryItem: Identifiable, Codable {
+struct MemoryItem: Identifiable, Codable, Equatable {
     let id: UUID
     var content: String
     let savedAt: Date
