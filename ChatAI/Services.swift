@@ -7,12 +7,23 @@ struct OpenAICompatibleService {
     let baseURL: URL
     func sendMessage(history: [ChatMessage], apiKey: String, model: String) async throws -> String {
         guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
-        var request = URLRequest(url: baseURL)
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+        guard let url = URL(string: urlString) else { throw AIProviderError.invalidResponse }
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let messages = history.map { ["role": $0.role.rawValue, "content": $0.content] }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "messages": messages])
+        var contents: [[String: Any]] = []
+        for message in history where message.role != .system {
+            var parts: [[String: Any]] = [["text": message.content]]
+            for attachment in message.attachments {
+                guard attachment.mimeType.hasPrefix("image/") else {
+                    throw AIProviderError.server("Gemini đang nhận ảnh đính kèm; tệp khác cần được trích xuất thành văn bản trước khi gửi.")
+                }
+                parts.append(["inlineData": ["mimeType": attachment.mimeType, "data": attachment.data.base64EncodedString()]])
+            }
+            contents.append(["role": message.role == .assistant ? "model" : "user", "parts": parts])
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["contents": contents])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let text = String(data: data, encoding: .utf8) ?? "unknown error"
@@ -20,8 +31,8 @@ struct OpenAICompatibleService {
             if code == 503 { throw AIProviderError.busy(text) }
             throw AIProviderError.server(text)
         }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let choices = json["choices"] as? [[String: Any]], let msg = choices.first?["message"] as? [String: Any], let content = msg["content"] as? String else { throw AIProviderError.invalidResponse }
-        return content
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let candidates = json["candidates"] as? [[String: Any]], let content = candidates.first?["content"] as? [String: Any], let parts = content["parts"] as? [[String: Any]] else { throw AIProviderError.invalidResponse }
+        return parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
     }
 }
 
