@@ -7,7 +7,7 @@ import UIKit
 //  - Nói chuyện liên tục như Voice của ChatGPT
 //  - Bảo AI đổi giọng điệu / tốc độ / vai diễn ngay trong lúc nói
 //  - Chọn giọng + vai diễn + model ngay trong màn hình gọi
-//  - Có bảng Chẩn đoán kỹ thuật để biết âm thanh kẹt ở đâu
+//  - Chạm robot để bắt đầu/kết thúc; cài đặt giọng nằm trong biểu tượng bánh răng
 // =====================================================================
 
 // MARK: - Vai diễn, giọng
