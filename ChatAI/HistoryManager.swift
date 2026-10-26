@@ -114,6 +114,13 @@ final class HistoryManager: ObservableObject {
         saveMemory()
     }
 
+    func updateMemory(_ item: MemoryItem, content: String) {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = memories.firstIndex(where: { $0.id == item.id }) else { return }
+        memories[index].content = trimmed
+        saveMemory()
+    }
+
     func deleteMemory(_ item: MemoryItem) {
         memories.removeAll { $0.id == item.id }
         saveMemory()
