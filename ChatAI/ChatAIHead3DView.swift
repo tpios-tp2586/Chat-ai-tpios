@@ -294,11 +294,11 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let likelyMouth = nodeNames.filter {
                 let name = $0.lowercased()
-                return ["jaw", "mouth", "lip", "teeth", "tongue", "mandible"].contains(where: name.contains)
+                return ["jaw", "mouth", "lip", "teeth", "tongue", "mandible"].contains { name.contains($0) }
             }
             let likelyMorphs = uniqueTargets.filter {
                 let name = $0.lowercased()
-                return ["jaw", "mouth", "lip", "open", "viseme", "phoneme", "talk"].contains(where: name.contains)
+                return ["jaw", "mouth", "lip", "open", "viseme", "phoneme", "talk"].contains { name.contains($0) }
             }
 
             var lines = [
