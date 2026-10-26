@@ -37,53 +37,56 @@ struct SettingsView: View {
                     Toggle("Tự động ghi nhớ thông tin", isOn: $autoMemory)
                 }
 
-                providerSection(
-                    title: "ChatGPT (OpenAI)",
-                    key: $openAIKey,
-                    placeholder: "sk-...",
-                    model: $openAIModel,
-                    mode: .openai
-                )
-                providerSection(
-                    title: "Claude (Anthropic)",
-                    key: $anthropicKey,
-                    placeholder: "sk-ant-...",
-                    model: $anthropicModel,
-                    mode: .anthropic
-                )
-                providerSection(
-                    title: "Gemini (Google)",
-                    key: $geminiKey,
-                    placeholder: "AIza...",
-                    model: $geminiModel,
-                    mode: .gemini
-                )
-                providerSection(
-                    title: "Grok (xAI)",
-                    key: $grokKey,
-                    placeholder: "xai-...",
-                    model: $grokModel,
-                    mode: .grok
-                )
-                providerSection(
-                    title: "DeepSeek",
-                    key: $deepseekKey,
-                    placeholder: "sk-...",
-                    model: $deepseekModel,
-                    mode: .deepseek
-                )
-                providerSection(
-                    title: "Groq (Llama – Miễn phí)",
-                    key: $groqKey,
-                    placeholder: "gsk_...",
-                    model: $groqModel,
-                    mode: .groq
-                )
+                DisclosureGroup("Nhà cung cấp AI · API key và model") {
+                    providerSection(
+                        title: "ChatGPT (OpenAI)",
+                        key: $openAIKey,
+                        placeholder: "sk-...",
+                        model: $openAIModel,
+                        mode: .openai
+                    )
+                    providerSection(
+                        title: "Claude (Anthropic)",
+                        key: $anthropicKey,
+                        placeholder: "sk-ant-...",
+                        model: $anthropicModel,
+                        mode: .anthropic
+                    )
+                    providerSection(
+                        title: "Gemini (Google)",
+                        key: $geminiKey,
+                        placeholder: "AIza...",
+                        model: $geminiModel,
+                        mode: .gemini
+                    )
+                    providerSection(
+                        title: "Grok (xAI)",
+                        key: $grokKey,
+                        placeholder: "xai-...",
+                        model: $grokModel,
+                        mode: .grok
+                    )
+                    providerSection(
+                        title: "DeepSeek",
+                        key: $deepseekKey,
+                        placeholder: "sk-...",
+                        model: $deepseekModel,
+                        mode: .deepseek
+                    )
+                    providerSection(
+                        title: "Groq (Llama – Miễn phí)",
+                        key: $groqKey,
+                        placeholder: "gsk_...",
+                        model: $groqModel,
+                        mode: .groq
+                    )
+                }
 
                 Section {
                     Text("API key được lưu trong Keychain của máy, không gửi đi đâu khác ngoài provider tương ứng.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
+                    ChatBrandingCredit()
                 }
             }
             .navigationTitle("Cài đặt")
