@@ -5,6 +5,7 @@ import SwiftUI
 final class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var inputText: String = ""
+    @Published var pendingAttachments: [ChatAttachment] = []
     @Published var isSending: Bool = false
     @Published var errorMessage: String?
     @Published var currentSession: ChatSession?
@@ -71,9 +72,12 @@ final class ChatViewModel: ObservableObject {
 
     func send() {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isSending else { return }
-        messages.append(ChatMessage(role: .user, content: trimmed))
+        guard (!trimmed.isEmpty || !pendingAttachments.isEmpty), !isSending else { return }
+        let attachmentsToSend = pendingAttachments
+        let userContent = trimmed.isEmpty && !attachmentsToSend.isEmpty ? "Hãy phân tích ảnh đính kèm." : trimmed
+        messages.append(ChatMessage(role: .user, content: userContent, attachments: attachmentsToSend))
         inputText = ""
+        pendingAttachments = []
         isSending = true
         errorMessage = nil
 
@@ -144,6 +148,16 @@ final class ChatViewModel: ObservableObject {
         case .deepseek:  return try await deepseekService.sendMessage(history: history, apiKey: key, model: deepseekModel)
         case .groq:      return try await groqService.sendMessage(history: history, apiKey: key, model: groqModel)
         }
+    }
+
+
+    func removePendingAttachment(id: UUID) {
+        pendingAttachments.removeAll { $0.id == id }
+    }
+
+    func addPendingAttachment(_ attachment: ChatAttachment) {
+        guard !pendingAttachments.contains(where: { $0.name == attachment.name && $0.data == attachment.data }) else { return }
+        pendingAttachments.append(attachment)
     }
 
     func clear() {
