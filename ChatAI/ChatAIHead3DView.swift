@@ -208,61 +208,112 @@ private struct CompanionRealityView: UIViewRepresentable {
         }
     }
 
-    /// Tests the original GLB in the same run so we can tell whether rig data was lost during USDZ conversion.
+    /// Reads the GLB container's JSON chunk directly; RealityKit/SceneKit don't reliably import GLB URLs.
     private static func inspectGLBResource(bundle: Bundle) -> String {
         guard let url = bundle.url(forResource: "model-1792924579279", withExtension: "glb")
             ?? bundle.url(forResource: "model-1792924579279", withExtension: "glb", subdirectory: "Companion") else {
             return "GLB_TEST: original GLB not found in app bundle"
         }
 
-        var lines = ["GLB_TEST: file=\(url.lastPathComponent)"]
         do {
-            let entity = try Entity.load(contentsOf: url)
-            let animations = collectAnimations(from: entity)
-            let entities = collectNamedEntities(from: entity)
-            lines.append("REALITYKIT_GL B: loaded=yes, animations=\(animations.count), entities=\(entities.count)")
-            lines.append("REALITYKIT_GLB_NAMES: \(entities.isEmpty ? "none" : entities.prefix(80).joined(separator: ", "))")
-        } catch {
-            lines.append("REALITYKIT_GLB: load failed: \(error.localizedDescription)")
-        }
+            let data = try Data(contentsOf: url)
+            guard data.count >= 20 else { return "GLB_TEST: file too small (\(data.count) bytes)" }
 
-        do {
-            let scene = try SCNScene(url: url, options: nil)
-            var bones: [String] = []
-            var morphs: [String] = []
-            var skinners = 0
-            var morphers = 0
-            var animationCount = 0
-            func walk(_ node: SCNNode) {
-                if let skinner = node.skinner {
-                    skinners += 1
-                    bones.append(contentsOf: skinner.bones.compactMap { $0.name }.filter { !$0.isEmpty })
-                }
-                if let morpher = node.morpher {
-                    morphers += 1
-                    morphs.append(contentsOf: morpher.targets.compactMap { $0.name }.filter { !$0.isEmpty })
-                }
-                animationCount += node.animationKeys.count
-                node.childNodes.forEach(walk)
+            func uint32LE(at offset: Int) -> UInt32 {
+                UInt32(data[offset]) |
+                (UInt32(data[offset + 1]) << 8) |
+                (UInt32(data[offset + 2]) << 16) |
+                (UInt32(data[offset + 3]) << 24)
             }
-            walk(scene.rootNode)
-            lines.append("SCENEKIT_GLB: loaded=yes, skinners=\(skinners), morphers=\(morphers), animations=\(animationCount)")
-            lines.append("GLB_BONES: \(Array(Set(bones)).joined(separator: ", ").isEmpty ? "none" : Array(Set(bones)).joined(separator: ", "))")
-            lines.append("GLB_MORPHS: \(Array(Set(morphs)).joined(separator: ", ").isEmpty ? "none" : Array(Set(morphs)).joined(separator: ", "))")
-        } catch {
-            lines.append("SCENEKIT_GLB: unsupported or failed: \(error.localizedDescription)")
-        }
-        return lines.joined(separator: "\n")
-    }
 
-    private static func collectNamedEntities(from root: Entity) -> [String] {
-        var names: [String] = []
-        func walk(_ entity: Entity) {
-            if !entity.name.isEmpty { names.append(entity.name) }
-            entity.children.forEach(walk)
+            let magic = uint32LE(at: 0)
+            let version = uint32LE(at: 4)
+            let declaredLength = Int(uint32LE(at: 8))
+            guard magic == 0x46546C67 else {
+                return "GLB_TEST: invalid magic/header; bytes=\(data.count)"
+            }
+            guard version == 2 else {
+                return "GLB_TEST: unsupported GLB version \(version)"
+            }
+            guard declaredLength <= data.count, declaredLength >= 20 else {
+                return "GLB_TEST: invalid declared length \(declaredLength), actual \(data.count)"
+            }
+
+            var offset = 12
+            var jsonData: Data?
+            while offset + 8 <= declaredLength {
+                let chunkLength = Int(uint32LE(at: offset))
+                let chunkType = uint32LE(at: offset + 4)
+                offset += 8
+                guard chunkLength >= 0, offset + chunkLength <= declaredLength else {
+                    return "GLB_TEST: invalid chunk length"
+                }
+                if chunkType == 0x4E4F534A {
+                    jsonData = data.subdata(in: offset..<(offset + chunkLength))
+                    break
+                }
+                offset += chunkLength
+            }
+
+            guard let jsonData else { return "GLB_TEST: JSON chunk not found" }
+            let object = try JSONSerialization.jsonObject(with: jsonData, options: [.fragmentsAllowed])
+            guard let gltf = object as? [String: Any] else {
+                return "GLB_TEST: JSON root is not an object"
+            }
+
+            let nodes = gltf["nodes"] as? [[String: Any]] ?? []
+            let skins = gltf["skins"] as? [[String: Any]] ?? []
+            let meshes = gltf["meshes"] as? [[String: Any]] ?? []
+            let animations = gltf["animations"] as? [[String: Any]] ?? []
+            let nodeNames = nodes.enumerated().map { index, node in
+                (node["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "node_\(index)"
+            }
+
+            var jointNames: [String] = []
+            for skin in skins {
+                for index in (skin["joints"] as? [Int] ?? []) where nodeNames.indices.contains(index) {
+                    jointNames.append(nodeNames[index])
+                }
+            }
+
+            var targetNames: [String] = []
+            var targetCount = 0
+            for mesh in meshes {
+                if let names = (mesh["extras"] as? [String: Any])?["targetNames"] as? [String] {
+                    targetNames.append(contentsOf: names)
+                }
+                for primitive in (mesh["primitives"] as? [[String: Any]] ?? []) {
+                    targetCount = max(targetCount, (primitive["targets"] as? [[String: Any]] ?? []).count)
+                }
+            }
+
+            let uniqueJoints = Array(NSOrderedSet(array: jointNames)) as? [String] ?? jointNames
+            let uniqueTargets = Array(NSOrderedSet(array: targetNames)) as? [String] ?? targetNames
+            let animationNames = animations.enumerated().map { index, animation in
+                (animation["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "animation_\(index)"
+            }
+            let likelyMouth = nodeNames.filter {
+                let name = $0.lowercased()
+                return ["jaw", "mouth", "lip", "teeth", "tongue", "mandible"].contains(where: name.contains)
+            }
+            let likelyMorphs = uniqueTargets.filter {
+                let name = $0.lowercased()
+                return ["jaw", "mouth", "lip", "open", "viseme", "phoneme", "talk"].contains(where: name.contains)
+            }
+
+            var lines = [
+                "GLB_TEST: file=\(url.lastPathComponent), bytes=\(data.count), format=GLB2",
+                "GLB_COUNTS: nodes=\(nodes.count), skins=\(skins.count), meshes=\(meshes.count), animations=\(animations.count), morphTargets=\(targetCount)",
+                "GLB_JOINTS: \(uniqueJoints.isEmpty ? "none" : uniqueJoints.prefix(100).joined(separator: ", "))",
+                "GLB_MORPHS: \(uniqueTargets.isEmpty ? "none" : uniqueTargets.prefix(100).joined(separator: ", "))",
+                "GLB_ANIMATIONS: \(animationNames.isEmpty ? "none" : animationNames.prefix(40).joined(separator: ", "))",
+                "GLB_MOUTH_CANDIDATES: nodes=\(likelyMouth.isEmpty ? "none" : likelyMouth.joined(separator: ", ")); morphs=\(likelyMorphs.isEmpty ? "none" : likelyMorphs.joined(separator: ", "))"
+            ]
+            lines.append("GLB_NODE_NAMES: \(nodeNames.prefix(100).joined(separator: ", "))")
+            return lines.joined(separator: "\n")
+        } catch {
+            return "GLB_TEST: JSON parse failed: \(error.localizedDescription)"
         }
-        walk(root)
-        return names
     }
 
     private static func collectAnimations(from entity: Entity) -> [AnimationResource] {
