@@ -10,6 +10,8 @@ enum ChatDesignTokens {
     static let contentPadding: CGFloat = 14
     static let bubbleRadius: CGFloat = 14
     static let compactSpacing: CGFloat = 8
+    static let userBubbleColor = Color.blue.opacity(0.85)
+    static let assistantBubbleColor = Color(.secondarySystemBackground)
 }
 
 struct ChatBrandingCredit: View {
@@ -321,8 +323,8 @@ struct MessageBubble: View {
                 Text(message.content)
                     .padding(10)
                     .background(message.role == .user
-                        ? Color.blue.opacity(0.85)
-                        : Color(.secondarySystemBackground))
+                        ? ChatDesignTokens.userBubbleColor
+                        : ChatDesignTokens.assistantBubbleColor)
                     .foregroundColor(message.role == .user ? .white : .primary)
                     .cornerRadius(ChatDesignTokens.bubbleRadius)
 
