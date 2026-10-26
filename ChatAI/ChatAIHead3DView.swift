@@ -188,7 +188,7 @@ private struct CompanionRealityView: UIViewRepresentable {
                     ? "animations=0"
                     : "animations=\(animations.count)"
                 let entityLines = Self.collectEntityDiagnostics(from: model)
-                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\\n\(animationStatus)\\n\(mouthStatus)\\nENTITIES:\\n\(entityLines)"
+                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\nENTITIES:\n\(entityLines)"
                 onResult(true, diagnostic)
             }
         } catch {
@@ -265,7 +265,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         }
         walk(root, depth: 0)
         if lines.count >= 40 { lines.append("… danh sách giới hạn ở 40 node") }
-        return lines.joined(separator: "\\n")
+        return lines.joined(separator: "\n")
     }
 
     /// Temporary runtime diagnostic: records the imported hierarchy and component summaries
