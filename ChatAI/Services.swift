@@ -7,6 +7,87 @@ struct OpenAICompatibleService {
     let baseURL: URL
     func sendMessage(history: [ChatMessage], apiKey: String, model: String) async throws -> String {
         guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
+        if history.contains(where: { !$0.attachments.isEmpty }) && baseURL.host != "api.openai.com" {
+            throw AIProviderError.server("Nhà cung cấp/model đang chọn chưa được bật gửi ảnh trong ChatAI. Hãy chuyển sang model OpenAI có hỗ trợ ảnh.")
+        }
+        var request = URLRequest(url: baseURL)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var messages: [[String: Any]] = []
+        for message in history {
+            var item: [String: Any] = ["role": message.role.rawValue, "content": message.content]
+            if !message.attachments.isEmpty {
+                var parts: [[String: Any]] = [["type": "text", "text": message.content]]
+                for attachment in message.attachments {
+                    guard attachment.mimeType.hasPrefix("image/") else {
+                        throw AIProviderError.server("Chỉ hỗ trợ đính kèm ảnh trực tiếp cho model này. Tệp văn bản/PDF cần được trích xuất thành nội dung trước khi gửi.")
+                    }
+                    parts.append(["type": "image_url", "image_url": ["url": "data:\(attachment.mimeType);base64,\(attachment.data.base64EncodedString())"]])
+                }
+                item["content"] = parts
+            }
+            messages.append(item)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "messages": messages])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let text = String(data: data, encoding: .utf8) ?? "unknown error"
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if code == 503 { throw AIProviderError.busy(text) }
+            throw AIProviderError.server(text)
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let msg = choices.first?["message"] as? [String: Any] else { throw AIProviderError.invalidResponse }
+        if let content = msg["content"] as? String { return content }
+        if let parts = msg["content"] as? [[String: Any]] {
+            return parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+        }
+        throw AIProviderError.invalidResponse
+    }
+}
+
+struct AnthropicService {
+    func sendMessage(history: [ChatMessage], apiKey: String, model: String) async throws -> String {
+        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
+        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        request.httpMethod = "POST"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var messages: [[String: Any]] = []
+        for message in history where message.role != .system {
+            var content: Any = message.content
+            if !message.attachments.isEmpty {
+                var blocks: [[String: Any]] = [["type": "text", "text": message.content]]
+                for attachment in message.attachments {
+                    guard ["image/jpeg", "image/png", "image/gif", "image/webp"].contains(attachment.mimeType) else {
+                        throw AIProviderError.server("Claude nhận ảnh JPEG, PNG, GIF hoặc WebP. Vui lòng chọn ảnh định dạng được hỗ trợ.")
+                    }
+                    blocks.append(["type": "image", "source": ["type": "base64", "media_type": attachment.mimeType, "data": attachment.data.base64EncodedString()]])
+                }
+                content = blocks
+            }
+            messages.append(["role": message.role == .assistant ? "assistant" : "user", "content": content])
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "max_tokens": 1024, "messages": messages])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let text = String(data: data, encoding: .utf8) ?? "unknown error"
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if code == 503 || code == 529 { throw AIProviderError.busy(text) }
+            throw AIProviderError.server(text)
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else { throw AIProviderError.invalidResponse }
+        return content.compactMap { $0["text"] as? String }.joined(separator: "\n")
+    }
+}
+
+struct GeminiService {
+    func sendMessage(history: [ChatMessage], apiKey: String, model: String) async throws -> String {
+        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
         let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString) else { throw AIProviderError.invalidResponse }
         var request = URLRequest(url: url)
@@ -31,52 +112,11 @@ struct OpenAICompatibleService {
             if code == 503 { throw AIProviderError.busy(text) }
             throw AIProviderError.server(text)
         }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let candidates = json["candidates"] as? [[String: Any]], let content = candidates.first?["content"] as? [String: Any], let parts = content["parts"] as? [[String: Any]] else { throw AIProviderError.invalidResponse }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let content = candidates.first?["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]] else { throw AIProviderError.invalidResponse }
         return parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
-    }
-}
-
-struct AnthropicService {
-    func sendMessage(history: [ChatMessage], apiKey: String, model: String) async throws -> String {
-        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
-        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
-        request.httpMethod = "POST"
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let messages = history.filter { $0.role != .system }.map { ["role": $0.role == .assistant ? "assistant" : "user", "content": $0.content] }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "max_tokens": 1024, "messages": messages])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            let text = String(data: data, encoding: .utf8) ?? "unknown error"
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code == 503 || code == 529 { throw AIProviderError.busy(text) }
-            throw AIProviderError.server(text)
-        }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let content = json["content"] as? [[String: Any]], let text = content.first?["text"] as? String else { throw AIProviderError.invalidResponse }
-        return text
-    }
-}
-
-struct GeminiService {
-    func sendMessage(history: [ChatMessage], apiKey: String, model: String) async throws -> String {
-        guard !apiKey.isEmpty else { throw AIProviderError.missingAPIKey }
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
-        guard let url = URL(string: urlString) else { throw AIProviderError.invalidResponse }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let contents = history.filter { $0.role != .system }.map { m -> [String: Any] in ["role": m.role == .assistant ? "model" : "user", "parts": [["text": m.content]]] }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["contents": contents])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            let text = String(data: data, encoding: .utf8) ?? "unknown error"
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code == 503 { throw AIProviderError.busy(text) }
-            throw AIProviderError.server(text)
-        }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let candidates = json["candidates"] as? [[String: Any]], let content = candidates.first?["content"] as? [String: Any], let parts = content["parts"] as? [[String: Any]], let text = parts.first?["text"] as? String else { throw AIProviderError.invalidResponse }
-        return text
     }
 }
 
