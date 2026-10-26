@@ -159,7 +159,8 @@ private struct CompanionRealityView: UIViewRepresentable {
                 let mouthStatus = context.coordinator.jaw == nil ? "KHÔNG TÌM THẤY jaw/mouth node theo tên" : "ĐÃ TÌM THẤY jaw/mouth node: \(context.coordinator.jaw?.name ?? "<unnamed>")"
                 let animationStatus = animations.isEmpty ? "animations=0" : "animations=\(animations.count)"
                 let entityLines = Self.collectEntityDiagnostics(from: model)
-                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\n\(rigDetails)\nENTITIES:\n\(entityLines)"
+                let glbDetails = Self.inspectGLBResource(bundle: bundle)
+                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\nUSDZ_\(rigDetails)\n\(glbDetails)\nENTITIES:\n\(entityLines)"
                 onResult(true, diagnostic)
             }
         } catch {
@@ -205,6 +206,63 @@ private struct CompanionRealityView: UIViewRepresentable {
                 jaw.transform.rotation = jawBaseTransform.rotation
             }
         }
+    }
+
+    /// Tests the original GLB in the same run so we can tell whether rig data was lost during USDZ conversion.
+    private static func inspectGLBResource(bundle: Bundle) -> String {
+        guard let url = bundle.url(forResource: "model-1792924579279", withExtension: "glb")
+            ?? bundle.url(forResource: "model-1792924579279", withExtension: "glb", subdirectory: "Companion") else {
+            return "GLB_TEST: original GLB not found in app bundle"
+        }
+
+        var lines = ["GLB_TEST: file=\(url.lastPathComponent)"]
+        do {
+            let entity = try Entity.load(contentsOf: url)
+            let animations = collectAnimations(from: entity)
+            let entities = collectNamedEntities(from: entity)
+            lines.append("REALITYKIT_GL B: loaded=yes, animations=\(animations.count), entities=\(entities.count)")
+            lines.append("REALITYKIT_GLB_NAMES: \(entities.isEmpty ? "none" : entities.prefix(80).joined(separator: ", "))")
+        } catch {
+            lines.append("REALITYKIT_GLB: load failed: \(error.localizedDescription)")
+        }
+
+        do {
+            let scene = try SCNScene(url: url, options: nil)
+            var bones: [String] = []
+            var morphs: [String] = []
+            var skinners = 0
+            var morphers = 0
+            var animationCount = 0
+            func walk(_ node: SCNNode) {
+                if let skinner = node.skinner {
+                    skinners += 1
+                    bones.append(contentsOf: skinner.bones.compactMap { $0.name }.filter { !$0.isEmpty })
+                }
+                if let morpher = node.morpher {
+                    morphers += 1
+                    morphs.append(contentsOf: morpher.targets.compactMap { $0.name }.filter { !$0.isEmpty })
+                }
+                animationCount += node.animationKeys.count
+                node.childNodes.forEach(walk)
+            }
+            walk(scene.rootNode)
+            lines.append("SCENEKIT_GLB: loaded=yes, skinners=\(skinners), morphers=\(morphers), animations=\(animationCount)")
+            lines.append("GLB_BONES: \(Array(Set(bones)).joined(separator: ", ").isEmpty ? "none" : Array(Set(bones)).joined(separator: ", "))")
+            lines.append("GLB_MORPHS: \(Array(Set(morphs)).joined(separator: ", ").isEmpty ? "none" : Array(Set(morphs)).joined(separator: ", "))")
+        } catch {
+            lines.append("SCENEKIT_GLB: unsupported or failed: \(error.localizedDescription)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func collectNamedEntities(from root: Entity) -> [String] {
+        var names: [String] = []
+        func walk(_ entity: Entity) {
+            if !entity.name.isEmpty { names.append(entity.name) }
+            entity.children.forEach(walk)
+        }
+        walk(root)
+        return names
     }
 
     private static func collectAnimations(from entity: Entity) -> [AnimationResource] {
