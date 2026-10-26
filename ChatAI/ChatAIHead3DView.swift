@@ -243,8 +243,11 @@ private struct CompanionRealityView: UIViewRepresentable {
     }
 
     private static func inspectSceneKitRig(url: URL) -> String {
-        guard let scene = SCNScene(url: url, options: nil) else {
-            return "SCENEKIT_RIG: không đọc được USDZ bằng SceneKit"
+        let scene: SCNScene
+        do {
+            scene = try SCNScene(url: url, options: nil)
+        } catch {
+            return "SCENEKIT_RIG: không đọc được USDZ bằng SceneKit: \(error.localizedDescription)"
         }
 
         var skinnerNodes = 0
