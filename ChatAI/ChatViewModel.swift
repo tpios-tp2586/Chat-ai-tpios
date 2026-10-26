@@ -44,6 +44,9 @@ final class ChatViewModel: ObservableObject {
     private let anthropicService = AnthropicService()
     private let geminiService    = GeminiService()
 
+    // Mỗi câu nói đã được xử lý một lần trong phiên voice, tránh gọi API Memory lặp lại.
+    private var extractedVoiceMemoryKeys = Set<String>()
+
     func startNewChat() {
         saveCurrentSession()
         pendingAttachments = []
@@ -70,6 +73,18 @@ final class ChatViewModel: ObservableObject {
         session.provider = provider ?? selectedProvider.rawValue
         HistoryManager.shared.save(session: session)
         currentSession = session
+
+        // Chibi dùng Gemini Live nên tự động trích xuất Memory từ câu người dùng
+        // sau khi đã có câu trả lời. Không ảnh hưởng luồng chat chữ thông thường.
+        if provider == "Chat chữ + Gemini Live", autoMemory,
+           messages.last?.role == .assistant,
+           let userMessage = messages.dropLast().last(where: { $0.role == .user }) {
+            let key = "\(session.id.uuidString)|\(userMessage.content)"
+            if !extractedVoiceMemoryKeys.contains(key) {
+                extractedVoiceMemoryKeys.insert(key)
+                Task { await extractVoiceMemory(from: userMessage.content) }
+            }
+        }
     }
 
     func send() {
@@ -122,6 +137,45 @@ final class ChatViewModel: ObservableObject {
         } catch { }
     }
 
+    private func extractVoiceMemory(from userMessage: String) async {
+        let trimmed = userMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let key = KeychainHelper.read(forKey: AIProviderKind.gemini.keychainKey), !key.isEmpty else { return }
+
+        let prompt = """
+        Bạn đang xây dựng bộ nhớ dài hạn cho một trợ lý AI.
+        Đọc câu nói của người dùng bên dưới và chỉ trích xuất những thông tin có giá trị lâu dài, có khả năng giúp trợ lý hiểu và hỗ trợ người dùng tốt hơn trong các cuộc trò chuyện sau.
+        Ưu tiên: tên/cách xưng hô, nghề nghiệp hoặc dự án lâu dài, sở thích ổn định, thói quen, mục tiêu, yêu cầu giao tiếp đặc biệt và các thông tin người dùng chủ động muốn trợ lý ghi nhớ.
+        Không lưu lời chào, cảm xúc nhất thời, câu hỏi thông thường, thông tin chỉ đúng trong vài phút, hoặc suy đoán không được người dùng nói rõ.
+        Nếu có nhiều thông tin, trả về mỗi thông tin trên một dòng theo đúng format: MEMORY: <nội dung>
+        Nếu không có gì đáng nhớ, trả về đúng: NONE
+        Chỉ trả về các dòng MEMORY hoặc NONE, không giải thích thêm.
+
+        Câu nói của người dùng:
+        """
+        + trimmed
+
+        let extractMsg = [ChatMessage(role: .user, content: prompt)]
+        do {
+            let result = try await geminiService.sendMessage(history: extractMsg, apiKey: key, model: geminiModel)
+            let memories = result
+                .components(separatedBy: .newlines)
+                .compactMap { line -> String? in
+                    let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard value.hasPrefix("MEMORY:") else { return nil }
+                    let memory = value.replacingOccurrences(of: "MEMORY:", with: "", options: .anchored)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    return memory.isEmpty ? nil : memory
+                }
+
+            for memory in memories.prefix(5) {
+                HistoryManager.shared.addMemory(memory)
+            }
+        } catch {
+            // Memory là tính năng bổ trợ; lỗi trích xuất không được làm gián đoạn cuộc gọi.
+        }
+    }
+
     private func fetchWithRetry(maxAttempts: Int = 3) async throws -> String {
         var lastError: Error = AIProviderError.invalidResponse
         for attempt in 1...maxAttempts {
@@ -151,7 +205,6 @@ final class ChatViewModel: ObservableObject {
         case .groq:      return try await groqService.sendMessage(history: history, apiKey: key, model: groqModel)
         }
     }
-
 
     func removePendingAttachment(id: UUID) {
         pendingAttachments.removeAll { $0.id == id }
