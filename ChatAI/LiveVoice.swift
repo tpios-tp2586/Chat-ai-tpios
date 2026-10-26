@@ -1053,11 +1053,11 @@ struct LiveLineRow: View {
 
             Text(line.text)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(10)
+                .padding(ChatDesignTokens.contentPadding - 4)
                 .frame(maxWidth: 300, alignment: .leading)
                 .background(line.role == .user ? Color.blue.opacity(0.85) : Color(.secondarySystemBackground))
                 .foregroundColor(line.role == .user ? .white : .primary)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: ChatDesignTokens.bubbleRadius))
 
             if line.role == .assistant { Spacer(minLength: 36) }
         }
