@@ -46,6 +46,7 @@ final class ChatViewModel: ObservableObject {
 
     func startNewChat() {
         saveCurrentSession()
+        pendingAttachments = []
         messages = []
         errorMessage = nil
         currentSession = nil
@@ -53,6 +54,7 @@ final class ChatViewModel: ObservableObject {
 
     func load(session: ChatSession) {
         saveCurrentSession()
+        pendingAttachments = []
         messages = session.messages
         currentSession = session
         errorMessage = nil
