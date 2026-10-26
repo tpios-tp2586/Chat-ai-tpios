@@ -29,6 +29,7 @@ targets:
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: Speech.framework
+      - sdk: SceneKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tpios.chatai
