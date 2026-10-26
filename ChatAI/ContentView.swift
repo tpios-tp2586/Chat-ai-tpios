@@ -59,7 +59,7 @@ struct ContentView: View {
                             .padding(.vertical, 8)
                         }
                     }
-                    .padding()
+                    .padding(ChatDesignTokens.contentPadding)
                 }
                 .onChange(of: viewModel.messages) { _ in
                     if let last = viewModel.messages.last {
@@ -320,7 +320,7 @@ struct MessageBubble: View {
                         ? Color.blue.opacity(0.85)
                         : Color(.secondarySystemBackground))
                     .foregroundColor(message.role == .user ? .white : .primary)
-                    .cornerRadius(12)
+                    .cornerRadius(ChatDesignTokens.bubbleRadius)
 
                 Button {
                     UIPasteboard.general.string = message.content
