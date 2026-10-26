@@ -2,17 +2,33 @@ import Foundation
 
 enum ChatRole: String, Codable { case user, assistant, system }
 
+struct ChatAttachment: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+    var mimeType: String
+    var data: Data
+
+    init(id: UUID = UUID(), name: String, mimeType: String, data: Data) {
+        self.id = id
+        self.name = name
+        self.mimeType = mimeType
+        self.data = data
+    }
+}
+
 struct ChatMessage: Identifiable, Codable, Equatable {
     let id: UUID
     let role: ChatRole
     var content: String
     let createdAt: Date
+    var attachments: [ChatAttachment] = []
 
-    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date()) {
+    init(id: UUID = UUID(), role: ChatRole, content: String, createdAt: Date = Date(), attachments: [ChatAttachment] = []) {
         self.id = id
         self.role = role
         self.content = content
         self.createdAt = createdAt
+        self.attachments = attachments
     }
 }
 
