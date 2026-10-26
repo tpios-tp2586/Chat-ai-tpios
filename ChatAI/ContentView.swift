@@ -1,4 +1,28 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
+import PDFKit
+
+
+// MARK: - Shared chat UI tokens and credit
+
+enum ChatDesignTokens {
+    static let contentPadding: CGFloat = 14
+    static let bubbleRadius: CGFloat = 14
+    static let compactSpacing: CGFloat = 8
+}
+
+struct ChatBrandingCredit: View {
+    var compact: Bool = false
+
+    var body: some View {
+        Text("Design By Trương Phong")
+            .font(compact ? .system(size: 9, weight: .regular) : .footnote)
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+            .accessibilityLabel("Design By Trương Phong")
+    }
+}
 
 struct ContentView: View {
     @StateObject private var viewModel = ChatViewModel()
@@ -8,6 +32,10 @@ struct ContentView: View {
     @State private var showHistory = false
     @State private var showProviderMenu = false
     @State private var showCompanion = false
+    @State private var showAttachmentMenu = false
+    @State private var showPhotoPicker = false
+    @State private var showFileImporter = false
+    @State private var photoPickerItems: [PhotosPickerItem] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -77,6 +105,57 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
+        .confirmationDialog("Đính kèm", isPresented: $showAttachmentMenu, titleVisibility: .visible) {
+            Button("Chọn ảnh") { showPhotoPicker = true }
+            Button("Chọn tệp") { showFileImporter = true }
+            Button("Hủy", role: .cancel) {}
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItems, maxSelectionCount: 6, matching: .images)
+        .onChange(of: photoPickerItems) { items in
+            guard !items.isEmpty else { return }
+            Task {
+                for item in items {
+                    guard let rawData = try? await item.loadTransferable(type: Data.self) else { continue }
+                    let normalized = UIImage(data: rawData)?.jpegData(compressionQuality: 0.88) ?? rawData
+                    let attachment = ChatAttachment(name: "Ảnh \(viewModel.pendingAttachments.count + 1).jpg", mimeType: "image/jpeg", data: normalized)
+                    viewModel.addPendingAttachment(attachment)
+                }
+                photoPickerItems = []
+            }
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image, .plainText, .pdf], allowsMultipleSelection: true) { result in
+            do {
+                for url in try result.get() {
+                    let access = url.startAccessingSecurityScopedResource()
+                    defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    let data = try Data(contentsOf: url)
+                    let ext = url.pathExtension.lowercased()
+                    if ["jpg", "jpeg", "png", "gif", "webp", "heic"].contains(ext) {
+                        guard let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.88) else {
+                            viewModel.errorMessage = "Không đọc được ảnh: \(url.lastPathComponent)"
+                            continue
+                        }
+                        viewModel.addPendingAttachment(ChatAttachment(name: url.lastPathComponent, mimeType: "image/jpeg", data: jpeg))
+                    } else if ext == "pdf" {
+                        let text = PDFDocument(data: data)?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        guard !text.isEmpty else {
+                            viewModel.errorMessage = "PDF không có văn bản trích xuất được: \(url.lastPathComponent)"
+                            continue
+                        }
+                        viewModel.inputText += (viewModel.inputText.isEmpty ? "" : "\n\n") + "[Nội dung tệp \(url.lastPathComponent)]\n" + text
+                    } else {
+                        let text = String(data: data, encoding: .utf8) ?? ""
+                        guard !text.isEmpty else {
+                            viewModel.errorMessage = "Không đọc được tệp văn bản: \(url.lastPathComponent)"
+                            continue
+                        }
+                        viewModel.inputText += (viewModel.inputText.isEmpty ? "" : "\n\n") + "[Nội dung tệp \(url.lastPathComponent)]\n" + text
+                    }
+                }
+            } catch {
+                viewModel.errorMessage = "Không mở được tệp: \(error.localizedDescription)"
+            }
+        }
         .onAppear {
             viewModel.onSpeakReply = { text, gender in
                 let azureKey    = KeychainHelper.read(forKey: "azure_tts_key") ?? ""
@@ -108,29 +187,32 @@ struct ContentView: View {
                 .padding(.trailing)
             }
 
-            HStack(spacing: 4) {
-                Text("AI")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Button {
-                    showProviderMenu = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(viewModel.selectedProvider.rawValue
-                            .components(separatedBy: "(").first?
-                            .trimmingCharacters(in: .whitespaces) ?? "")
-                            .font(.headline)
-                        Image(systemName: "chevron.down").font(.caption)
-                    }
-                }
-                .confirmationDialog("Chọn AI", isPresented: $showProviderMenu, titleVisibility: .visible) {
-                    ForEach(AIProviderKind.allCases) { provider in
-                        Button(provider.rawValue) {
-                            viewModel.selectedProviderRaw = provider.rawValue
+            VStack(spacing: 2) {
+                HStack(spacing: 4) {
+                    Text("AI")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Button {
+                        showProviderMenu = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(viewModel.selectedProvider.rawValue
+                                .components(separatedBy: "(").first?
+                                .trimmingCharacters(in: .whitespaces) ?? "")
+                                .font(.headline)
+                            Image(systemName: "chevron.down").font(.caption2)
                         }
                     }
-                    Button("Hủy", role: .cancel) {}
+                    .confirmationDialog("Chọn AI", isPresented: $showProviderMenu, titleVisibility: .visible) {
+                        ForEach(AIProviderKind.allCases) { provider in
+                            Button(provider.rawValue) {
+                                viewModel.selectedProviderRaw = provider.rawValue
+                            }
+                        }
+                        Button("Hủy", role: .cancel) {}
+                    }
                 }
+                ChatBrandingCredit(compact: true)
             }
         }
         .padding(.vertical, 10)
@@ -139,32 +221,71 @@ struct ContentView: View {
     // MARK: - Input bar
 
     private var inputBar: some View {
-        HStack {
-            Button {
-                let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
-                voiceManager.startListening(
-                    groqAPIKey: groqKey,
-                    onPartialResult: { viewModel.inputText = $0 },
-                    onFinish: { text in
-                        viewModel.inputText = text
-                        viewModel.send()
+        VStack(spacing: 8) {
+            if !viewModel.pendingAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.pendingAttachments) { attachment in
+                            HStack(spacing: 6) {
+                                if let image = UIImage(data: attachment.data) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 42, height: 42)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                } else {
+                                    Image(systemName: "doc.fill")
+                                        .frame(width: 42, height: 42)
+                                }
+                                Button {
+                                    viewModel.removePendingAttachment(id: attachment.id)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(5)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
-                )
-            } label: {
-                Image(systemName: voiceManager.isListening ? "mic.fill" : "mic")
-                    .foregroundColor(voiceManager.isListening ? .red : .accentColor)
+                }
             }
+            HStack(spacing: 12) {
+                Button { showAttachmentMenu = true } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.accentColor)
+                }
+                .accessibilityLabel("Đính kèm ảnh hoặc tệp")
 
-            TextField("Nhập tin nhắn hoặc nhấn mic...", text: $viewModel.inputText, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...4)
+                Button {
+                    let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
+                    voiceManager.startListening(
+                        groqAPIKey: groqKey,
+                        onPartialResult: { viewModel.inputText = $0 },
+                        onFinish: { text in
+                            viewModel.inputText = text
+                            viewModel.send()
+                        }
+                    )
+                } label: {
+                    Image(systemName: voiceManager.isListening ? "mic.fill" : "mic")
+                        .foregroundColor(voiceManager.isListening ? .red : .accentColor)
+                }
 
-            Button { viewModel.send() } label: {
-                Image(systemName: "paperplane.fill")
+                TextField("Nhắn tin...", text: $viewModel.inputText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...4)
+
+                Button { viewModel.send() } label: {
+                    Image(systemName: "paperplane.fill")
+                }
+                .disabled((viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && viewModel.pendingAttachments.isEmpty) || viewModel.isSending)
             }
-            .disabled(viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSending)
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial)
     }
 }
 
@@ -179,6 +300,20 @@ struct MessageBubble: View {
             if message.role == .user { Spacer(minLength: 40) }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+                if !message.attachments.isEmpty {
+                    ForEach(message.attachments) { attachment in
+                        if let image = UIImage(data: attachment.data) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 220, maxHeight: 220)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        } else {
+                            Label(attachment.name, systemImage: "doc.fill")
+                                .font(.caption)
+                        }
+                    }
+                }
                 Text(message.content)
                     .padding(10)
                     .background(message.role == .user
