@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 // =====================================================================
 //  GỌI THOẠI TRỰC TIẾP VỚI GEMINI LIVE  (file độc lập, không phụ thuộc VoiceManager)
@@ -758,15 +759,15 @@ final class LiveVoiceManager: ObservableObject {
     }
 }
 
-// MARK: - Nút trên thanh tiêu đề (tự chứa mọi thứ, chỉ cần chèn 1 dòng vào ContentView)
-
-struct LiveCallButton: View {
+// MARK: - Nút trên thanh tiêu đề (tự chứa mọi thứ, chỉ cần chèn 1 dòng vào Cstruct LiveCallButton: View {
     @ObservedObject var viewModel: ChatViewModel
     @StateObject private var manager = LiveVoiceManager()
     @State private var showSheet = false
+    @State private var messagesBeforeCall: [ChatMessage] = []
 
     var body: some View {
         Button {
+            messagesBeforeCall = viewModel.messages
             showSheet = true
         } label: {
             Image(systemName: manager.state == .idle ? "waveform.circle" : "waveform.circle.fill")
@@ -774,25 +775,35 @@ struct LiveCallButton: View {
                 .foregroundColor(manager.state == .idle ? .accentColor : .red)
         }
         .padding(.trailing, 10)
+        .accessibilityLabel("Mở trò chuyện chibi")
         .sheet(isPresented: $showSheet, onDismiss: { finishCall() }) {
-            LiveCallView(manager: manager)
+            LiveCallView(manager: manager) { lines in syncTranscript(lines) }
         }
+    }
+
+    @MainActor
+    private func syncTranscript(_ lines: [LiveVoiceManager.Line]) {
+        let voiceMessages = lines.compactMap { line -> ChatMessage? in
+            let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            return ChatMessage(role: line.role, content: text)
+        }
+        viewModel.messages = messagesBeforeCall + voiceMessages
+        if !voiceMessages.isEmpty { viewModel.saveCurrentSession(provider: "Chat chữ + Gemini Live") }
     }
 
     @MainActor
     private func finishCall() {
         manager.end()
         let transcript = manager.takeTranscript()
-        var added = false
-        for line in transcript {
+        let voiceMessages = transcript.compactMap { line -> ChatMessage? in
             let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.isEmpty { continue }
-            viewModel.messages.append(ChatMessage(role: line.role, content: text))
-            added = true
+            guard !text.isEmpty else { return nil }
+            return ChatMessage(role: line.role, content: text)
         }
-        if added {
-            viewModel.saveCurrentSession()
-        }
+        viewModel.messages = messagesBeforeCall + voiceMessages
+        if !voiceMessages.isEmpty { viewModel.saveCurrentSession(provider: "Chat chữ + Gemini Live") }
+        messagesBeforeCall = []
     }
 }
 
@@ -800,6 +811,7 @@ struct LiveCallButton: View {
 
 struct LiveCallView: View {
     @ObservedObject var manager: LiveVoiceManager
+    var onTranscriptChanged: (([LiveVoiceManager.Line]) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("live_model") private var model: String = "gemini-3.8-live"
@@ -808,62 +820,70 @@ struct LiveCallView: View {
     @AppStorage("live_barge_in") private var bargeIn: Bool = false
 
     @State private var showOptions = false
-    @State private var showDiagnostics = false
     @State private var showModelPicker = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                ChatBrandingCredit(compact: true)
-                    .padding(.top, 4)
-                    .padding(.bottom, 4)
-
-                // Giữ chibi cố định phía trên; chỉ vùng hội thoại được cuộn.
                 robotFaceSection
-
                 Divider()
-
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
-                            transcriptContent
+                            ForEach(manager.lines) { line in
+                                LiveLineRow(line: line).id(line.id)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12).padding(.vertical, 10)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(.secondarySystemBackground).opacity(0.25))
                     .onChange(of: manager.lines.count) { _ in
+                        onTranscriptChanged?(manager.lines)
                         if let last = manager.lines.last {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
+                            withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(last.id, anchor: .bottom) }
                         }
                     }
                     .onChange(of: manager.lines.last?.text) { _ in
-                        // Cập nhật cả khi AI nối thêm chữ vào tin nhắn hiện tại.
+                        onTranscriptChanged?(manager.lines)
                         if let last = manager.lines.last {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
+                            withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(last.id, anchor: .bottom) }
                         }
                     }
                 }
-
-                optionsGroup
-                    .padding(.horizontal, 12)
-                diagnosticsGroup
-                    .padding(.horizontal, 12)
-
-                Divider()
-                bottomBar
+                if manager.state != .idle {
+                    HStack(spacing: 7) {
+                        Circle().fill(manager.state == .live ? Color.green : Color.orange).frame(width: 7, height: 7)
+                        Text(manager.state == .connecting ? "Đang kết nối…" : (manager.aiSpeaking ? "Đang nói…" : "Đang nghe…"))
+                            .font(.caption).foregroundColor(.secondary)
+                    }.padding(.vertical, 8)
+                }
+                if let message = manager.errorText {
+                    Text(message).font(.footnote).foregroundColor(.red).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                }
             }
-            .navigationTitle("Gọi thoại Gemini")
+            .background(Color(.systemBackground))
+            .navigationTitle("Trò chuyện chibi")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Xong") { dismiss() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showOptions = true } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Cài đặt giọng nói")
+                }
+                ToolbarItem(placement: .confirmationAction) { Button("Xong") { dismiss() } }
+            }
+            .sheet(isPresented: $showOptions) {
+                NavigationStack {
+                    ScrollView { optionsBody.padding() }
+                        .navigationTitle("Cài đặt giọng nói")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) { Button("Xong") { showOptions = false } }
+                        }
                 }
             }
             .sheet(isPresented: $showModelPicker) {
@@ -879,7 +899,6 @@ struct LiveCallView: View {
         }
     }
 
-    @ViewBuilder
     private var robotFaceSection: some View {
         RobotFaceView(
             expression: manager.faceExpression,
@@ -889,158 +908,48 @@ struct LiveCallView: View {
                 return CGFloat(abs(sin(t * 9.0)) * (0.5 + 0.5 * abs(sin(t * 2.3))))
             },
             isListening: manager.state == .live && !manager.aiSpeaking,
-            onTap: { }
+            onTap: { handleRobotTap() }
         )
-        .frame(height: 220)
-        .background(Color(red: 0.04, green: 0.05, blue: 0.13).cornerRadius(20))
-        .padding(.bottom, 4)
+        .frame(height: 220).frame(maxWidth: .infinity)
+        .background(Color(red: 0.04, green: 0.05, blue: 0.13))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .padding(.horizontal, 10).padding(.vertical, 8)
     }
 
-    @ViewBuilder
-    private var transcriptContent: some View {
-        if manager.lines.isEmpty {
-            Text("Bấm Bắt đầu gọi rồi cứ nói tự nhiên. Muốn đổi giọng, vai diễn hay tốc độ thì nói thẳng với AI. Ví dụ: nói chậm lại, giả làm giáo viên, nói giọng miền Nam.")
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        ForEach(manager.lines) { line in
-            LiveLineRow(line: line)
-                .id(line.id)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var statusText: String {
-        switch manager.state {
-        case .idle: return "Chưa kết nối"
-        case .connecting: return "Đang kết nối..."
-        case .live: return manager.aiSpeaking ? "AI đang nói..." : "Đang nghe bạn nói..."
-        }
-    }
-
-    private var liveCounters: String {
-        let stats = manager.micStats
-        let level = Int(stats.peak * 100)
-        return "Mic đã gửi \(stats.sent) gói, mức \(level)% | Google \(manager.serverMessages) tin, \(manager.audioChunksIn) gói tiếng"
-    }
-
-    private var bottomBar: some View {
-        VStack(spacing: 10) {
-            Text(statusText)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-
-            if manager.state != .idle {
-                Text(liveCounters)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-
-            if let message = manager.errorText {
-                HStack(alignment: .top) {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundColor(.red)
-                        .textSelection(.enabled)
-                    Spacer()
-                    Button {
-                        UIPasteboard.general.string = message
-                    } label: {
-                        Image(systemName: "doc.on.doc").foregroundColor(.red)
-                    }
-                }
-            }
-
-            Button {
-                if manager.state == .idle {
-                    manager.start(model: model, voice: voice, persona: persona, bargeIn: bargeIn)
-                } else {
-                    manager.end()
-                }
-            } label: {
-                Text(manager.state == .idle ? "Bắt đầu gọi" : "Kết thúc")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(manager.state == .idle ? Color.green : Color.red)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-            }
-
-            if manager.state == .idle && !manager.lines.isEmpty {
-                Button("Xóa nội dung trên màn hình để bắt đầu mới") {
-                    manager.clearLines()
-                }
-                .font(.footnote)
-            }
-        }
-        .padding()
-    }
-
-    private var optionsGroup: some View {
-        DisclosureGroup("Tùy chỉnh giọng, vai diễn, model", isExpanded: $showOptions) {
-            optionsBody
+    private func handleRobotTap() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if manager.state == .idle {
+            manager.start(model: model, voice: voice, persona: persona, bargeIn: bargeIn)
+        } else {
+            manager.end()
         }
     }
 
     private var optionsBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("Giọng", selection: $voice) {
-                ForEach(LiveVoices.all) { item in
-                    Text("\(item.id) - \(item.hint)").tag(item.id)
-                }
+                ForEach(LiveVoices.all) { item in Text(item.id).tag(item.id) }
             }
-
-            Menu("Chọn nhanh vai diễn") {
-                ForEach(LivePersona.presets) { preset in
-                    Button(preset.id) { persona = preset.text }
-                }
+            Menu("Vai diễn") {
+                ForEach(LivePersona.presets) { preset in Button(preset.id) { persona = preset.text } }
             }
-
-            Text("Vai diễn và ngữ cảnh (AI làm theo ngay từ đầu cuộc gọi)")
-                .font(.caption)
-                .foregroundColor(.secondary)
             TextEditor(text: $persona)
                 .frame(minHeight: 110)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.secondary.opacity(0.4))
-                )
-
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.4)))
             HStack {
-                TextField("Tên model", text: $model)
+                TextField("Model", text: $model)
                     .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                 Button("Danh sách") { showModelPicker = true }
             }
-
-            Toggle("Cho phép ngắt lời (chế độ khử vọng, nên dùng tai nghe)", isOn: $bargeIn)
-
-            Text("Mặc định tắt: dùng mic của máy và tạm nghỉ mic lúc AI đang nói, ít lỗi nhất. Đổi giọng hoặc vai diễn ở đây áp dụng từ lần Bắt đầu gọi kế tiếp. Đổi giọng điệu trong lúc đang nói thì cứ nói thẳng với AI.")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Toggle("Cho phép ngắt lời", isOn: $bargeIn)
         }
         .disabled(manager.state != .idle)
-        .padding(.top, 8)
     }
+}
 
-    private var diagnosticsGroup: some View {
-        DisclosureGroup("Chẩn đoán kỹ thuật (gửi tôi khi có lỗi)", isExpanded: $showDiagnostics) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(manager.report)
-                    .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Copy báo cáo") {
-                    UIPasteboard.general.string = manager.report
-                }
-                .font(.footnote)
-            }
-            .padding(.top, 6)
-        }
+  }
     }
 }
 
