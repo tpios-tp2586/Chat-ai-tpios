@@ -47,6 +47,20 @@ struct ChatAIHead3DView: View {
                         .foregroundStyle(.white.opacity(0.72))
                         .padding(.bottom, 6)
                 }
+            } else {
+                VStack {
+                    Spacer()
+                    ScrollView {
+                        Text(loadMessage)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                    }
+                    .frame(maxHeight: 112)
+                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 10))
+                    .padding(8)
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 22))
@@ -168,12 +182,14 @@ private struct CompanionRealityView: UIViewRepresentable {
 
             DispatchQueue.main.async {
                 let mouthStatus = context.coordinator.jaw == nil
-                    ? " • chưa tìm thấy jaw/mouth rig"
-                    : " • đã tìm thấy jaw/mouth rig"
+                    ? "KHÔNG TÌM THẤY jaw/mouth node theo tên"
+                    : "ĐÃ TÌM THẤY jaw/mouth node: \(context.coordinator.jaw?.name ?? "<unnamed>")"
                 let animationStatus = animations.isEmpty
-                    ? "Mô hình 3D lớn hơn • không có animation dựng sẵn"
-                    : "Mô hình 3D lớn hơn • đã tìm thấy \(animations.count) animation"
-                onResult(true, animationStatus + mouthStatus)
+                    ? "animations=0"
+                    : "animations=\(animations.count)"
+                let entityLines = Self.collectEntityDiagnostics(from: model)
+                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\\n\(animationStatus)\\n\(mouthStatus)\\nENTITIES:\\n\(entityLines)"
+                onResult(true, diagnostic)
             }
         } catch {
             DispatchQueue.main.async {
@@ -231,6 +247,25 @@ private struct CompanionRealityView: UIViewRepresentable {
             result.append(contentsOf: collectAnimations(from: child))
         }
         return result
+    }
+
+    /// Builds a compact hierarchy summary for the in-app diagnostic panel.
+    /// The list is capped to keep the overlay responsive on large imported models.
+    private static func collectEntityDiagnostics(from root: Entity) -> String {
+        var lines: [String] = []
+        func walk(_ entity: Entity, depth: Int) {
+            guard lines.count < 40 else { return }
+            let indent = String(repeating: "  ", count: min(depth, 6))
+            let name = entity.name.isEmpty ? "<unnamed>" : entity.name
+            lines.append("\(indent)• \(name) [animations=\(entity.availableAnimations.count)]")
+            for child in entity.children {
+                walk(child, depth: depth + 1)
+                if lines.count >= 40 { break }
+            }
+        }
+        walk(root, depth: 0)
+        if lines.count >= 40 { lines.append("… danh sách giới hạn ở 40 node") }
+        return lines.joined(separator: "\\n")
     }
 
     /// Temporary runtime diagnostic: records the imported hierarchy and component summaries
