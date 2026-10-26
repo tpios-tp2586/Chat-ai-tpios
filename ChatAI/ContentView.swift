@@ -115,8 +115,12 @@ struct ContentView: View {
             guard !items.isEmpty else { return }
             Task {
                 for item in items {
-                    guard let rawData = try? await item.loadTransferable(type: Data.self) else { continue }
-                    let normalized = UIImage(data: rawData)?.jpegData(compressionQuality: 0.88) ?? rawData
+                    guard let rawData = try? await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: rawData),
+                          let normalized = image.jpegData(compressionQuality: 0.88) else {
+                        viewModel.errorMessage = "Không đọc được một ảnh đã chọn."
+                        continue
+                    }
                     let attachment = ChatAttachment(name: "Ảnh \(viewModel.pendingAttachments.count + 1).jpg", mimeType: "image/jpeg", data: normalized)
                     viewModel.addPendingAttachment(attachment)
                 }
