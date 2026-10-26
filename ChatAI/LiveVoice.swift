@@ -814,22 +814,44 @@ struct LiveCallView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Giữ chibi cố định phía trên; chỉ vùng hội thoại được cuộn.
+                robotFaceSection
+
+                Divider()
+
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            robotFaceSection
+                        LazyVStack(alignment: .leading, spacing: 12) {
                             transcriptContent
-                            optionsGroup
-                            diagnosticsGroup
                         }
-                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.secondarySystemBackground).opacity(0.25))
                     .onChange(of: manager.lines.count) { _ in
                         if let last = manager.lines.last {
-                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: manager.lines.last?.text) { _ in
+                        // Cập nhật cả khi AI nối thêm chữ vào tin nhắn hiện tại.
+                        if let last = manager.lines.last {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
+
+                optionsGroup
+                    .padding(.horizontal, 12)
+                diagnosticsGroup
+                    .padding(.horizontal, 12)
+
                 Divider()
                 bottomBar
             }
@@ -876,9 +898,13 @@ struct LiveCallView: View {
             Text("Bấm Bắt đầu gọi rồi cứ nói tự nhiên. Muốn đổi giọng, vai diễn hay tốc độ thì nói thẳng với AI. Ví dụ: nói chậm lại, giả làm giáo viên, nói giọng miền Nam.")
                 .font(.footnote)
                 .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         ForEach(manager.lines) { line in
-            LiveLineRow(line: line).id(line.id)
+            LiveLineRow(line: line)
+                .id(line.id)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1018,14 +1044,19 @@ struct LiveLineRow: View {
     let line: LiveVoiceManager.Line
 
     var body: some View {
-        HStack {
-            if line.role == .user { Spacer(minLength: 40) }
+        HStack(alignment: .top, spacing: 8) {
+            if line.role == .user { Spacer(minLength: 36) }
+
             Text(line.text)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(10)
+                .frame(maxWidth: 300, alignment: .leading)
                 .background(line.role == .user ? Color.blue.opacity(0.85) : Color(.secondarySystemBackground))
                 .foregroundColor(line.role == .user ? .white : .primary)
-                .cornerRadius(12)
-            if line.role == .assistant { Spacer(minLength: 40) }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            if line.role == .assistant { Spacer(minLength: 36) }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
