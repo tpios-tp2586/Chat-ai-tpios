@@ -13,6 +13,7 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
     @State private var nightMode = false
+    @State private var showChibiFace = false
     @State private var headRotation: Float = 0
 
     var body: some View {
@@ -29,39 +30,64 @@ struct CompanionChatView: View {
             VStack(spacing: 0) {
                 header
 
+                Picker("Nhân vật", selection: $showChibiFace) {
+                    Text("Mô hình 3D").tag(false)
+                    Text("Robot chibi").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        ChatAIHead3DView(
-                            headRotation: headRotation,
-                            speaking: liveManager.aiSpeaking
-                        )
-                        .frame(
-                            width: min(proxy.size.width - 12, 410),
-                            height: min(proxy.size.height * 0.72, 450)
-                        )
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 8)
-                                .onChanged { value in
-                                    let rotation = Float(value.translation.width / 180)
-                                    headRotation = max(-0.66, min(0.66, rotation))
-                                }
-                                .onEnded { _ in
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
-                                        headRotation = 0
+                        if showChibiFace {
+                            RobotFaceView(
+                                expression: robotFaceExpression,
+                                speakingLevel: { date in
+                                    guard liveManager.aiSpeaking else { return 0 }
+                                    let t = date.timeIntervalSinceReferenceDate
+                                    return CGFloat(abs(sin(t * 9.0)) * (0.5 + 0.5 * abs(sin(t * 2.3))))
+                                },
+                                isListening: liveManager.state == .live && !liveManager.aiSpeaking,
+                                onTap: { }
+                            )
+                            .frame(
+                                width: min(proxy.size.width - 12, 410),
+                                height: min(proxy.size.height * 0.72, 450)
+                            )
+                        } else {
+                            ChatAIHead3DView(
+                                headRotation: headRotation,
+                                speaking: liveManager.aiSpeaking
+                            )
+                            .frame(
+                                width: min(proxy.size.width - 12, 410),
+                                height: min(proxy.size.height * 0.72, 450)
+                            )
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 8)
+                                    .onChanged { value in
+                                        let rotation = Float(value.translation.width / 180)
+                                        headRotation = max(-0.66, min(0.66, rotation))
                                     }
+                                    .onEnded { _ in
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
+                                            headRotation = 0
+                                        }
+                                    }
+                            )
+                            .onTapGesture {
+                                let sequence: [CompanionEmotion] = [
+                                    .idle, .listening, .thinking, .speaking, .happy,
+                                    .surprised, .confused, .sad, .angry, .sleepy
+                                ]
+                                let current = sequence.firstIndex(of: emotion) ?? 0
+                                withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
+                                    emotion = sequence[(current + 1) % sequence.count]
                                 }
-                        )
-                        .onTapGesture {
-                            let sequence: [CompanionEmotion] = [
-                                .idle, .listening, .thinking, .speaking, .happy,
-                                .surprised, .confused, .sad, .angry, .sleepy
-                            ]
-                            let current = sequence.firstIndex(of: emotion) ?? 0
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
-                                emotion = sequence[(current + 1) % sequence.count]
+                                message = "Biểu cảm: " + emotion.label
                             }
-                            message = "Biểu cảm: " + emotion.label
                         }
 
                         Spacer(minLength: 6)
@@ -128,6 +154,22 @@ struct CompanionChatView: View {
         }
         .onDisappear {
             liveManager.end()
+        }
+    }
+
+    private var robotFaceExpression: RobotFaceExpression {
+        if liveManager.aiSpeaking { return .speaking }
+        switch emotion {
+        case .idle: return .idle
+        case .listening: return .listening
+        case .thinking: return .thinking
+        case .speaking: return .speaking
+        case .happy: return .happy
+        case .surprised: return .surprised
+        case .confused: return .confused
+        case .sad: return .sad
+        case .angry: return .angry
+        case .sleepy: return .sleepy
         }
     }
 
