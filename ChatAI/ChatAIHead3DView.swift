@@ -253,19 +253,35 @@ private struct CompanionRealityView: UIViewRepresentable {
     /// The list is capped to keep the overlay responsive on large imported models.
     private static func collectEntityDiagnostics(from root: Entity) -> String {
         var lines: [String] = []
+        var visited = 0
+        var modelEntityCount = 0
+        var animatedEntityCount = 0
+
         func walk(_ entity: Entity, depth: Int) {
+            visited += 1
+            let hasModel = entity.components[ModelComponent.self] != nil
+            if hasModel { modelEntityCount += 1 }
+            let animationCount = entity.availableAnimations.count
+            if animationCount > 0 { animatedEntityCount += 1 }
+
             guard lines.count < 40 else { return }
             let indent = String(repeating: "  ", count: min(depth, 6))
             let name = entity.name.isEmpty ? "<unnamed>" : entity.name
-            lines.append("\(indent)• \(name) [animations=\(entity.availableAnimations.count)]")
+            let kind = String(describing: type(of: entity))
+            let components = String(describing: entity.components)
+                .replacingOccurrences(of: "\\n", with: " ")
+            lines.append("\(indent)• \(name) | type=\(kind) | model=\(hasModel ? "YES" : "no") | animations=\(animationCount)")
+            lines.append("\(indent)  components: \(components)")
             for child in entity.children {
                 walk(child, depth: depth + 1)
                 if lines.count >= 40 { break }
             }
         }
+
         walk(root, depth: 0)
-        if lines.count >= 40 { lines.append("… danh sách giới hạn ở 40 node") }
-        return lines.joined(separator: "\n")
+        let summary = "SUMMARY: entities=\(visited), ModelComponent=\(modelEntityCount), entitiesWithAnimations=\(animatedEntityCount)"
+        if lines.count >= 40 { lines.append("… danh sách chẩn đoán giới hạn ở 40 dòng") }
+        return ([summary] + lines).joined(separator: "\n")
     }
 
     /// Temporary runtime diagnostic: records the imported hierarchy and component summaries
