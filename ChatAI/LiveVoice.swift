@@ -814,6 +814,10 @@ struct LiveCallView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                ChatBrandingCredit(compact: true)
+                    .padding(.top, 4)
+                    .padding(.bottom, 4)
+
                 // Giữ chibi cố định phía trên; chỉ vùng hội thoại được cuộn.
                 robotFaceSection
 
