@@ -60,14 +60,14 @@ final class ChatViewModel: ObservableObject {
         errorMessage = nil
     }
 
-    func saveCurrentSession() {
+    func saveCurrentSession(provider: String? = nil) {
         guard !messages.isEmpty else { return }
         var session = currentSession ?? ChatSession(
-            provider: selectedProvider.rawValue,
+            provider: provider ?? selectedProvider.rawValue,
             messages: messages
         )
         session.messages = messages
-        session.provider = selectedProvider.rawValue
+        session.provider = provider ?? selectedProvider.rawValue
         HistoryManager.shared.save(session: session)
         currentSession = session
     }
