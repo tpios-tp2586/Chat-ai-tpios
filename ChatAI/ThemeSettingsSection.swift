@@ -43,7 +43,7 @@ struct ThemeSettingsSection: View {
         } header: {
             Text("Chủ đề giao diện")
         } footer: {
-            Text("Lựa chọn được lưu tự động. Chủ đề đang được thiết lập trước tiên; màu sắc sẽ được áp dụng dần cho các màn hình trong các bước tiếp theo.")
+            Text("Lựa chọn được lưu tự động và áp dụng cho giao diện chat, thanh công cụ, lịch sử, AI Memory, Cài đặt và màn hình trò chuyện thoại.")
         }
     }
 }
