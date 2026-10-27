@@ -791,6 +791,15 @@ struct MemoryView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     overviewCard
                     searchField
+                    if historyManager.memories.count >= 50 {
+                        Label("Bộ nhớ đã đạt giới hạn 50 mục. Xóa một mục cũ trước khi thêm mới.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(activeTheme.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(11)
+                            .background(activeTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+                    }
+
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("GHI NHỚ CỦA ANH")
@@ -835,6 +844,8 @@ struct MemoryView: View {
                                     .padding(.horizontal, 15).padding(.vertical, 10)
                                     .background(activeTheme.accent, in: Capsule())
                                     .foregroundStyle(Color.black)
+                                    .disabled(historyManager.memories.count >= 50)
+                                    .opacity(historyManager.memories.count >= 50 ? 0.45 : 1)
                             }
                         }
                         .frame(maxWidth: .infinity)
