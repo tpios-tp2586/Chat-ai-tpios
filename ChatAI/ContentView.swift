@@ -186,7 +186,7 @@ struct ContentView: View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
                 Button { showHistory = true } label: {
-                    Image(systemName: "clock.arrow.circlepath")
+                    ChatAICustomIcon(kind: .history, color: activeTheme.accent)
                         .symbolRenderingMode(.hierarchical)
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(activeTheme.accent)
@@ -241,7 +241,7 @@ struct ContentView: View {
                 Spacer(minLength: 2)
 
                 Button { showCompanion = true } label: {
-                    Image(systemName: "person.crop.rectangle.stack")
+                    ChatAICustomIcon(kind: .companion, color: activeTheme.accent)
                         .symbolRenderingMode(.hierarchical)
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(activeTheme.accent)
@@ -265,7 +265,7 @@ struct ContentView: View {
                 Spacer()
                 LiveCallButton(viewModel: viewModel)
                 Button { showSettings = true } label: {
-                    Label("Cài đặt", systemImage: "slider.horizontal.3")
+                    HStack(spacing: 5) { ChatAICustomIcon(kind: .settings, color: activeTheme.accent); Text("Cài đặt") }
                         .labelStyle(.titleAndIcon)
                         .symbolRenderingMode(.hierarchical)
                         .font(.system(size: 12, weight: .semibold))
@@ -322,11 +322,11 @@ struct ContentView: View {
                 }
             }
             HStack(spacing: 9) {
-                ChatActionButton(symbol: "plus", label: "Đính kèm ảnh hoặc tệp", accent: activeTheme.accent) {
+                ChatActionButton(kind: .attachment, label: "Đính kèm ảnh hoặc tệp", accent: activeTheme.accent) {
                     showAttachmentMenu = true
                 }
                 ChatActionButton(
-                    symbol: voiceManager.isListening ? "mic.fill" : "mic",
+                    kind: .microphone,
                     label: voiceManager.isListening ? "Dừng nghe" : "Nhập bằng giọng nói",
                     accent: voiceManager.isListening ? .red : activeTheme.accent
                 ) {
@@ -341,7 +341,7 @@ struct ContentView: View {
                     )
                 }
                 ChatComposerField(text: $viewModel.inputText, accent: activeTheme.accent, placeholder: "Nhắn tin...")
-                ChatActionButton(symbol: "paperplane.fill", label: "Gửi tin nhắn", accent: activeTheme.accent, prominent: true) {
+                ChatActionButton(kind: .send, label: "Gửi tin nhắn", accent: activeTheme.accent, prominent: true) {
                     viewModel.send()
                 }
                 .disabled((viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && viewModel.pendingAttachments.isEmpty) || viewModel.isSending)
@@ -646,7 +646,7 @@ private struct ChatComposerField: View {
 }
 
 private struct ChatActionButton: View {
-    let symbol: String
+    let kind: ChatAIIconKind
     let label: String
     let accent: Color
     var prominent: Bool = false
@@ -654,10 +654,8 @@ private struct ChatActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundStyle(prominent ? Color.white : accent)
+            ChatAICustomIcon(kind: kind, color: prominent ? .white : accent)
+                .frame(width: 20, height: 20)
                 .frame(width: 42, height: 42)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -709,5 +707,100 @@ private struct ChatMessageCard: View {
                         }
                     }
             }
+    }
+}
+
+
+// MARK: - Custom vector icon set (drawn in SwiftUI; independent of SF Symbols)
+
+enum ChatAIIconKind {
+    case history, companion, settings, attachment, microphone, send, voice, memory, provider
+}
+
+struct ChatAICustomIcon: View {
+    let kind: ChatAIIconKind
+    let color: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let side = min(proxy.size.width, proxy.size.height)
+            let u = side / 24
+            ZStack {
+                switch kind {
+                case .history:
+                    Circle().trim(from: 0.08, to: 0.83)
+                        .stroke(color, style: StrokeStyle(lineWidth: 1.8 * u, lineCap: .round))
+                        .frame(width: 18 * u, height: 18 * u).rotationEffect(.degrees(-42))
+                    Path { p in
+                        p.move(to: CGPoint(x: 4*u, y: 4*u)); p.addLine(to: CGPoint(x: 4*u, y: 9*u)); p.addLine(to: CGPoint(x: 9*u, y: 9*u))
+                        p.move(to: CGPoint(x: 12*u, y: 7*u)); p.addLine(to: CGPoint(x: 12*u, y: 12*u)); p.addLine(to: CGPoint(x: 16*u, y: 14*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round, lineJoin: .round))
+                case .companion:
+                    Path { p in
+                        p.move(to: CGPoint(x: 12*u, y: 3*u)); p.addLine(to: CGPoint(x: 12*u, y: 5*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 1.7*u, lineCap: .round))
+                    Circle().fill(color).frame(width: 3*u, height: 3*u).offset(y: -9*u)
+                    RoundedRectangle(cornerRadius: 4*u).stroke(color, lineWidth: 1.7*u).frame(width: 18*u, height: 14*u).offset(y: 2*u)
+                    HStack(spacing: 4*u) {
+                        Circle().fill(color).frame(width: 2.8*u, height: 2.8*u)
+                        Circle().fill(color).frame(width: 2.8*u, height: 2.8*u)
+                    }.offset(y: 1*u)
+                    Capsule().fill(color).frame(width: 6*u, height: 1.6*u).offset(y: 6*u)
+                case .settings:
+                    ForEach(0..<3, id: \.self) { index in
+                        let x = CGFloat(5 + index * 7) * u
+                        Path { p in p.move(to: CGPoint(x: x, y: 3*u)); p.addLine(to: CGPoint(x: x, y: 21*u)) }
+                            .stroke(color, style: StrokeStyle(lineWidth: 1.7*u, lineCap: .round))
+                        Circle().fill(color).frame(width: 4*u, height: 4*u)
+                            .position(x: x, y: (index == 0 ? 9 : (index == 1 ? 15 : 7))*u)
+                    }
+                case .attachment:
+                    Path { p in
+                        p.move(to: CGPoint(x: 12*u, y: 5*u)); p.addLine(to: CGPoint(x: 12*u, y: 19*u))
+                        p.move(to: CGPoint(x: 5*u, y: 12*u)); p.addLine(to: CGPoint(x: 19*u, y: 12*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 2*u, lineCap: .round))
+                case .microphone:
+                    Capsule().stroke(color, lineWidth: 1.8*u).frame(width: 7*u, height: 11*u).offset(y: -3*u)
+                    Path { p in
+                        p.move(to: CGPoint(x: 5*u, y: 11*u)); p.addCurve(to: CGPoint(x: 19*u, y: 11*u), control1: CGPoint(x: 5*u, y: 19*u), control2: CGPoint(x: 19*u, y: 19*u))
+                        p.move(to: CGPoint(x: 12*u, y: 18*u)); p.addLine(to: CGPoint(x: 12*u, y: 21*u))
+                        p.move(to: CGPoint(x: 8*u, y: 21*u)); p.addLine(to: CGPoint(x: 16*u, y: 21*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round))
+                case .send:
+                    Path { p in
+                        p.move(to: CGPoint(x: 3*u, y: 11*u)); p.addLine(to: CGPoint(x: 21*u, y: 3*u))
+                        p.addLine(to: CGPoint(x: 15*u, y: 21*u)); p.addLine(to: CGPoint(x: 11*u, y: 13*u)); p.closeSubpath()
+                        p.move(to: CGPoint(x: 11*u, y: 13*u)); p.addLine(to: CGPoint(x: 21*u, y: 3*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round, lineJoin: .round))
+                case .voice:
+                    HStack(spacing: 2*u) {
+                        ForEach(Array([7, 12, 18, 10, 15, 8].enumerated()), id: \.offset) { _, height in
+                            Capsule().fill(color).frame(width: 2*u, height: CGFloat(height)*u)
+                        }
+                    }
+                case .memory:
+                    Path { p in
+                        p.move(to: CGPoint(x: 12*u, y: 3*u)); p.addLine(to: CGPoint(x: 12*u, y: 21*u))
+                        p.move(to: CGPoint(x: 12*u, y: 7*u)); p.addLine(to: CGPoint(x: 7*u, y: 7*u)); p.addLine(to: CGPoint(x: 7*u, y: 11*u))
+                        p.move(to: CGPoint(x: 12*u, y: 15*u)); p.addLine(to: CGPoint(x: 17*u, y: 15*u)); p.addLine(to: CGPoint(x: 17*u, y: 19*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round, lineJoin: .round))
+                    ForEach([CGPoint(x: 12, y: 3), CGPoint(x: 7, y: 11), CGPoint(x: 17, y: 19)], id: \.self) { point in
+                        Circle().fill(color).frame(width: 3*u, height: 3*u).position(x: point.x*u, y: point.y*u)
+                    }
+                case .provider:
+                    Path { p in
+                        p.move(to: CGPoint(x: 12*u, y: 12*u)); p.addLine(to: CGPoint(x: 5*u, y: 5*u))
+                        p.move(to: CGPoint(x: 12*u, y: 12*u)); p.addLine(to: CGPoint(x: 19*u, y: 5*u))
+                        p.move(to: CGPoint(x: 12*u, y: 12*u)); p.addLine(to: CGPoint(x: 12*u, y: 21*u))
+                    }.stroke(color, style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round))
+                    ForEach([CGPoint(x: 5, y: 5), CGPoint(x: 19, y: 5), CGPoint(x: 12, y: 12), CGPoint(x: 12, y: 21)], id: \.self) { point in
+                        Circle().fill(color).frame(width: 4*u, height: 4*u).position(x: point.x*u, y: point.y*u)
+                    }
+                }
+            }
+            .frame(width: side, height: side)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .accessibilityHidden(true)
     }
 }
