@@ -20,7 +20,7 @@ final class ChatViewModel: ObservableObject {
     @AppStorage("model_groq")      var groqModel:      String = AIProviderKind.groq.defaultModel
     @AppStorage("autoSpeakReplies") var autoSpeakReplies: Bool = false
     @AppStorage("voiceGender")     var voiceGenderRaw: String = VoiceGender.female.rawValue
-    @AppStorage("autoMemory")      var autoMemory: Bool = true
+    @AppStorage("autoMemoryV2")    var autoMemory: Bool = false
 
     var voiceGender: VoiceGender { VoiceGender(rawValue: voiceGenderRaw) ?? .female }
     var onSpeakReply: ((String, VoiceGender) -> Void)?
