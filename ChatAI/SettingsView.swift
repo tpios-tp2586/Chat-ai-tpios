@@ -28,10 +28,8 @@ struct SettingsView: View {
 
     private func settingsSectionLabel(_ title: String, kind: ChatAIIconKind) -> some View {
         HStack(spacing: 9) {
-            Image(systemName: symbol)
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(activeTheme.accent)
+            ChatAICustomIcon(kind: kind, color: activeTheme.accent)
+                .frame(width: 18, height: 18)
                 .frame(width: 30, height: 30)
                 .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay {
