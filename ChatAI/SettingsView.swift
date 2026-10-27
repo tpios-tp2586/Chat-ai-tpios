@@ -54,7 +54,8 @@ struct SettingsView: View {
                                 openAIKey: $openAIKey, anthropicKey: $anthropicKey, geminiKey: $geminiKey,
                                 grokKey: $grokKey, deepseekKey: $deepseekKey, groqKey: $groqKey,
                                 openAIModel: $openAIModel, anthropicModel: $anthropicModel, geminiModel: $geminiModel,
-                                grokModel: $grokModel, deepseekModel: $deepseekModel, groqModel: $groqModel
+                                grokModel: $grokModel, deepseekModel: $deepseekModel, groqModel: $groqModel,
+                                selectedProviderRaw: $selectedProviderRaw
                             )
                         } label: {
                             settingRowLabel("Model AI", value: currentModel, icon: .provider)
@@ -71,6 +72,7 @@ struct SettingsView: View {
                                 grokKey: $grokKey, deepseekKey: $deepseekKey, groqKey: $groqKey,
                                 openAIModel: $openAIModel, anthropicModel: $anthropicModel, geminiModel: $geminiModel,
                                 grokModel: $grokModel, deepseekModel: $deepseekModel, groqModel: $groqModel,
+                                selectedProviderRaw: $selectedProviderRaw,
                                 initialTab: 0
                             )
                         } label: {
@@ -190,6 +192,7 @@ struct SettingsView: View {
 
 struct ThemeAndModelView: View {
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @AppStorage("chatAI.themeOpacity") private var themeOpacity = 0.70
     @State private var tab: Int
 
     @Binding var openAIKey: String
@@ -204,31 +207,38 @@ struct ThemeAndModelView: View {
     @Binding var grokModel: String
     @Binding var deepseekModel: String
     @Binding var groqModel: String
+    @Binding var selectedProviderRaw: String
 
     init(
         openAIKey: Binding<String>, anthropicKey: Binding<String>, geminiKey: Binding<String>, grokKey: Binding<String>, deepseekKey: Binding<String>, groqKey: Binding<String>,
         openAIModel: Binding<String>, anthropicModel: Binding<String>, geminiModel: Binding<String>, grokModel: Binding<String>, deepseekModel: Binding<String>, groqModel: Binding<String>,
-        initialTab: Int = 1
+        selectedProviderRaw: Binding<String>, initialTab: Int = 1
     ) {
         _openAIKey = openAIKey; _anthropicKey = anthropicKey; _geminiKey = geminiKey; _grokKey = grokKey; _deepseekKey = deepseekKey; _groqKey = groqKey
         _openAIModel = openAIModel; _anthropicModel = anthropicModel; _geminiModel = geminiModel; _grokModel = grokModel; _deepseekModel = deepseekModel; _groqModel = groqModel
+        _selectedProviderRaw = selectedProviderRaw
         _tab = State(initialValue: initialTab)
     }
 
     private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
+    private var selectedProvider: AIProviderKind { AIProviderKind(rawValue: selectedProviderRaw) ?? .openAI }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 16) {
-                Picker("", selection: $tab) {
-                    Text("Chủ đề").tag(0)
-                    Text("Mô hình").tag(1)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 3) {
+                    themeTab("Chủ đề", 0)
+                    themeTab("Mô hình", 1)
                 }
-                .pickerStyle(.segmented)
-                .tint(theme.accent)
-                if tab == 0 { themeCards } else { modelCards }
+                .padding(3)
+                .background(Color.black.opacity(0.32), in: Capsule())
+                .overlay(Capsule().stroke(theme.accent.opacity(0.18), lineWidth: 1))
+
+                if tab == 0 { themeDesign } else { modelDesign }
             }
-            .padding(14)
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 22)
         }
         .background(theme.background.ignoresSafeArea())
         .navigationTitle("Chủ đề & Mô hình")
@@ -237,77 +247,175 @@ struct ThemeAndModelView: View {
         .tint(theme.accent)
     }
 
-    private var themeCards: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Chủ đề giao diện")
+    private func themeTab(_ title: String, _ value: Int) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.18)) { tab = value }
+        } label: {
+            Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                .foregroundStyle(tab == value ? Color.white : Color.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background {
+                    if tab == value { Capsule().fill(theme.accent.opacity(0.88)) }
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var themeDesign: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text("Chủ đề giao diện").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(ChatAITheme.allCases) { option in
                     Button { selectedTheme = option.rawValue } label: {
                         VStack(alignment: .leading, spacing: 7) {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(LinearGradient(colors: [option.accent, option.background], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .frame(height: 78)
-                                .overlay(alignment: .topTrailing) {
-                                    if option.rawValue == selectedTheme {
-                                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.white).padding(8)
+                            ZStack(alignment: .topTrailing) {
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .fill(LinearGradient(colors: [option.accent.opacity(0.95), option.background, option.surface], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(height: 82)
+                                    .overlay(alignment: .bottomLeading) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.78)).frame(width: 42, height: 4)
+                                            RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.30)).frame(width: 62, height: 3)
+                                        }
+                                        .padding(10)
                                     }
+                                if option == theme {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 22, height: 22)
+                                        .background(theme.accent, in: Circle())
+                                        .padding(8)
                                 }
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(option.accent.opacity(option.rawValue == selectedTheme ? 0.9 : 0.25), lineWidth: option.rawValue == selectedTheme ? 1.5 : 0.8)
-                                }
-                            Text(option.title).font(.system(size: 13, weight: .semibold, design: .rounded))
-                            Text(option.subtitle).font(.system(size: 9)).foregroundStyle(.secondary)
+                            }
+                            .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(option == theme ? option.accent : Color.white.opacity(0.10), lineWidth: option == theme ? 1.4 : 0.8))
+
+                            Text(option.title).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.primary)
+                            Text(option.subtitle).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(.plain)
                 }
             }
-        }
-    }
 
-    private var modelCards: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Mô hình AI").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-            providerCard(.openAI, model: $openAIModel, key: $openAIKey)
-            providerCard(.anthropic, model: $anthropicModel, key: $anthropicKey)
-            providerCard(.gemini, model: $geminiModel, key: $geminiKey)
-            providerCard(.grok, model: $grokModel, key: $grokKey)
-            providerCard(.deepseek, model: $deepseekModel, key: $deepseekKey)
-            providerCard(.groq, model: $groqModel, key: $groqKey)
-        }
-    }
+            Text("Màu sắc").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 2)
+            HStack(spacing: 13) {
+                paletteDot(theme.accent)
+                paletteDot(Color(red: 0.35, green: 0.16, blue: 0.11))
+                paletteDot(Color(red: 0.78, green: 0.73, blue: 0.66))
+                paletteDot(Color(red: 0.42, green: 0.30, blue: 0.82))
+                paletteDot(Color(red: 0.34, green: 0.60, blue: 0.48))
+                paletteDot(Color(red: 0.17, green: 0.17, blue: 0.19))
+                paletteDot(Color(red: 0.55, green: 0.55, blue: 0.57))
+                paletteDot(Color(red: 0.10, green: 0.10, blue: 0.11))
+            }
+            .padding(.horizontal, 2)
 
-    private func providerCard(_ provider: AIProviderKind, model: Binding<String>, key: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                ChatAICustomIcon(kind: .provider, color: theme.accent, theme: theme).frame(width: 20, height: 20)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(provider.rawValue).font(.system(size: 14, weight: .semibold))
-                    Text(model.wrappedValue).font(.system(size: 10)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack {
+                    Text("Độ trong suốt").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(Int(themeOpacity * 100))%").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                 }
-                Spacer()
+                Slider(value: $themeOpacity, in: 0.45...0.90, step: 0.05).tint(theme.accent)
             }
-            SecureField("API key", text: key)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, 10)
-                .frame(height: 38)
-                .background(Color.black.opacity(0.20), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            HStack {
-                Button("Model mặc định") { model.wrappedValue = provider.defaultModel }
-                Spacer()
-                Text("Keychain").font(.system(size: 10)).foregroundStyle(.secondary)
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.accent)
+            .padding(12)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.accent.opacity(0.14), lineWidth: 1))
         }
-        .padding(11)
-        .background(theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(theme.accent.opacity(0.16), lineWidth: 1) }
+    }
+
+    private func paletteDot(_ color: Color) -> some View {
+        Circle().fill(color).frame(width: 22, height: 22).overlay(Circle().stroke(Color.white.opacity(0.22), lineWidth: 1))
+    }
+
+    private var modelDesign: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Mô hình AI").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+
+            VStack(spacing: 0) {
+                modelRow(.openAI, subtitle: "Trò chuyện · Đa năng · Sáng tạo", model: $openAIModel, key: $openAIKey)
+                modelRow(.anthropic, subtitle: "An toàn · Logic · Phân tích", model: $anthropicModel, key: $anthropicKey)
+                modelRow(.gemini, subtitle: "Đa phương thức · Kết nối Google", model: $geminiModel, key: $geminiKey)
+                modelRow(.grok, subtitle: "Nhanh · Thời sự · Sáng tạo", model: $grokModel, key: $grokKey)
+                modelRow(.deepseek, subtitle: "Lý luận · Code · Phân tích", model: $deepseekModel, key: $deepseekKey)
+                modelRow(.groq, subtitle: "Miễn phí · Nhanh · Linh hoạt", model: $groqModel, key: $groqKey)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(theme.accent.opacity(0.16), lineWidth: 1))
+
+            Text("Vai trò AI").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 2)
+            VStack(spacing: 0) {
+                roleRow("Bạn đồng hành", "Thân thiện · Tự nhiên · Hỗ trợ", selected: true)
+                roleRow("Trợ lý công việc", "Gọn gàng · Chính xác · Năng suất", selected: false)
+                roleRow("Chuyên gia", "Chuyên sâu · Phân tích", selected: false)
+                roleRow("Sáng tạo nội dung", "Ý tưởng · Viết · Biên tập", selected: false)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(theme.accent.opacity(0.16), lineWidth: 1))
+        }
+    }
+
+    private func modelRow(_ provider: AIProviderKind, subtitle: String, model: Binding<String>, key: Binding<String>) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                selectedProviderRaw = provider.rawValue
+            } label: {
+                HStack(spacing: 9) {
+                    ChatAICustomIcon(kind: .provider, color: selectedProvider == provider ? theme.accent : .secondary, theme: theme).frame(width: 19, height: 19)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(provider.rawValue.components(separatedBy: " (").first ?? provider.rawValue).font(.system(size: 13, weight: .semibold))
+                        Text(subtitle).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 6)
+                    Image(systemName: selectedProvider == provider ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 17))
+                        .foregroundStyle(selectedProvider == provider ? theme.accent : Color.secondary.opacity(0.55))
+                }
+                .padding(.vertical, 9)
+            }
+            .buttonStyle(.plain)
+
+            if selectedProvider == provider {
+                HStack(spacing: 7) {
+                    SecureField("API key", text: key)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(size: 10))
+                        .padding(.horizontal, 9)
+                        .frame(height: 32)
+                        .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    Button("Mặc định") { model.wrappedValue = provider.defaultModel }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(theme.accent)
+                }
+                .padding(.bottom, 8)
+            }
+            if provider != .groq { Divider().opacity(0.25) }
+        }
+    }
+
+    private func roleRow(_ title: String, _ subtitle: String, selected: Bool) -> some View {
+        HStack(spacing: 9) {
+            ChatAICustomIcon(kind: .companion, color: selected ? theme.accent : .secondary, theme: theme).frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                Text(subtitle).font(.system(size: 9)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 16))
+                .foregroundStyle(selected ? theme.accent : Color.secondary.opacity(0.5))
+        }
+        .padding(.vertical, 9)
     }
 }
 
