@@ -899,6 +899,7 @@ struct LiveCallView: View {
             .sheet(isPresented: $showOptions) {
                 NavigationStack {
                     ScrollView { optionsBody.padding() }
+                        .background(activeTheme.background.ignoresSafeArea())
                         .navigationTitle("Cài đặt giọng nói")
                         .tint(activeTheme.accent)
                         .preferredColorScheme(.dark)
