@@ -790,7 +790,6 @@ struct MemoryView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    overviewCard
                     profileSections
                     searchField
                     if historyManager.memories.count >= 50 {
