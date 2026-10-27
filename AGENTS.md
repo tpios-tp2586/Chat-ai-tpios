@@ -4,7 +4,7 @@ These rules apply to all work in this repository and must be followed before any
 
 ## Branch policy — strict
 - Never create, rename, or switch to a new Git branch unless the user explicitly gives permission first.
-- Work only on the branch the user has selected. The current requested working branch is `feature/3d-companion-mvp-shell`.
+- Work only on the branch the user has selected. The current working branch is `main`; continue work directly on `main`.
 - Do not create a branch “for safety”, experiments, or design work without asking and receiving explicit approval.
 - If a task cannot be completed safely on the selected branch, stop and explain the limitation; do not create a branch.
 
