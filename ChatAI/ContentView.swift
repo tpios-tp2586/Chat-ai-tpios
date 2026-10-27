@@ -10,8 +10,8 @@ enum ChatDesignTokens {
     static let contentPadding: CGFloat = 14
     static let bubbleRadius: CGFloat = 14
     static let compactSpacing: CGFloat = 8
-    static let userBubbleColor = Color.blue.opacity(0.85)
-    static let assistantBubbleColor = Color(.secondarySystemBackground)
+    static var userBubbleColor: Color { ChatAIThemeStore.current.accent.opacity(0.92) }
+    static var assistantBubbleColor: Color { ChatAIThemeStore.current.surface }
 }
 
 struct ChatBrandingCredit: View {
@@ -38,6 +38,11 @@ struct ContentView: View {
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -104,6 +109,10 @@ struct ContentView: View {
 
             inputBar
         }
+        .background(activeTheme.background.ignoresSafeArea())
+        .foregroundStyle(.primary)
+        .tint(activeTheme.accent)
+        .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
@@ -222,6 +231,7 @@ struct ContentView: View {
             }
         }
         .padding(.vertical, 10)
+        .background(activeTheme.background)
     }
 
     // MARK: - Input bar
@@ -291,7 +301,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.thinMaterial)
+        .background(activeTheme.surface)
     }
 }
 
@@ -300,6 +310,11 @@ struct ContentView: View {
 struct MessageBubble: View {
     let message: ChatMessage
     @State private var copied = false
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 6) {
@@ -322,9 +337,7 @@ struct MessageBubble: View {
                 }
                 Text(message.content)
                     .padding(10)
-                    .background(message.role == .user
-                        ? ChatDesignTokens.userBubbleColor
-                        : ChatDesignTokens.assistantBubbleColor)
+                    .background(message.role == .user ? activeTheme.accent.opacity(0.92) : activeTheme.surface)
                     .foregroundColor(message.role == .user ? .white : .primary)
                     .cornerRadius(ChatDesignTokens.bubbleRadius)
 
