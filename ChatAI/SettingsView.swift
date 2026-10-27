@@ -102,6 +102,9 @@ struct SettingsView: View {
                     ChatBrandingCredit()
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(activeTheme.background)
+            .listRowBackground(activeTheme.surface)
             .navigationTitle("Cài đặt")
             .tint(activeTheme.accent)
             .preferredColorScheme(.dark)
