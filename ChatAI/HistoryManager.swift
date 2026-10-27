@@ -108,7 +108,11 @@ final class HistoryManager: ObservableObject {
 
     func addMemory(_ content: String) {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !memories.contains(where: { $0.content == trimmed }) else { return }
+        let normalized = trimmed.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()
+        guard !trimmed.isEmpty,
+              !memories.contains(where: {
+                  $0.content.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased() == normalized
+              }) else { return }
         memories.append(MemoryItem(content: trimmed))
         if memories.count > 50 { memories.removeFirst() }
         saveMemory()
@@ -133,8 +137,9 @@ final class HistoryManager: ObservableObject {
 
     var memorySystemPrompt: String? {
         guard !memories.isEmpty else { return nil }
-        let items = memories.map { "- \($0.content)" }.joined(separator: "\n")
-        return "Đây là thông tin quan trọng bạn đã ghi nhớ về người dùng:\n\(items)\n\nHãy sử dụng thông tin này khi phù hợp trong cuộc trò chuyện."
+        let items = memories.suffix(15).map { "- \($0.content)" }.joined(separator: "\n")
+        let limitedItems = String(items.prefix(3000))
+        return "Đây là thông tin quan trọng bạn đã ghi nhớ về người dùng:\n\(limitedItems)\n\nHãy sử dụng thông tin này khi phù hợp trong cuộc trò chuyện."
     }
 
     static func extractMemoryPrompt(from message: String) -> String {
