@@ -187,7 +187,8 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 Button { showHistory = true } label: {
                     Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 16, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(activeTheme.accent)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -241,7 +242,8 @@ struct ContentView: View {
 
                 Button { showCompanion = true } label: {
                     Image(systemName: "person.crop.rectangle.stack")
-                        .font(.system(size: 16, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(activeTheme.accent)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -264,6 +266,8 @@ struct ContentView: View {
                 LiveCallButton(viewModel: viewModel)
                 Button { showSettings = true } label: {
                     Label("Cài đặt", systemImage: "slider.horizontal.3")
+                        .labelStyle(.titleAndIcon)
+                        .symbolRenderingMode(.hierarchical)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(activeTheme.accent)
                         .padding(.horizontal, 11)
@@ -651,13 +655,31 @@ private struct ChatActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: 17, weight: .medium, design: .rounded))
                 .foregroundStyle(prominent ? Color.white : accent)
                 .frame(width: 42, height: 42)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(prominent ? accent : accent.opacity(0.12))
+                        .fill(
+                            prominent
+                            ? LinearGradient(
+                                colors: [accent, accent.opacity(0.78)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                              )
+                            : LinearGradient(
+                                colors: [accent.opacity(0.16), accent.opacity(0.07)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                              )
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(accent.opacity(prominent ? 0.85 : 0.28), lineWidth: 1)
+                        }
                 }
+                .shadow(color: accent.opacity(prominent ? 0.24 : 0.07), radius: prominent ? 9 : 4, x: 0, y: 3)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
