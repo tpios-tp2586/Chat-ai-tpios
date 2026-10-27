@@ -754,24 +754,9 @@ private struct ChatMessageCard: View {
 }
 
 
-// MARK: - Icon rendering
-// Keep the shared icon API, but use stable system symbols instead of custom GeometryReader/Path drawing.
+// MARK: - Custom compact icon set
 enum ChatAIIconKind {
     case history, companion, settings, attachment, microphone, send, voice, memory, provider
-
-    var systemName: String {
-        switch self {
-        case .history: return "clock.arrow.circlepath"
-        case .companion: return "person.crop.circle"
-        case .settings: return "slider.horizontal.3"
-        case .attachment: return "plus"
-        case .microphone: return "mic"
-        case .send: return "paperplane"
-        case .voice: return "waveform"
-        case .memory: return "brain.head.profile"
-        case .provider: return "point.3.connected.trianglepath.dotted"
-        }
-    }
 }
 
 struct ChatAICustomIcon: View {
@@ -779,9 +764,70 @@ struct ChatAICustomIcon: View {
     let color: Color
 
     var body: some View {
-        Image(systemName: kind.systemName)
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(color)
-            .accessibilityHidden(true)
+        Canvas { context, size in
+            let s = min(size.width, size.height)
+            let u = s / 24
+            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * u, y: y * u) }
+            func line(_ points: [CGPoint], width: CGFloat = 1.8) {
+                guard let first = points.first else { return }
+                var path = Path()
+                path.move(to: p(first.x, first.y))
+                for point in points.dropFirst() { path.addLine(to: p(point.x, point.y)) }
+                context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: width * u, lineCap: .round, lineJoin: .round))
+            }
+            func circle(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat, fill: Bool = true) {
+                let rect = CGRect(x: (x-r)*u, y: (y-r)*u, width: 2*r*u, height: 2*r*u)
+                context.drawLayer { layer in
+                    if fill { layer.fill(Path(ellipseIn: rect), with: .color(color)) }
+                    else { layer.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.7*u) }
+                }
+            }
+            switch kind {
+            case .history:
+                var arc = Path()
+                arc.addArc(center: p(12,12), radius: 8*u, startAngle: .degrees(-55), endAngle: .degrees(250), clockwise: false)
+                context.stroke(arc, with: .color(color), style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round))
+                line([CGPoint(x:4,y:4),CGPoint(x:4,y:9),CGPoint(x:9,y:9)])
+                line([CGPoint(x:12,y:7),CGPoint(x:12,y:12),CGPoint(x:16,y:14)])
+            case .companion:
+                circle(12,4,1.5); line([CGPoint(x:12,y:5.5),CGPoint(x:12,y:7)])
+                var face = Path(roundedRect: CGRect(x:4*u,y:7*u,width:16*u,height:13*u), cornerSize: CGSize(width:4*u,height:4*u))
+                context.stroke(face, with: .color(color), lineWidth: 1.7*u)
+                circle(9,12,1.2); circle(15,12,1.2); line([CGPoint(x:9,y:16),CGPoint(x:15,y:16)])
+            case .settings:
+                for (x,y) in [(5,9),(12,15),(19,7)] {
+                    line([CGPoint(x:CGFloat(x),y:3),CGPoint(x:CGFloat(x),y:21)])
+                    circle(CGFloat(x),CGFloat(y),2.1)
+                }
+            case .attachment:
+                line([CGPoint(x:12,y:4),CGPoint(x:12,y:20)])
+                line([CGPoint(x:4,y:12),CGPoint(x:20,y:12)])
+            case .microphone:
+                let capsule = Path(roundedRect: CGRect(x:9*u,y:3*u,width:6*u,height:12*u), cornerSize: CGSize(width:3*u,height:3*u))
+                context.stroke(capsule, with: .color(color), lineWidth: 1.8*u)
+                line([CGPoint(x:5,y:11),CGPoint(x:5,y:13),CGPoint(x:7,y:17),CGPoint(x:12,y:19),CGPoint(x:17,y:17),CGPoint(x:19,y:13),CGPoint(x:19,y:11)])
+                line([CGPoint(x:12,y:19),CGPoint(x:12,y:22)]); line([CGPoint(x:8,y:22),CGPoint(x:16,y:22)])
+            case .send:
+                line([CGPoint(x:3,y:11),CGPoint(x:21,y:3),CGPoint(x:15,y:21),CGPoint(x:11,y:13),CGPoint(x:3,y:11)])
+                line([CGPoint(x:11,y:13),CGPoint(x:21,y:3)])
+            case .voice:
+                for (i,h) in [7,12,18,10,15,8].enumerated() {
+                    let rect = CGRect(x: CGFloat(4+i*3)*u, y: (12-CGFloat(h)/2)*u, width: 2*u, height: CGFloat(h)*u)
+                    context.fill(Path(roundedRect: rect, cornerSize: CGSize(width:u,height:u)), with: .color(color))
+                }
+            case .memory:
+                line([CGPoint(x:12,y:3),CGPoint(x:12,y:21)])
+                line([CGPoint(x:12,y:7),CGPoint(x:7,y:7),CGPoint(x:7,y:11)])
+                line([CGPoint(x:12,y:15),CGPoint(x:17,y:15),CGPoint(x:17,y:19)])
+                circle(12,3,1.5); circle(7,11,1.5); circle(17,19,1.5)
+            case .provider:
+                line([CGPoint(x:12,y:12),CGPoint(x:5,y:5)])
+                line([CGPoint(x:12,y:12),CGPoint(x:19,y:5)])
+                line([CGPoint(x:12,y:12),CGPoint(x:12,y:21)])
+                circle(5,5,2); circle(19,5,2); circle(12,12,2); circle(12,21,2)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityHidden(true)
     }
 }
