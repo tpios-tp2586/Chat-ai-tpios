@@ -271,16 +271,16 @@ struct ContentView: View {
 
     private var bottomNavigation: some View {
         HStack(spacing: 0) {
-            bottomNavigationItem(title: "Chat", kind: .companion, selected: true) {
+            bottomNavigationItem(title: "Chat", symbol: "bubble.left.and.bubble.right", selected: true) {
                 // Already on the Chat tab; preserve the current conversation.
             }
-            bottomNavigationItem(title: "Lịch sử", kind: .history) {
+            bottomNavigationItem(title: "Lịch sử", symbol: "clock.arrow.circlepath") {
                 showHistory = true
             }
-            bottomNavigationItem(title: "Memory", kind: .memory) {
+            bottomNavigationItem(title: "Memory", symbol: "brain") {
                 showMemory = true
             }
-            bottomNavigationItem(title: "Cài đặt", kind: .settings) {
+            bottomNavigationItem(title: "Cài đặt", symbol: "gearshape") {
                 showSettings = true
             }
         }
@@ -298,18 +298,15 @@ struct ContentView: View {
 
     private func bottomNavigationItem(
         title: String,
-        kind: ChatAIIconKind,
+        symbol: String,
         selected: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                ChatAICustomIcon(
-                    kind: kind,
-                    color: selected ? activeTheme.accent : .secondary,
-                    theme: activeTheme
-                )
-                .frame(width: 21, height: 21)
+                Image(systemName: symbol)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
                 Text(title)
                     .font(.system(size: 10, weight: selected ? .semibold : .medium))
                     .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
