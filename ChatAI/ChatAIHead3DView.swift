@@ -13,10 +13,15 @@ struct ChatAIHead3DView: View {
     @State private var modelLoaded = false
     @State private var loadMessage = "Đang tải mô hình 3D…"
     @State private var copyStatus = ""
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 0.025, green: 0.04, blue: 0.075), Color(red: 0.10, green: 0.035, blue: 0.14)], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [activeTheme.background, activeTheme.surface], startPoint: .top, endPoint: .bottom)
 
             FallbackCompanionRobot(speaking: speaking)
                 .padding(.vertical, 8)
@@ -51,7 +56,7 @@ struct ChatAIHead3DView: View {
                                     .font(.caption2.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
-                            .tint(.cyan)
+                            .tint(activeTheme.accent)
 
                             Button {
                                 loadMessage = "Đã xoá log"
@@ -61,7 +66,7 @@ struct ChatAIHead3DView: View {
                                     .font(.caption2.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
-                            .tint(.pink)
+                            .tint(activeTheme.accent)
 
                             if !copyStatus.isEmpty {
                                 Text(copyStatus)
@@ -85,7 +90,8 @@ struct ChatAIHead3DView: View {
                 }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .tint(activeTheme.accent)
         .onAppear { modelLoaded = false }
     }
 }
@@ -99,7 +105,8 @@ private struct CompanionRealityView: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero)
         view.cameraMode = .nonAR
-        view.environment.background = .color(UIColor(red: 0.025, green: 0.04, blue: 0.075, alpha: 1))
+        let theme = ChatAIThemeStore.current
+        view.environment.background = .color(UIColor(theme.background))
         let scene = AnchorEntity(world: .zero)
         view.scene.addAnchor(scene)
         let camera = PerspectiveCamera()
@@ -107,7 +114,7 @@ private struct CompanionRealityView: UIViewRepresentable {
         camera.look(at: [0, 0, 0], from: camera.position, relativeTo: nil)
         scene.addChild(camera)
         scene.addChild(makeLight(color: .white, intensity: 1300, position: [-0.45, 0.55, 0.65]))
-        scene.addChild(makeLight(color: UIColor(red: 0.25, green: 0.7, blue: 1, alpha: 1), intensity: 800, position: [0.5, 0.15, 0.4]))
+        scene.addChild(makeLight(color: UIColor(theme.accent), intensity: 800, position: [0.5, 0.15, 0.4]))
         scene.addChild(makeLight(color: .white, intensity: 1000, position: [0, 0.45, -0.4]))
         let bundle = Bundle.main
         let directURL = bundle.url(forResource: modelResourceName, withExtension: "usdz") ?? bundle.url(forResource: modelResourceName, withExtension: "usdz", subdirectory: "Companion")
