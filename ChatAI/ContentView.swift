@@ -812,6 +812,8 @@ struct MemoryView: View {
                                 .overlay(Capsule().stroke(activeTheme.accent.opacity(0.45), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
+                        .disabled(historyManager.memories.count >= 50)
+                        .opacity(historyManager.memories.count >= 50 ? 0.45 : 1)
                     }
 
                     if filteredMemories.isEmpty {
@@ -914,6 +916,8 @@ struct MemoryView: View {
                     .foregroundStyle(Color.black)
             }
             .buttonStyle(.plain)
+            .disabled(historyManager.memories.count >= 50)
+            .opacity(historyManager.memories.count >= 50 ? 0.45 : 1)
             if !historyManager.memories.isEmpty {
                 Button { showClearConfirmation = true } label: {
                     Image(systemName: "trash")
