@@ -1000,7 +1000,7 @@ struct MemoryView: View {
             }
             ForEach(profileFields, id: \.title) { field in
                 let matching = historyManager.memories.filter {
-                    $0.content.localizedCaseInsensitiveHasPrefix(field.title + ":")
+                    $0.content.lowercased().hasPrefix((field.title + ":").lowercased())
                 }.sorted { $0.savedAt > $1.savedAt }
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
@@ -1134,6 +1134,7 @@ struct MemoryView: View {
 
     private func beginAdd() {
         editingItem = nil
+        selectedProfileField = nil
         editingText = ""
         showMemoryEditor = true
     }
