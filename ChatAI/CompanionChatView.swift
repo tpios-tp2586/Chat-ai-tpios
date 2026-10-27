@@ -300,6 +300,11 @@ private struct ApprovedRobotHead: View {
     @State private var mouthOpen = false
     @State private var rotationAngle: CGFloat = 0
     @State private var dragStartAngle: CGFloat?
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -307,7 +312,7 @@ private struct ApprovedRobotHead: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.cyan.opacity(0.10))
+                    .fill(activeTheme.accent.opacity(0.10))
                     .frame(width: 350 * scale, height: 350 * scale)
                     .blur(radius: 46)
 
@@ -332,19 +337,19 @@ private struct ApprovedRobotHead: View {
                     .frame(width: 354 * scale, height: 282 * scale)
                     .overlay(
                         HelmetShape()
-                            .stroke(Color(red: 1, green: 0.56, blue: 0.79), lineWidth: 11 * scale)
+                            .stroke(activeTheme.accent.opacity(0.88), lineWidth: 11 * scale)
                     )
                     .overlay(
                         HelmetShape()
                             .stroke(.white.opacity(0.92), lineWidth: 2 * scale)
                             .padding(9 * scale)
                     )
-                    .shadow(color: Color.pink.opacity(0.35), radius: 20 * scale, y: 10 * scale)
+                    .shadow(color: activeTheme.accent.opacity(0.28), radius: 20 * scale, y: 10 * scale)
                     .position(x: 205 * scale, y: 240 * scale)
 
                 // Pale blue shell seams.
                 Capsule()
-                    .fill(Color(red: 0.42, green: 0.82, blue: 1).opacity(0.72))
+                    .fill(activeTheme.accent.opacity(0.72))
                     .frame(width: 4 * scale, height: 38 * scale)
                     .rotationEffect(.degrees(19))
                     .position(x: 120 * scale, y: 102 * scale)
