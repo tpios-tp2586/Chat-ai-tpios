@@ -492,18 +492,35 @@ struct HistoryView: View {
                 }
             }
             .sheet(isPresented: $showMemory) { MemoryView() }
-            .alert("Đổi tên cuộc chat", isPresented: .init(
+            .sheet(isPresented: Binding(
                 get: { renameSession != nil },
                 set: { if !$0 { renameSession = nil } }
             )) {
-                TextField("Tên mới", text: $newTitle)
-                Button("Lưu") {
-                    if let session = renameSession {
-                        historyManager.rename(session: session, newTitle: newTitle)
+                NavigationStack {
+                    Form {
+                        TextField("Tên mới", text: $newTitle)
+                            .foregroundStyle(Color.primary)
                     }
-                    renameSession = nil
+                    .scrollContentBackground(.hidden)
+                    .background(activeTheme.background)
+                    .navigationTitle("Đổi tên cuộc chat")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Hủy") { renameSession = nil }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Lưu") {
+                                if let session = renameSession {
+                                    historyManager.rename(session: session, newTitle: newTitle)
+                                }
+                                renameSession = nil
+                            }
+                        }
+                    }
+                    .preferredColorScheme(.dark)
                 }
-                Button("Hủy", role: .cancel) { renameSession = nil }
+                .presentationDetents([.medium])
             }
             .onAppear { historyManager.loadSessions() }
         }
@@ -578,17 +595,43 @@ struct MemoryView: View {
                 }
                 ToolbarItem(placement: .navigationBarLeading) { Button("Đóng") { dismiss() } }
             }
-            .alert(editingItem == nil ? "Thêm ghi nhớ" : "Chỉnh sửa ghi nhớ", isPresented: $showMemoryEditor) {
-                TextField("Thông tin cần nhớ", text: $editingText)
-                Button("Lưu") {
-                    if let item = editingItem {
-                        historyManager.updateMemory(item, content: editingText)
-                    } else {
-                        historyManager.addMemory(editingText)
+            .sheet(isPresented: $showMemoryEditor, onDismiss: {
+                editingItem = nil
+            }) {
+                NavigationStack {
+                    Form {
+                        TextField("Thông tin cần nhớ", text: $editingText, axis: .vertical)
+                            .lineLimit(4...10)
+                            .foregroundStyle(Color.primary)
                     }
-                    editingItem = nil
+                    .scrollContentBackground(.hidden)
+                    .background(activeTheme.background)
+                    .navigationTitle(editingItem == nil ? "Thêm ghi nhớ" : "Sửa ghi nhớ")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Hủy") {
+                                showMemoryEditor = false
+                                editingItem = nil
+                            }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Lưu") {
+                                let value = editingText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !value.isEmpty else { return }
+                                if let item = editingItem {
+                                    historyManager.updateMemory(item, content: value)
+                                } else {
+                                    historyManager.addMemory(value)
+                                }
+                                showMemoryEditor = false
+                                editingItem = nil
+                            }
+                        }
+                    }
+                    .preferredColorScheme(.dark)
                 }
-                Button("Hủy", role: .cancel) { editingItem = nil }
+                .presentationDetents([.medium, .large])
             }
             .onAppear { historyManager.loadMemory() }
         }
