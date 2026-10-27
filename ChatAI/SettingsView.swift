@@ -31,20 +31,24 @@ struct SettingsView: View {
             Form {
                 ThemeSettingsSection()
 
-                Section("Giọng nói") {
+                Section {
                     Toggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies)
                     Picker("Giọng đọc", selection: $voiceGenderRaw) {
                         ForEach(VoiceGender.allCases) { g in
                             Text(g.rawValue).tag(g.rawValue)
                         }
                     }
+                } header: {
+                    Label("Giọng nói", systemImage: "waveform")
                 }
 
-                Section("AI Memory") {
+                Section {
                     Toggle("Tự động ghi nhớ thông tin", isOn: $autoMemory)
+                } header: {
+                    Label("AI Memory", systemImage: "brain.head.profile")
                 }
 
-                DisclosureGroup("Nhà cung cấp AI · API key và model") {
+                DisclosureGroup {
                     providerSection(
                         title: "ChatGPT (OpenAI)",
                         key: $openAIKey,
@@ -87,6 +91,8 @@ struct SettingsView: View {
                         model: $groqModel,
                         mode: .groq
                     )
+                } label: {
+                    Label("Nhà cung cấp AI · API key và model", systemImage: "cpu")
                 }
 
                 Section {
