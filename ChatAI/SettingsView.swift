@@ -28,7 +28,7 @@ struct SettingsView: View {
 
     private func settingsSectionLabel(_ title: String, kind: ChatAIIconKind) -> some View {
         HStack(spacing: 9) {
-            ChatAICustomIcon(kind: kind, color: activeTheme.accent)
+            ChatAICustomIcon(kind: kind, color: activeTheme.accent, theme: activeTheme)
                 .frame(width: 18, height: 18)
                 .frame(width: 30, height: 30)
                 .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
