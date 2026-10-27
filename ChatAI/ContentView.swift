@@ -183,55 +183,106 @@ struct ContentView: View {
     // MARK: - Header
 
     private var header: some View {
-        ZStack {
-            HStack {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button { showHistory = true } label: {
-                    Image(systemName: "clock.arrow.circlepath").font(.title3)
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 38, height: 38)
+                        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                        }
                 }
-                .padding(.leading)
-                Spacer()
+                .accessibilityLabel("Lịch sử chat")
+
+                Spacer(minLength: 2)
+
+                VStack(spacing: 3) {
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(activeTheme.accent)
+                            .frame(width: 7, height: 7)
+                        Text("ChatAI")
+                            .font(.system(size: 19, weight: .bold, design: .rounded))
+                            .tracking(0.2)
+                        Button { showProviderMenu = true } label: {
+                            HStack(spacing: 4) {
+                                Text(viewModel.selectedProvider.rawValue
+                                    .components(separatedBy: "(").first?
+                                    .trimmingCharacters(in: .whitespaces) ?? "")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .foregroundStyle(activeTheme.accent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(activeTheme.accent.opacity(0.12), in: Capsule())
+                        }
+                        .confirmationDialog("Chọn AI", isPresented: $showProviderMenu, titleVisibility: .visible) {
+                            ForEach(AIProviderKind.allCases) { provider in
+                                Button(provider.rawValue) {
+                                    viewModel.selectedProviderRaw = provider.rawValue
+                                }
+                            }
+                            Button("Hủy", role: .cancel) {}
+                        }
+                    }
+                    ChatBrandingCredit(compact: true)
+                }
+                .frame(maxWidth: .infinity)
+
+                Spacer(minLength: 2)
+
                 Button { showCompanion = true } label: {
                     Image(systemName: "person.crop.rectangle.stack")
-                        .font(.title3)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 38, height: 38)
+                        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                        }
                 }
                 .accessibilityLabel("Mở ChatAI 3D")
-                LiveCallButton(viewModel: viewModel)
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape").font(.title3)
-                }
-                .padding(.trailing)
             }
 
-            VStack(spacing: 2) {
-                HStack(spacing: 4) {
-                    Text("AI")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Button {
-                        showProviderMenu = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(viewModel.selectedProvider.rawValue
-                                .components(separatedBy: "(").first?
-                                .trimmingCharacters(in: .whitespaces) ?? "")
-                                .font(.headline)
-                            Image(systemName: "chevron.down").font(.caption2)
-                        }
-                    }
-                    .confirmationDialog("Chọn AI", isPresented: $showProviderMenu, titleVisibility: .visible) {
-                        ForEach(AIProviderKind.allCases) { provider in
-                            Button(provider.rawValue) {
-                                viewModel.selectedProviderRaw = provider.rawValue
-                            }
-                        }
-                        Button("Hủy", role: .cancel) {}
-                    }
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Circle().fill(Color.green).frame(width: 6, height: 6)
+                    Text("Sẵn sàng trò chuyện")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
-                ChatBrandingCredit(compact: true)
+                Spacer()
+                LiveCallButton(viewModel: viewModel)
+                Button { showSettings = true } label: {
+                    Label("Cài đặt", systemImage: "slider.horizontal.3")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(activeTheme.accent)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(activeTheme.accent.opacity(0.10), in: Capsule())
+                }
             }
         }
-        .padding(.vertical, 10)
-        .background(activeTheme.background)
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 11)
+        .background {
+            activeTheme.background
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(activeTheme.accent.opacity(0.25))
+                        .frame(height: 0.5)
+                }
+        }
     }
 
     // MARK: - Input bar
