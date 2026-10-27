@@ -26,7 +26,7 @@ struct SettingsView: View {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium
     }
 
-    private func settingsSectionLabel(_ title: String, symbol: String) -> some View {
+    private func settingsSectionLabel(_ title: String, kind: ChatAIIconKind) -> some View {
         HStack(spacing: 9) {
             Image(systemName: symbol)
                 .symbolRenderingMode(.hierarchical)
@@ -57,13 +57,13 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    settingsSectionLabel("Giọng nói", symbol: "waveform")
+                    settingsSectionLabel("Giọng nói", kind: .voice)
                 }
 
                 Section {
                     Toggle("Tự động ghi nhớ thông tin", isOn: $autoMemory)
                 } header: {
-                    settingsSectionLabel("AI Memory", symbol: "brain.head.profile")
+                    settingsSectionLabel("AI Memory", kind: .memory)
                 }
 
                 DisclosureGroup {
@@ -110,7 +110,7 @@ struct SettingsView: View {
                         mode: .groq
                     )
                 } label: {
-                    settingsSectionLabel("Nhà cung cấp AI · API key và model", symbol: "cpu")
+                    settingsSectionLabel("Nhà cung cấp AI · API key và model", kind: .provider)
                 }
 
                 Section {
