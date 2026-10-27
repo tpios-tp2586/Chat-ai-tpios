@@ -237,7 +237,7 @@ struct ContentView: View {
     // MARK: - Input bar
 
     private var inputBar: some View {
-        VStack(spacing: 8) {
+        ChatComposerSurface(accent: activeTheme.accent, surface: activeTheme.surface) {
             if !viewModel.pendingAttachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -266,15 +266,15 @@ struct ContentView: View {
                     }
                 }
             }
-            HStack(spacing: 12) {
-                Button { showAttachmentMenu = true } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.accentColor)
+            HStack(spacing: 9) {
+                ChatActionButton(symbol: "plus", label: "Đính kèm ảnh hoặc tệp", accent: activeTheme.accent) {
+                    showAttachmentMenu = true
                 }
-                .accessibilityLabel("Đính kèm ảnh hoặc tệp")
-
-                Button {
+                ChatActionButton(
+                    symbol: voiceManager.isListening ? "mic.fill" : "mic",
+                    label: voiceManager.isListening ? "Dừng nghe" : "Nhập bằng giọng nói",
+                    accent: voiceManager.isListening ? .red : activeTheme.accent
+                ) {
                     let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
                     voiceManager.startListening(
                         groqAPIKey: groqKey,
@@ -284,24 +284,14 @@ struct ContentView: View {
                             viewModel.send()
                         }
                     )
-                } label: {
-                    Image(systemName: voiceManager.isListening ? "mic.fill" : "mic")
-                        .foregroundColor(voiceManager.isListening ? .red : .accentColor)
                 }
-
-                TextField("Nhắn tin...", text: $viewModel.inputText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...4)
-
-                Button { viewModel.send() } label: {
-                    Image(systemName: "paperplane.fill")
+                ChatComposerField(text: $viewModel.inputText, accent: activeTheme.accent, placeholder: "Nhắn tin...")
+                ChatActionButton(symbol: "paperplane.fill", label: "Gửi tin nhắn", accent: activeTheme.accent, prominent: true) {
+                    viewModel.send()
                 }
                 .disabled((viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && viewModel.pendingAttachments.isEmpty) || viewModel.isSending)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(activeTheme.surface)
     }
 }
 
@@ -335,11 +325,12 @@ struct MessageBubble: View {
                         }
                     }
                 }
-                Text(message.content)
-                    .padding(10)
-                    .background(message.role == .user ? activeTheme.accent.opacity(0.92) : activeTheme.surface)
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .cornerRadius(ChatDesignTokens.bubbleRadius)
+                ChatMessageCard(
+                    text: message.content,
+                    isUser: message.role == .user,
+                    accent: activeTheme.accent.opacity(0.92),
+                    surface: activeTheme.surface
+                )
 
                 Button {
                     UIPasteboard.general.string = message.content
@@ -540,5 +531,104 @@ struct MemoryView: View {
             }
             .onAppear { historyManager.loadMemory() }
         }
+    }
+}
+
+
+ // MARK: - Premium chat presentation components
+
+private enum ChatScreenStyle {
+    static let cardRadius: CGFloat = 22
+}
+
+private struct ChatComposerSurface<Content: View>: View {
+    let accent: Color
+    let surface: Color
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 10) { content }
+            .padding(12)
+            .background {
+                RoundedRectangle(cornerRadius: ChatScreenStyle.cardRadius, style: .continuous)
+                    .fill(surface)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: ChatScreenStyle.cardRadius, style: .continuous)
+                            .stroke(accent.opacity(0.20), lineWidth: 1)
+                    }
+            }
+            .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: -4)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+    }
+}
+
+private struct ChatComposerField: View {
+    @Binding var text: String
+    let accent: Color
+    let placeholder: String
+
+    var body: some View {
+        TextField(placeholder, text: $text, axis: .vertical)
+            .font(.system(size: 15))
+            .lineLimit(1...5)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            }
+            .tint(accent)
+    }
+}
+
+private struct ChatActionButton: View {
+    let symbol: String
+    let label: String
+    let accent: Color
+    var prominent: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(prominent ? Color.white : accent)
+                .frame(width: 42, height: 42)
+                .background {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(prominent ? accent : accent.opacity(0.12))
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+private struct ChatMessageCard: View {
+    let text: String
+    let isUser: Bool
+    let accent: Color
+    let surface: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 15))
+            .lineSpacing(4)
+            .foregroundStyle(isUser ? Color.white : Color.primary)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 21, style: .continuous)
+                    .fill(isUser ? accent : surface)
+                    .overlay {
+                        if !isUser {
+                            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                                .stroke(Color.white.opacity(0.055), lineWidth: 1)
+                        }
+                    }
+            }
     }
 }
