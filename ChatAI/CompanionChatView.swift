@@ -86,10 +86,10 @@ struct CompanionChatView: View {
                         .foregroundStyle(.white)
                         .padding(13)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 18))
+                        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
-                                .stroke(.white.opacity(0.10), lineWidth: 1)
+                                .stroke(activeTheme.accent.opacity(0.18), lineWidth: 1)
                         )
                         .padding(.horizontal, 16)
                     }
@@ -191,7 +191,8 @@ struct CompanionChatView: View {
             } label: {
                 Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
                     .frame(width: 52, height: 52)
-                    .background(.white.opacity(0.14), in: Circle())
+                    .background(activeTheme.surface, in: Circle())
+                    .overlay(Circle().stroke(activeTheme.accent.opacity(0.24), lineWidth: 1))
             }
 
             Button {
@@ -222,12 +223,12 @@ struct CompanionChatView: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .frame(width: 52, height: 52)
-                    .background(.red.opacity(0.85), in: Circle())
+                    .background(Color.red.opacity(0.85), in: Circle())
             }
         }
         .foregroundStyle(.white)
         .padding(16)
-        .background(.black.opacity(0.24))
+        .background(activeTheme.background.opacity(0.96))
     }
 
     private func startLive() {
