@@ -213,6 +213,11 @@ struct ModelPickerView: View {
     @Binding var currentModel: String
     let fetch: () async throws -> [String]
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     @State private var models: [String] = []
     @State private var isLoading = true
@@ -244,7 +249,7 @@ struct ModelPickerView: View {
                                 Spacer()
                                 if model == currentModel {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(activeTheme.accent)
                                 }
                             }
                         }
@@ -252,6 +257,8 @@ struct ModelPickerView: View {
                 }
             }
             .navigationTitle(title)
+            .tint(activeTheme.accent)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Đóng") { dismiss() }
