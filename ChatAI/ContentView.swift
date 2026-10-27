@@ -32,6 +32,7 @@ struct ContentView: View {
     @StateObject private var historyManager = HistoryManager.shared
     @State private var showSettings = false
     @State private var showHistory = false
+    @State private var showMemory = false
     @State private var showProviderMenu = false
     @State private var showCompanion = false
     @State private var showAttachmentMenu = false
@@ -108,6 +109,7 @@ struct ContentView: View {
             }
 
             inputBar
+            bottomNavigation
         }
         .background(activeTheme.background.ignoresSafeArea())
         .foregroundStyle(.primary)
@@ -116,6 +118,7 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
+        .sheet(isPresented: $showMemory) { MemoryView() }
         .confirmationDialog("Đính kèm", isPresented: $showAttachmentMenu, titleVisibility: .visible) {
             Button("Chọn ảnh") { showPhotoPicker = true }
             Button("Chọn tệp") { showFileImporter = true }
@@ -183,112 +186,126 @@ struct ContentView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 10) {
-                Button { showHistory = true } label: {
-                    ChatAICustomIcon(kind: .history, color: activeTheme.accent, theme: activeTheme)
-                        .frame(width: 19, height: 19)
-                        .frame(width: 40, height: 40)
-                        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(activeTheme.accent.opacity(0.28), lineWidth: 1)
-                        }
+        HStack(spacing: 10) {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [activeTheme.accent.opacity(0.28), activeTheme.accent.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                    ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
+                        .frame(width: 23, height: 23)
                 }
-                .accessibilityLabel("Lịch sử chat")
+                .frame(width: 42, height: 42)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(activeTheme.accent.opacity(0.42), lineWidth: 1)
+                }
 
-                HStack(spacing: 9) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(LinearGradient(
-                                colors: [activeTheme.accent.opacity(0.24), activeTheme.accent.opacity(0.07)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                        ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
-                            .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("ChatAI")
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Button { showProviderMenu = true } label: {
+                        HStack(spacing: 4) {
+                            Text(viewModel.selectedProvider.rawValue
+                                .components(separatedBy: "(").first?
+                                .trimmingCharacters(in: .whitespaces) ?? "")
+                                .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundStyle(activeTheme.accent)
                     }
-                    .frame(width: 42, height: 42)
+                    .confirmationDialog("Chọn AI", isPresented: $showProviderMenu, titleVisibility: .visible) {
+                        ForEach(AIProviderKind.allCases) { provider in
+                            Button(provider.rawValue) {
+                                viewModel.selectedProviderRaw = provider.rawValue
+                            }
+                        }
+                        Button("Hủy", role: .cancel) {}
+                    }
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            LiveCallButton(viewModel: viewModel)
+
+            Button { showCompanion = true } label: {
+                ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
+                    .frame(width: 20, height: 20)
+                    .frame(width: 40, height: 40)
+                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(activeTheme.accent.opacity(0.48), lineWidth: 1)
+                            .stroke(activeTheme.accent.opacity(0.25), lineWidth: 1)
                     }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("ChatAI")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .tracking(0.2)
-                            .foregroundStyle(.primary)
-                        Button { showProviderMenu = true } label: {
-                            HStack(spacing: 4) {
-                                Text(viewModel.selectedProvider.rawValue
-                                    .components(separatedBy: "(").first?
-                                    .trimmingCharacters(in: .whitespaces) ?? "")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 9, weight: .bold))
-                            }
-                            .foregroundStyle(activeTheme.accent)
-                        }
-                        .confirmationDialog("Chọn AI", isPresented: $showProviderMenu, titleVisibility: .visible) {
-                            ForEach(AIProviderKind.allCases) { provider in
-                                Button(provider.rawValue) {
-                                    viewModel.selectedProviderRaw = provider.rawValue
-                                }
-                            }
-                            Button("Hủy", role: .cancel) {}
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Button { showCompanion = true } label: {
-                    ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
-                        .frame(width: 19, height: 19)
-                        .frame(width: 40, height: 40)
-                        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(activeTheme.accent.opacity(0.28), lineWidth: 1)
-                        }
-                }
-                .accessibilityLabel("Mở ChatAI 3D")
             }
+            .accessibilityLabel("Mở ChatAI 3D")
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(activeTheme.background)
+    }
 
-            HStack(spacing: 7) {
-                Capsule()
-                    .fill(activeTheme.accent.opacity(0.75))
-                    .frame(width: 18, height: 2)
-                ChatBrandingCredit(compact: true)
-                Spacer()
-                HStack(spacing: 5) {
-                    Circle().fill(activeTheme.accent).frame(width: 5, height: 5)
-                    Text("Sẵn sàng trò chuyện")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                LiveCallButton(viewModel: viewModel)
-                Button { showSettings = true } label: {
-                    ChatAICustomIcon(kind: .settings, color: activeTheme.accent, theme: activeTheme)
-                        .frame(width: 18, height: 18)
-                        .frame(width: 34, height: 34)
-                        .background(activeTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .accessibilityLabel("Cài đặt")
+    // MARK: - Bottom navigation
+
+    private var bottomNavigation: some View {
+        HStack(spacing: 0) {
+            bottomNavigationItem(title: "Chat", kind: .companion, selected: true) {
+                viewModel.startNewChat()
+            }
+            bottomNavigationItem(title: "Lịch sử", kind: .history) {
+                showHistory = true
+            }
+            bottomNavigationItem(title: "Memory", kind: .memory) {
+                showMemory = true
+            }
+            bottomNavigationItem(title: "Cài đặt", kind: .settings) {
+                showSettings = true
             }
         }
-        .padding(.horizontal, 12)
         .padding(.top, 8)
-        .padding(.bottom, 9)
+        .padding(.bottom, 4)
         .background {
             activeTheme.background
-                .overlay(alignment: .bottom) {
+                .overlay(alignment: .top) {
                     Rectangle()
-                        .fill(activeTheme.accent.opacity(0.35))
+                        .fill(activeTheme.accent.opacity(0.22))
                         .frame(height: 0.7)
                 }
         }
+    }
+
+    private func bottomNavigationItem(
+        title: String,
+        kind: ChatAIIconKind,
+        selected: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                ChatAICustomIcon(
+                    kind: kind,
+                    color: selected ? activeTheme.accent : .secondary,
+                    theme: activeTheme
+                )
+                .frame(width: 21, height: 21)
+                Text(title)
+                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Input bar
