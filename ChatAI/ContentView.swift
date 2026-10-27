@@ -769,114 +769,331 @@ struct HistoryView: View {
 struct MemoryView: View {
     @StateObject private var historyManager = HistoryManager.shared
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
-
-    private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     @Environment(\.dismiss) private var dismiss
     @State private var editingItem: MemoryItem?
     @State private var editingText = ""
     @State private var showMemoryEditor = false
+    @State private var searchText = ""
+    @State private var showClearConfirmation = false
+
+    private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
+    private var filteredMemories: [MemoryItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return historyManager.memories.sorted { $0.savedAt > $1.savedAt } }
+        return historyManager.memories.filter { $0.content.localizedCaseInsensitiveContains(query) }
+            .sorted { $0.savedAt > $1.savedAt }
+    }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if historyManager.memories.isEmpty {
-                    Text("Chưa có thông tin nào được ghi nhớ. Anh có thể thêm thông tin bằng nút +.")
-                        .font(.footnote).foregroundColor(.secondary).padding(.vertical, 8)
-                } else {
-                    ForEach(historyManager.memories) { item in
+        VStack(spacing: 0) {
+            header
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    overviewCard
+                    searchField
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("GHI NHỚ CỦA ANH")
+                                .font(.system(size: 11, weight: .bold))
+                                .tracking(1.2)
+                                .foregroundStyle(activeTheme.accent)
+                            Text("\(filteredMemories.count) mục thông tin")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
                         Button {
-                            editingItem = item
-                            editingText = item.content
-                            showMemoryEditor = true
+                            beginAdd()
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.content).foregroundColor(.primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                Text(item.savedAt, style: .date).font(.caption2).foregroundColor(.secondary)
-                            }.contentShape(Rectangle())
+                            Label("Thêm mới", systemImage: "plus")
+                                .font(.system(size: 12, weight: .semibold))
+                                .padding(.horizontal, 12).padding(.vertical, 9)
+                                .background(activeTheme.accent.opacity(0.15), in: Capsule())
+                                .overlay(Capsule().stroke(activeTheme.accent.opacity(0.45), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { historyManager.deleteMemory(item) } label: {
-                                Label("Xóa", systemImage: "trash")
+                    }
+
+                    if filteredMemories.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: searchText.isEmpty ? "brain.head.profile" : "magnifyingglass")
+                                .font(.system(size: 34, weight: .light))
+                                .foregroundStyle(activeTheme.accent)
+                            Text(searchText.isEmpty ? "Chưa có ghi nhớ nào" : "Không tìm thấy kết quả")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text(searchText.isEmpty
+                                 ? "Thêm thông tin quan trọng để ChatAI tham khảo trong những cuộc trò chuyện sau."
+                                 : "Thử từ khóa khác hoặc xóa nội dung tìm kiếm.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                            if searchText.isEmpty {
+                                Button("Tạo ghi nhớ đầu tiên") { beginAdd() }
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .padding(.horizontal, 15).padding(.vertical, 10)
+                                    .background(activeTheme.accent, in: Capsule())
+                                    .foregroundStyle(Color.black)
                             }
-                            Button {
-                                editingItem = item
-                                editingText = item.content
-                                showMemoryEditor = true
-                            } label: { Label("Sửa", systemImage: "pencil") }.tint(activeTheme.accent)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 34)
+                        .padding(.horizontal, 18)
+                        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(activeTheme.accent.opacity(0.16), lineWidth: 1))
+                    } else {
+                        LazyVStack(spacing: 10) {
+                            ForEach(filteredMemories) { item in
+                                memoryCard(item)
+                            }
                         }
                     }
+
+                    Text("Ghi nhớ được lưu trên thiết bị và được đưa vào ngữ cảnh AI khi phù hợp.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 2)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
+            }
+
+            HStack(spacing: 0) {
+                bottomItem("Chat", symbol: "bubble.left.and.bubble.right") { dismiss() }
+                bottomItem("Lịch sử", symbol: "clock.arrow.circlepath") { dismiss() }
+                bottomItem("Memory", symbol: "brain", selected: true) {}
+                bottomItem("Cài đặt", symbol: "gearshape") { dismiss() }
+            }
+            .padding(.top, 9)
+            .padding(.bottom, 4)
+            .background(activeTheme.background.overlay(alignment: .top) {
+                Rectangle().fill(activeTheme.accent.opacity(0.24)).frame(height: 0.7)
+            })
+        }
+        .background(activeTheme.background.ignoresSafeArea())
+        .foregroundStyle(.primary)
+        .tint(activeTheme.accent)
+        .preferredColorScheme(.dark)
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showMemoryEditor, onDismiss: { editingItem = nil }) {
+            editorSheet
+        }
+        .confirmationDialog("Xóa toàn bộ ghi nhớ?", isPresented: $showClearConfirmation, titleVisibility: .visible) {
+            Button("Xóa tất cả", role: .destructive) { historyManager.clearAllMemory() }
+            Button("Hủy", role: .cancel) {}
+        } message: {
+            Text("Thao tác này không thể hoàn tác.")
+        }
+        .onAppear { historyManager.loadMemory() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 38, height: 38)
+                    .background(activeTheme.surface, in: Circle())
+            }
+            .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("AI MEMORY")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(activeTheme.accent)
+                Text("Trí nhớ của ChatAI")
+                    .font(.system(size: 19, weight: .bold))
+            }
+            Spacer()
+            Button { beginAdd() } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .bold))
+                    .frame(width: 38, height: 38)
+                    .background(activeTheme.accent, in: Circle())
+                    .foregroundStyle(Color.black)
+            }
+            .buttonStyle(.plain)
+            if !historyManager.memories.isEmpty {
+                Button { showClearConfirmation = true } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 38, height: 38)
+                        .background(activeTheme.surface, in: Circle())
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(activeTheme.background)
+    }
+
+    private var overviewCard: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16).fill(activeTheme.accent.opacity(0.14))
+                    .frame(width: 58, height: 58)
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 27, weight: .medium))
+                    .foregroundStyle(activeTheme.accent)
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Bộ nhớ cá nhân")
+                    .font(.system(size: 16, weight: .bold))
+                Text("Lưu sở thích, thông tin và cách anh muốn ChatAI hỗ trợ.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(historyManager.memories.count) / 50 ghi nhớ")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(activeTheme.accent)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(activeTheme.accent.opacity(0.28), lineWidth: 1))
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Tìm trong ghi nhớ...", text: $searchText)
+                .font(.system(size: 14))
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 13).padding(.vertical, 12)
+        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(activeTheme.accent.opacity(0.14), lineWidth: 1))
+    }
+
+    private func memoryCard(_ item: MemoryItem) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(activeTheme.accent)
+                    .frame(width: 30, height: 30)
+                    .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 9))
+                Text(item.content)
+                    .font(.system(size: 14))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HStack(spacing: 6) {
+                Image(systemName: "calendar").font(.system(size: 10))
+                Text(item.savedAt, style: .date).font(.system(size: 10))
+                Text("•")
+                Text(item.savedAt, style: .time).font(.system(size: 10))
+                Spacer()
+                Button { beginEdit(item) } label: {
+                    Label("Sửa", systemImage: "pencil")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                Button(role: .destructive) { historyManager.deleteMemory(item) } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.red)
+                        .padding(.leading, 5)
+                }
+                .buttonStyle(.plain)
+            }
+            .foregroundStyle(.secondary)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(activeTheme.accent.opacity(0.14), lineWidth: 1))
+        .contextMenu {
+            Button { beginEdit(item) } label: { Label("Sửa ghi nhớ", systemImage: "pencil") }
+            Button(role: .destructive) { historyManager.deleteMemory(item) } label: { Label("Xóa ghi nhớ", systemImage: "trash") }
+        }
+    }
+
+    private var editorSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Nội dung") {
+                    TextField("Ví dụ: Ưu tiên trả lời bằng tiếng Việt...", text: $editingText, axis: .vertical)
+                        .lineLimit(4...10)
+                }
+                Section {
+                    Text("Thông tin này sẽ được lưu vào bộ nhớ của ChatAI để tham khảo ở các cuộc trò chuyện phù hợp.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             .scrollContentBackground(.hidden)
             .background(activeTheme.background)
-            .listRowBackground(activeTheme.surface)
-            .navigationTitle("AI Memory")
-            .tint(activeTheme.accent)
-            .preferredColorScheme(.dark)
+            .navigationTitle(editingItem == nil ? "Thêm ghi nhớ" : "Sửa ghi nhớ")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        Button {
-                            editingItem = nil
-                            editingText = ""
-                            showMemoryEditor = true
-                        } label: { Image(systemName: "plus") }
-                        if !historyManager.memories.isEmpty {
-                            Button(role: .destructive) { historyManager.clearAllMemory() } label: {
-                                Image(systemName: "trash")
-                            }
-                        }
-                    }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") { showMemoryEditor = false; editingItem = nil }
                 }
-                ToolbarItem(placement: .navigationBarLeading) { Button("Đóng") { dismiss() } }
-            }
-            .sheet(isPresented: $showMemoryEditor, onDismiss: {
-                editingItem = nil
-            }) {
-                NavigationStack {
-                    Form {
-                        TextField("Thông tin cần nhớ", text: $editingText, axis: .vertical)
-                            .lineLimit(4...10)
-                            .foregroundStyle(Color.primary)
-                    }
-                    .scrollContentBackground(.hidden)
-                    .background(activeTheme.background)
-                    .navigationTitle(editingItem == nil ? "Thêm ghi nhớ" : "Sửa ghi nhớ")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Hủy") {
-                                showMemoryEditor = false
-                                editingItem = nil
-                            }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Lưu") {
-                                let value = editingText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                guard !value.isEmpty else { return }
-                                if let item = editingItem {
-                                    historyManager.updateMemory(item, content: value)
-                                } else {
-                                    historyManager.addMemory(value)
-                                }
-                                showMemoryEditor = false
-                                editingItem = nil
-                            }
-                        }
-                    }
-                    .preferredColorScheme(.dark)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") { saveEditor() }
+                        .disabled(editingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .presentationDetents([.medium, .large])
             }
-            .onAppear { historyManager.loadMemory() }
+            .preferredColorScheme(.dark)
         }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func beginAdd() {
+        editingItem = nil
+        editingText = ""
+        showMemoryEditor = true
+    }
+
+    private func beginEdit(_ item: MemoryItem) {
+        editingItem = item
+        editingText = item.content
+        showMemoryEditor = true
+    }
+
+    private func saveEditor() {
+        let value = editingText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        if let item = editingItem {
+            historyManager.updateMemory(item, content: value)
+        } else {
+            historyManager.addMemory(value)
+        }
+        showMemoryEditor = false
+        editingItem = nil
+    }
+
+    private func bottomItem(_ title: String, symbol: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
+                Text(title)
+                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
 
- // MARK: - Premium chat presentation components
+// MARK: - Premium chat presentation components
 
 private enum ChatScreenStyle {
     static let cardRadius: CGFloat = 22
