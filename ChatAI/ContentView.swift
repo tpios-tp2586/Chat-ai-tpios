@@ -186,7 +186,7 @@ struct ContentView: View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
                 Button { showHistory = true } label: {
-                    ChatAICustomIcon(kind: .history, color: activeTheme.accent)
+                    ChatAICustomIcon(kind: .history, color: activeTheme.accent, theme: activeTheme)
                         .frame(width: 18, height: 18)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -239,7 +239,7 @@ struct ContentView: View {
                 Spacer(minLength: 2)
 
                 Button { showCompanion = true } label: {
-                    ChatAICustomIcon(kind: .companion, color: activeTheme.accent)
+                    ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
                         .frame(width: 18, height: 18)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -262,7 +262,7 @@ struct ContentView: View {
                 LiveCallButton(viewModel: viewModel)
                 Button { showSettings = true } label: {
                     HStack(spacing: 6) {
-                            ChatAICustomIcon(kind: .settings, color: activeTheme.accent)
+                            ChatAICustomIcon(kind: .settings, color: activeTheme.accent, theme: activeTheme)
                                 .frame(width: 14, height: 14)
                             Text("Cài đặt")
                                 .font(.system(size: 12, weight: .semibold))
@@ -695,7 +695,7 @@ private struct ChatActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            ChatAICustomIcon(kind: kind, color: prominent ? .white : accent)
+            ChatAICustomIcon(kind: kind, color: prominent ? .white : accent, theme: ChatAIThemeStore.current)
                 .frame(width: 20, height: 20)
                 .frame(width: 42, height: 42)
                 .background {
@@ -760,31 +760,41 @@ enum ChatAIIconKind {
 struct ChatAICustomIcon: View {
     let kind: ChatAIIconKind
     let color: Color
+    var theme: ChatAITheme = ChatAIThemeStore.current
 
     var body: some View {
         Canvas { context, size in
             let s = min(size.width, size.height)
             let u = s / 24
+            // Preserve icon geometry and button dimensions while adapting line weight to theme.
+            let strokeWeight: CGFloat = {
+                switch theme {
+                case .firePremium: return 1.9
+                case .sunrise: return 1.8
+                case .nature: return 1.75
+                case .minimal: return 1.45
+                }
+            }()
             func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * u, y: y * u) }
-            func line(_ points: [CGPoint], width: CGFloat = 1.8) {
+            func line(_ points: [CGPoint], width: CGFloat? = nil) {
                 guard let first = points.first else { return }
                 var path = Path()
                 path.move(to: p(first.x, first.y))
                 for point in points.dropFirst() { path.addLine(to: p(point.x, point.y)) }
-                context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: width * u, lineCap: .round, lineJoin: .round))
+                context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: (width ?? strokeWeight) * u, lineCap: .round, lineJoin: .round))
             }
             func circle(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat, fill: Bool = true) {
                 let rect = CGRect(x: (x-r)*u, y: (y-r)*u, width: 2*r*u, height: 2*r*u)
                 context.drawLayer { layer in
                     if fill { layer.fill(Path(ellipseIn: rect), with: .color(color)) }
-                    else { layer.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.7*u) }
+                    else { layer.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: strokeWeight*u) }
                 }
             }
             switch kind {
             case .history:
                 var arc = Path()
                 arc.addArc(center: p(12,12), radius: 8*u, startAngle: .degrees(-55), endAngle: .degrees(250), clockwise: false)
-                context.stroke(arc, with: .color(color), style: StrokeStyle(lineWidth: 1.8*u, lineCap: .round))
+                context.stroke(arc, with: .color(color), style: StrokeStyle(lineWidth: strokeWeight*u))
                 line([CGPoint(x:4,y:4),CGPoint(x:4,y:9),CGPoint(x:9,y:9)])
                 line([CGPoint(x:12,y:7),CGPoint(x:12,y:12),CGPoint(x:16,y:14)])
             case .companion:
