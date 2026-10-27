@@ -258,7 +258,7 @@ struct ContentView: View {
     private var bottomNavigation: some View {
         HStack(spacing: 0) {
             bottomNavigationItem(title: "Chat", kind: .companion, selected: true) {
-                viewModel.startNewChat()
+                // Already on the Chat tab; preserve the current conversation.
             }
             bottomNavigationItem(title: "Lịch sử", kind: .history) {
                 showHistory = true
