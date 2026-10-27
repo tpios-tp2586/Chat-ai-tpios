@@ -24,6 +24,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                ThemeSettingsSection()
+
                 Section("Giọng nói") {
                     Toggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies)
                     Picker("Giọng đọc", selection: $voiceGenderRaw) {
