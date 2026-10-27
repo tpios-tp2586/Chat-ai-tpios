@@ -367,6 +367,9 @@ struct ContentView: View {
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
