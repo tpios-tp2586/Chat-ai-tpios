@@ -115,7 +115,38 @@ final class ChatViewModel: ObservableObject {
     }
 
     private func extractMemory(from userMessage: String) async {
-        let prompt = HistoryManager.extractMemoryPrompt(from: userMessage)
+        let trimmed = userMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // Lệnh ghi nhớ rõ ràng của người dùng phải được lưu trực tiếp,
+        // không phụ thuộc vào việc model có trả đúng tiền tố MEMORY hay không.
+        let normalized = trimmed.lowercased()
+        let explicitMemoryPhrases = [
+            "hãy ghi nhớ", "nhớ rằng", "ghi nhớ giúp", "hãy nhớ", "lưu vào bộ nhớ",
+            "remember that", "please remember", "remember this"
+        ]
+        if explicitMemoryPhrases.contains(where: { normalized.contains($0) }) {
+            let prefixes = [
+                "hãy ghi nhớ rằng", "hãy ghi nhớ", "ghi nhớ giúp anh rằng",
+                "ghi nhớ giúp em rằng", "ghi nhớ giúp", "nhớ rằng", "hãy nhớ rằng",
+                "hãy nhớ", "lưu vào bộ nhớ rằng", "lưu vào bộ nhớ",
+                "please remember that", "please remember", "remember that", "remember this"
+            ]
+            var memory = trimmed
+            for prefix in prefixes {
+                if memory.lowercased().hasPrefix(prefix) {
+                    memory = String(memory.dropFirst(prefix.count))
+                        .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+                    break
+                }
+            }
+            if !memory.isEmpty {
+                HistoryManager.shared.addMemory(memory)
+                return
+            }
+        }
+
+        let prompt = HistoryManager.extractMemoryPrompt(from: trimmed)
         let key = KeychainHelper.read(forKey: selectedProvider.keychainKey) ?? ""
         guard !key.isEmpty else { return }
 
@@ -130,11 +161,19 @@ final class ChatViewModel: ObservableObject {
             case .deepseek:  result = try await deepseekService.sendMessage(history: extractMsg, apiKey: key, model: deepseekModel)
             case .groq:      result = try await groqService.sendMessage(history: extractMsg, apiKey: key, model: groqModel)
             }
-            if result.hasPrefix("MEMORY:") {
-                let memory = result.replacingOccurrences(of: "MEMORY:", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                HistoryManager.shared.addMemory(memory)
+
+            // Chấp nhận MEMORY ở đầu dòng kể cả khi model thêm dấu định dạng.
+            for line in result.components(separatedBy: .newlines) {
+                guard let range = line.range(of: "MEMORY:", options: [.caseInsensitive]) else { continue }
+                let memory = String(line[range.upperBound...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+                if !memory.isEmpty {
+                    HistoryManager.shared.addMemory(memory)
+                }
             }
-        } catch { }
+        } catch {
+            // Không làm gián đoạn chat; lỗi được giữ kín để không làm lộ thông tin API.
+        }
     }
 
     private func extractVoiceMemory(from userMessage: String) async {
