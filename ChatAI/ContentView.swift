@@ -500,85 +500,218 @@ struct HistoryView: View {
 
     private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     @StateObject private var historyManager = HistoryManager.shared
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\\.dismiss) private var dismiss
     @State private var showMemory = false
     @State private var renameSession: ChatSession?
     @State private var newTitle = ""
+    @State private var searchText = ""
+    @State private var selectedFilter = "Tất cả"
+
+    private let filters = ["Tất cả", "Văn bản", "Giọng nói", "Hình ảnh"]
+
+    private var filteredSessions: [ChatSession] {
+        historyManager.sessions.filter { session in
+            let matchesSearch = searchText.isEmpty ||
+                session.title.localizedCaseInsensitiveContains(searchText) ||
+                session.preview.localizedCaseInsensitiveContains(searchText) ||
+                session.provider.localizedCaseInsensitiveContains(searchText)
+            let matchesFilter: Bool
+            switch selectedFilter {
+            case "Giọng nói":
+                matchesFilter = session.title.localizedCaseInsensitiveContains("voice") ||
+                    session.preview.localizedCaseInsensitiveContains("giọng nói")
+            case "Hình ảnh":
+                matchesFilter = session.preview.localizedCaseInsensitiveContains("ảnh") ||
+                    session.preview.localizedCaseInsensitiveContains("image")
+            case "Văn bản":
+                matchesFilter = true
+            default:
+                matchesFilter = true
+            }
+            return matchesSearch && matchesFilter
+        }
+    }
 
     var body: some View {
         NavigationStack {
-            List {
-                if !historyManager.sessions.isEmpty {
-                    Section("Cuộc hội thoại") {
-                        ForEach(historyManager.sessions) { session in
-                            Button {
-                                viewModel.load(session: session)
-                                dismiss()
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(session.title)
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-                                    Text(session.preview)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                    Text(session.provider)
-                                        .font(.caption2)
-                                        .foregroundColor(activeTheme.accent)
-                                }
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    historyManager.delete(session: session)
-                                } label: {
-                                    Label("Xóa", systemImage: "trash")
-                                }
-                                Button {
-                                    renameSession = session
-                                    newTitle = session.title
-                                } label: {
-                                    Label("Đổi tên", systemImage: "pencil")
-                                }
-                                .tint(activeTheme.accent)
-                            }
-                        }
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(activeTheme.accent)
+                            .frame(width: 34, height: 34)
+                            .background(activeTheme.surface, in: Circle())
                     }
-                } else {
-                    Text("Chưa có cuộc hội thoại nào.")
-                        .foregroundColor(.secondary)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(activeTheme.background)
-            .listRowBackground(activeTheme.surface)
-            .navigationTitle("Lịch sử chat")
-            .tint(activeTheme.accent)
-            .preferredColorScheme(.dark)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("Lịch sử chat")
+                        .font(.system(size: 21, weight: .bold, design: .rounded))
+                    Spacer()
                     Button {
                         viewModel.startNewChat()
                         dismiss()
                     } label: {
-                        Label("Chat mới", systemImage: "plus")
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(activeTheme.accent)
+                            .frame(width: 36, height: 36)
+                            .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    if !historyManager.sessions.isEmpty {
+                        Button(role: .destructive) {
+                            historyManager.deleteAll()
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(activeTheme.accent)
+                                .frame(width: 36, height: 36)
+                                .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        Button { showMemory = true } label: {
-                            Image(systemName: "brain")
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("Tìm kiếm...", text: $searchText)
+                        .font(.system(size: 14))
+                }
+                .padding(.horizontal, 13)
+                .frame(height: 42)
+                .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(activeTheme.accent.opacity(0.18), lineWidth: 1))
+                .padding(.horizontal, 16)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(filters, id: \\.self) { filter in
+                            Button { selectedFilter = filter } label: {
+                                Text(filter)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(selectedFilter == filter ? Color.white : Color.secondary)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background {
+                                        Capsule().fill(selectedFilter == filter ? activeTheme.accent : activeTheme.surface)
+                                    }
+                                    .overlay(Capsule().stroke(activeTheme.accent.opacity(selectedFilter == filter ? 0.8 : 0.18), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
                         }
-                        if !historyManager.sessions.isEmpty {
-                            Button(role: .destructive) {
-                                historyManager.deleteAll()
-                            } label: {
-                                Image(systemName: "trash")
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        if filteredSessions.isEmpty {
+                            VStack(spacing: 10) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 30))
+                                    .foregroundStyle(activeTheme.accent)
+                                Text(searchText.isEmpty ? "Chưa có cuộc hội thoại nào" : "Không tìm thấy cuộc hội thoại")
+                                    .font(.system(size: 15, weight: .semibold))
+                                Text(searchText.isEmpty ? "Các cuộc trò chuyện của anh sẽ xuất hiện ở đây." : "Thử từ khóa khác nhé.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 44)
+                            .padding(.horizontal, 20)
+                            .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+                        } else {
+                            ForEach(filteredSessions) { session in
+                                Button {
+                                    viewModel.load(session: session)
+                                    dismiss()
+                                } label: {
+                                    HStack(alignment: .top, spacing: 12) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 13)
+                                                .fill(activeTheme.accent.opacity(0.14))
+                                            Image(systemName: "flame.fill")
+                                                .font(.system(size: 18))
+                                                .foregroundStyle(activeTheme.accent)
+                                        }
+                                        .frame(width: 44, height: 44)
+
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                                Text(session.title)
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                Spacer(minLength: 4)
+                                                Text(session.preview.isEmpty ? "" : session.provider)
+                                                    .font(.system(size: 9, weight: .medium))
+                                                    .foregroundStyle(activeTheme.accent)
+                                                    .lineLimit(1)
+                                            }
+                                            Text(session.preview)
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                            HStack {
+                                                Text(session.provider)
+                                                    .font(.system(size: 10, weight: .medium))
+                                                    .foregroundStyle(activeTheme.accent)
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .font(.system(size: 10, weight: .semibold))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            .padding(.top, 2)
+                                        }
+                                    }
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 17))
+                                    .overlay(RoundedRectangle(cornerRadius: 17).stroke(activeTheme.accent.opacity(0.17), lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button {
+                                        renameSession = session
+                                        newTitle = session.title
+                                    } label: {
+                                        Label("Đổi tên", systemImage: "pencil")
+                                    }
+                                    Button(role: .destructive) {
+                                        historyManager.delete(session: session)
+                                    } label: {
+                                        Label("Xóa", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
                 }
+
+                HStack(spacing: 0) {
+                    historyBottomItem("Chat", symbol: "bubble.left.and.bubble.right") { dismiss() }
+                    historyBottomItem("Lịch sử", symbol: "clock.arrow.circlepath", selected: true) {}
+                    historyBottomItem("Memory", symbol: "brain") { showMemory = true }
+                    historyBottomItem("Cài đặt", symbol: "gearshape") {}
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+                .background(activeTheme.background.overlay(alignment: .top) {
+                    Rectangle().fill(activeTheme.accent.opacity(0.22)).frame(height: 0.7)
+                })
             }
+            .background(activeTheme.background.ignoresSafeArea())
+            .foregroundStyle(.primary)
+            .tint(activeTheme.accent)
+            .preferredColorScheme(.dark)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showMemory) { MemoryView() }
             .sheet(isPresented: Binding(
                 get: { renameSession != nil },
@@ -612,6 +745,22 @@ struct HistoryView: View {
             }
             .onAppear { historyManager.loadSessions() }
         }
+    }
+
+    private func historyBottomItem(_ title: String, symbol: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
+                Text(title)
+                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(selected ? activeTheme.accent : Color.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
