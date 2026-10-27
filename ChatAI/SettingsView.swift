@@ -21,64 +21,73 @@ struct SettingsView: View {
     @AppStorage("autoMemoryV2") private var autoMemory = false
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
 
-    @State private var pickerMode: ModelPickerMode?
-
-    private var activeTheme: ChatAITheme {
-        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
-    }
+    private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
+    private var currentModel: String { openAIModel }
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
-                    settingsHero
-
-                    settingsGroup("TÙY CHỈNH AI", icon: .companion) {
-                        settingsRow("Giọng nói", value: voiceGenderRaw, icon: .voice) {
+                    settingsSection("TÙY CHỈNH AI", icon: .companion) {
+                        settingRow("Giọng nói", value: voiceGenderRaw, icon: .voice) {
                             Picker("Giọng đọc", selection: $voiceGenderRaw) {
                                 ForEach(VoiceGender.allCases) { voice in
                                     Text(voice.rawValue).tag(voice.rawValue)
                                 }
                             }
                             .labelsHidden()
-                            .tint(activeTheme.accent)
+                            .tint(theme.accent)
                         }
-                        settingsToggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies, icon: .voice)
+                        settingRow("Vai trò", value: "Bạn đồng hành", icon: .companion)
+                        NavigationLink {
+                            ThemeAndModelView(
+                                openAIKey: $openAIKey, anthropicKey: $anthropicKey, geminiKey: $geminiKey,
+                                grokKey: $grokKey, deepseekKey: $deepseekKey, groqKey: $groqKey,
+                                openAIModel: $openAIModel, anthropicModel: $anthropicModel, geminiModel: $geminiModel,
+                                grokModel: $grokModel, deepseekModel: $deepseekModel, groqModel: $groqModel
+                            )
+                        } label: {
+                            settingRowLabel("Model AI", value: currentModel, icon: .provider)
+                        }
+                        settingRow("Avatar", value: "Kawaii Girl", icon: .companion)
+                        settingRow("Ngôn ngữ", value: "Tiếng Việt", icon: .settings)
+                        settingToggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies, icon: .voice)
                     }
 
-                    settingsGroup("GIAO DIỆN", icon: .settings) {
-                        ThemeSettingsSection()
+                    settingsSection("GIAO DIỆN", icon: .settings) {
+                        NavigationLink {
+                            ThemeAndModelView(
+                                openAIKey: $openAIKey, anthropicKey: $anthropicKey, geminiKey: $geminiKey,
+                                grokKey: $grokKey, deepseekKey: $deepseekKey, groqKey: $groqKey,
+                                openAIModel: $openAIModel, anthropicModel: $anthropicModel, geminiModel: $geminiModel,
+                                grokModel: $grokModel, deepseekModel: $deepseekModel, groqModel: $groqModel,
+                                initialTab: 0
+                            )
+                        } label: {
+                            settingRowLabel("Chủ đề", value: theme.title, icon: .settings)
+                        }
+                        settingRow("Kiểu hiển thị", value: "Cân bằng", icon: .history)
+                        settingRow("Hiệu ứng", value: "Mượt mà", icon: .voice)
                     }
 
-                    settingsGroup("AI MEMORY", icon: .memory) {
-                        settingsToggle("Tự động ghi nhớ thông tin", isOn: $autoMemory, icon: .memory)
-                        settingsInfoRow("Lịch sử và bộ nhớ được giữ nguyên", icon: .history)
-                    }
-
-                    settingsGroup("NHÀ CUNG CẤP AI", icon: .provider) {
-                        providerRow("ChatGPT · OpenAI", key: $openAIKey, model: $openAIModel, mode: .openai, placeholder: "sk-...")
-                        providerRow("Claude · Anthropic", key: $anthropicKey, model: $anthropicModel, mode: .anthropic, placeholder: "sk-ant-...")
-                        providerRow("Gemini · Google", key: $geminiKey, model: $geminiModel, mode: .gemini, placeholder: "AIza...")
-                        providerRow("Grok · xAI", key: $grokKey, model: $grokModel, mode: .grok, placeholder: "xai-...")
-                        providerRow("DeepSeek", key: $deepseekKey, model: $deepseekModel, mode: .deepseek, placeholder: "sk-...")
-                        providerRow("Groq · Llama", key: $groqKey, model: $groqModel, mode: .groq, placeholder: "gsk_...")
+                    settingsSection("TÀI KHOẢN", icon: .memory) {
+                        settingRow("Thông tin cá nhân", value: "Anh Phong", icon: .companion)
+                        settingToggle("AI Memory", isOn: $autoMemory, icon: .memory)
+                        settingRow("Lịch sử chat", value: "Mở từ thanh dưới", icon: .history)
                     }
 
                     Text("API key được lưu trong Keychain của máy và chỉ dùng với provider tương ứng.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
-
-                    ChatBrandingCredit()
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 18)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.top, 12)
+                .padding(.bottom, 18)
             }
-            .background(activeTheme.background.ignoresSafeArea())
+            .background(theme.background.ignoresSafeArea())
             .foregroundStyle(.primary)
-            .tint(activeTheme.accent)
+            .tint(theme.accent)
             .preferredColorScheme(.dark)
             .navigationTitle("Cài đặt")
             .navigationBarTitleDisplayMode(.inline)
@@ -88,171 +97,74 @@ struct SettingsView: View {
                         .fontWeight(.semibold)
                 }
             }
-            .sheet(item: $pickerMode) { mode in
-                ModelPickerView(
-                    title: mode.title,
-                    currentModel: mode.binding(
-                        openAI: $openAIModel,
-                        anthropic: $anthropicModel,
-                        gemini: $geminiModel,
-                        grok: $grokModel,
-                        deepseek: $deepseekModel,
-                        groq: $groqModel
-                    ),
-                    fetch: {
-                        switch mode {
-                        case .openai: return try await OpenAIModelFetcher.fetchModels(apiKey: openAIKey)
-                        case .anthropic: return try await AnthropicModelFetcher.fetchModels(apiKey: anthropicKey)
-                        case .gemini: return try await GeminiModelFetcher.fetchModels(apiKey: geminiKey)
-                        case .grok: return try await GrokModelFetcher.fetchModels(apiKey: grokKey)
-                        case .deepseek: return try await DeepSeekModelFetcher.fetchModels(apiKey: deepseekKey)
-                        case .groq: return try await GroqModelFetcher.fetchModels(apiKey: groqKey)
-                        }
-                    }
-                )
-            }
         }
     }
 
-    private var settingsHero: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(activeTheme.accent.opacity(0.14))
-                ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
-                    .frame(width: 28, height: 28)
-            }
-            .frame(width: 60, height: 60)
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(activeTheme.accent.opacity(0.38), lineWidth: 1)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("CHAT AI")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .tracking(1.5)
-                    .foregroundStyle(activeTheme.accent)
-                Text("Tùy chỉnh trợ lý của anh")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                Text("Giọng nói · giao diện · model · bộ nhớ")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(activeTheme.accent.opacity(0.28), lineWidth: 1)
-        }
-    }
-
-    private func settingsGroup<Content: View>(_ title: String, icon: ChatAIIconKind, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                ChatAICustomIcon(kind: icon, color: activeTheme.accent, theme: activeTheme)
-                    .frame(width: 16, height: 16)
+    private func settingsSection<Content: View>(_ title: String, icon: ChatAIIconKind, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                ChatAICustomIcon(kind: icon, color: theme.accent, theme: theme)
+                    .frame(width: 15, height: 15)
                 Text(title)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .tracking(1.1)
-                    .foregroundStyle(activeTheme.accent)
-                Spacer()
+                    .foregroundStyle(theme.accent)
+                    .tracking(1.0)
             }
-
-            VStack(spacing: 0) {
-                content()
-            }
-            .padding(12)
-            .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(activeTheme.accent.opacity(0.18), lineWidth: 1)
-            }
+            VStack(spacing: 0) { content() }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(theme.accent.opacity(0.20), lineWidth: 1)
+                }
         }
     }
 
-    private func settingsRow(_ title: String, value: String, icon: ChatAIIconKind, @ViewBuilder control: () -> some View) -> some View {
+    private func settingRowLabel(_ title: String, value: String, icon: ChatAIIconKind) -> some View {
         HStack(spacing: 10) {
             iconBadge(icon)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 14, weight: .semibold))
-                Text(value).font(.system(size: 11)).foregroundStyle(.secondary)
-            }
-            Spacer()
-            control()
+            Text(title).font(.system(size: 14, weight: .medium))
+            Spacer(minLength: 8)
+            Text(value).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
     }
 
-    private func settingsToggle(_ title: String, isOn: Binding<Bool>, icon: ChatAIIconKind) -> some View {
+    private func settingRow(_ title: String, value: String, icon: ChatAIIconKind, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
+        HStack(spacing: 10) {
+            iconBadge(icon)
+            Text(title).font(.system(size: 14, weight: .medium))
+            Spacer(minLength: 8)
+            if !value.isEmpty {
+                Text(value).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+            }
+            trailing()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func settingToggle(_ title: String, isOn: Binding<Bool>, icon: ChatAIIconKind) -> some View {
         HStack(spacing: 10) {
             iconBadge(icon)
             Text(title).font(.system(size: 14, weight: .medium))
             Spacer()
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(activeTheme.accent)
+            Toggle("", isOn: isOn).labelsHidden().tint(theme.accent)
         }
         .padding(.vertical, 7)
     }
 
-    private func settingsInfoRow(_ title: String, icon: ChatAIIconKind) -> some View {
-        HStack(spacing: 10) {
-            iconBadge(icon)
-            Text(title).font(.system(size: 12)).foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.vertical, 6)
-    }
-
     private func iconBadge(_ kind: ChatAIIconKind) -> some View {
-        ChatAICustomIcon(kind: kind, color: activeTheme.accent, theme: activeTheme)
-            .frame(width: 18, height: 18)
-            .frame(width: 34, height: 34)
-            .background(activeTheme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private func providerRow(_ title: String, key: Binding<String>, model: Binding<String>, mode: ModelPickerMode, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 9) {
-                iconBadge(.provider)
-                Text(title).font(.system(size: 14, weight: .semibold))
-                Spacer()
-            }
-            SecureField(placeholder, text: key)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, 11)
-                .frame(height: 42)
-                .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(activeTheme.accent.opacity(0.13), lineWidth: 1)
-                }
-            Button {
-                pickerMode = mode
-            } label: {
-                HStack(spacing: 9) {
-                    ChatAICustomIcon(kind: .provider, color: activeTheme.accent, theme: activeTheme)
-                        .frame(width: 16, height: 16)
-                    Text(model.wrappedValue)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(activeTheme.accent)
-                }
-                .padding(.horizontal, 11)
-                .frame(height: 40)
-                .background(activeTheme.accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.vertical, 9)
+        ChatAICustomIcon(kind: kind, color: theme.accent, theme: theme)
+            .frame(width: 17, height: 17)
+            .frame(width: 28, height: 28)
     }
 
     private func saveAndDismiss() {
@@ -266,34 +178,132 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - ModelPickerMode
+struct ThemeAndModelView: View {
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @State private var tab: Int
+
+    @Binding var openAIKey: String
+    @Binding var anthropicKey: String
+    @Binding var geminiKey: String
+    @Binding var grokKey: String
+    @Binding var deepseekKey: String
+    @Binding var groqKey: String
+    @Binding var openAIModel: String
+    @Binding var anthropicModel: String
+    @Binding var geminiModel: String
+    @Binding var grokModel: String
+    @Binding var deepseekModel: String
+    @Binding var groqModel: String
+
+    init(
+        openAIKey: Binding<String>, anthropicKey: Binding<String>, geminiKey: Binding<String>, grokKey: Binding<String>, deepseekKey: Binding<String>, groqKey: Binding<String>,
+        openAIModel: Binding<String>, anthropicModel: Binding<String>, geminiModel: Binding<String>, grokModel: Binding<String>, deepseekModel: Binding<String>, groqModel: Binding<String>,
+        initialTab: Int = 1
+    ) {
+        _openAIKey = openAIKey; _anthropicKey = anthropicKey; _geminiKey = geminiKey; _grokKey = grokKey; _deepseekKey = deepseekKey; _groqKey = groqKey
+        _openAIModel = openAIModel; _anthropicModel = anthropicModel; _geminiModel = geminiModel; _grokModel = grokModel; _deepseekModel = deepseekModel; _groqModel = groqModel
+        _tab = State(initialValue: initialTab)
+    }
+
+    private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 16) {
+                Picker("", selection: $tab) {
+                    Text("Chủ đề").tag(0)
+                    Text("Mô hình").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .tint(theme.accent)
+                if tab == 0 { themeCards } else { modelCards }
+            }
+            .padding(14)
+        }
+        .background(theme.background.ignoresSafeArea())
+        .navigationTitle("Chủ đề & Mô hình")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+        .tint(theme.accent)
+    }
+
+    private var themeCards: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Chủ đề giao diện")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(ChatAITheme.allCases) { option in
+                    Button { selectedTheme = option.rawValue } label: {
+                        VStack(alignment: .leading, spacing: 7) {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(LinearGradient(colors: [option.accent, option.background], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(height: 78)
+                                .overlay(alignment: .topTrailing) {
+                                    if option.rawValue == selectedTheme {
+                                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.white).padding(8)
+                                    }
+                                }
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(option.accent.opacity(option.rawValue == selectedTheme ? 0.9 : 0.25), lineWidth: option.rawValue == selectedTheme ? 1.5 : 0.8)
+                                }
+                            Text(option.title).font(.system(size: 13, weight: .semibold, design: .rounded))
+                            Text(option.subtitle).font(.system(size: 9)).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var modelCards: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Mô hình AI").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+            providerCard(.openAI, model: $openAIModel, key: $openAIKey)
+            providerCard(.anthropic, model: $anthropicModel, key: $anthropicKey)
+            providerCard(.gemini, model: $geminiModel, key: $geminiKey)
+            providerCard(.grok, model: $grokModel, key: $grokKey)
+            providerCard(.deepseek, model: $deepseekModel, key: $deepseekKey)
+            providerCard(.groq, model: $groqModel, key: $groqKey)
+        }
+    }
+
+    private func providerCard(_ provider: AIProviderKind, model: Binding<String>, key: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                ChatAICustomIcon(kind: .provider, color: theme.accent, theme: theme).frame(width: 20, height: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(provider.rawValue).font(.system(size: 14, weight: .semibold))
+                    Text(model.wrappedValue).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            SecureField("API key", text: key)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 10)
+                .frame(height: 38)
+                .background(Color.black.opacity(0.20), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            HStack {
+                Button("Model mặc định") { model.wrappedValue = provider.defaultModel }
+                Spacer()
+                Text("Keychain").font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.accent)
+        }
+        .padding(11)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(theme.accent.opacity(0.16), lineWidth: 1) }
+    }
+}
 
 enum ModelPickerMode: String, Identifiable {
     case openai, anthropic, gemini, grok, deepseek, groq
-
     var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .openai: return "Chọn model OpenAI"
-        case .anthropic: return "Chọn model Anthropic"
-        case .gemini: return "Chọn model Gemini"
-        case .grok: return "Chọn model Grok"
-        case .deepseek: return "Chọn model DeepSeek"
-        case .groq: return "Chọn model Groq"
-        }
-    }
-
-    func binding(openAI: Binding<String>, anthropic: Binding<String>, gemini: Binding<String>, grok: Binding<String>, deepseek: Binding<String>, groq: Binding<String>) -> Binding<String> {
-        switch self {
-        case .openai: return openAI
-        case .anthropic: return anthropic
-        case .gemini: return gemini
-        case .grok: return grok
-        case .deepseek: return deepseek
-        case .groq: return groq
-        }
-    }
 }
 
 struct ModelPickerView: View {
@@ -306,7 +316,7 @@ struct ModelPickerView: View {
     @State private var isLoading = true
     @State private var errorText: String?
 
-    private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
+    private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
 
     var body: some View {
         NavigationStack {
@@ -315,11 +325,12 @@ struct ModelPickerView: View {
                     ProgressView("Đang hỏi server...")
                 } else if let errorText {
                     VStack(spacing: 12) {
-                        Text(errorText).font(.footnote).foregroundStyle(.red).padding()
+                        Text(errorText).font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center)
                         Button("Thử lại") { Task { await load() } }
                     }
+                    .padding()
                 } else if models.isEmpty {
-                    Text("Không tìm thấy model nào.")
+                    Text("Không tìm thấy model nào.").foregroundStyle(.secondary)
                 } else {
                     ScrollView(showsIndicators: false) {
                         LazyVStack(spacing: 9) {
@@ -329,46 +340,34 @@ struct ModelPickerView: View {
                                     dismiss()
                                 } label: {
                                     HStack(spacing: 12) {
-                                        ChatAICustomIcon(kind: .provider, color: activeTheme.accent, theme: activeTheme)
-                                            .frame(width: 18, height: 18)
-                                            .frame(width: 38, height: 38)
-                                            .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                                        Text(model)
-                                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        ChatAICustomIcon(kind: .provider, color: theme.accent, theme: theme).frame(width: 18, height: 18)
+                                        Text(model).font(.system(size: 14, weight: .medium, design: .rounded)).frame(maxWidth: .infinity, alignment: .leading)
                                         Image(systemName: model == currentModel ? "checkmark.circle.fill" : "chevron.right")
-                                            .foregroundStyle(model == currentModel ? activeTheme.accent : Color.secondary)
+                                            .foregroundStyle(model == currentModel ? theme.accent : Color.secondary)
                                     }
-                                    .padding(11)
-                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                            .stroke(activeTheme.accent.opacity(model == currentModel ? 0.65 : 0.18), lineWidth: model == currentModel ? 1.2 : 0.8)
-                                    }
+                                    .padding(12)
+                                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.accent.opacity(model == currentModel ? 0.55 : 0.15), lineWidth: model == currentModel ? 1.1 : 0.8) }
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
-                        .padding(16)
+                        .padding(14)
                     }
-                    .background(activeTheme.background)
                 }
             }
+            .background(theme.background.ignoresSafeArea())
             .navigationTitle(title)
-            .tint(activeTheme.accent)
+            .navigationBarTitleDisplayMode(.inline)
             .preferredColorScheme(.dark)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Đóng") { dismiss() } }
-            }
-            .task { await load() }
         }
+        .task { await load() }
     }
 
     private func load() async {
         isLoading = true
         errorText = nil
-        do { models = try await fetch() }
-        catch { errorText = error.localizedDescription }
+        do { models = try await fetch() } catch { errorText = error.localizedDescription }
         isLoading = false
     }
 }
