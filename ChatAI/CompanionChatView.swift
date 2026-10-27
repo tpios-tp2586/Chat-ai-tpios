@@ -355,7 +355,7 @@ private struct ApprovedRobotHead: View {
                     .position(x: 120 * scale, y: 102 * scale)
 
                 Capsule()
-                    .fill(Color(red: 0.42, green: 0.82, blue: 1).opacity(0.72))
+                    .fill(activeTheme.accent.opacity(0.72))
                     .frame(width: 4 * scale, height: 38 * scale)
                     .rotationEffect(.degrees(-19))
                     .position(x: 290 * scale, y: 102 * scale)
@@ -385,7 +385,7 @@ private struct ApprovedRobotHead: View {
                     .frame(width: 308 * scale, height: 194 * scale)
                     .overlay(
                         VisorShape()
-                            .stroke(Color(red: 1, green: 0.64, blue: 0.83), lineWidth: 5 * scale)
+                            .stroke(activeTheme.accent.opacity(0.82), lineWidth: 5 * scale)
                     )
                     .overlay(
                         VisorShape()
