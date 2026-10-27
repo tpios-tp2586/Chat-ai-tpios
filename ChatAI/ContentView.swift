@@ -362,6 +362,9 @@ struct MessageBubble: View {
 
 struct HistoryView: View {
     @ObservedObject var viewModel: ChatViewModel
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     @StateObject private var historyManager = HistoryManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showMemory = false
@@ -413,6 +416,8 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("Lịch sử chat")
+            .tint(activeTheme.accent)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -460,6 +465,9 @@ struct HistoryView: View {
 
 struct MemoryView: View {
     @StateObject private var historyManager = HistoryManager.shared
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     @Environment(\.dismiss) private var dismiss
     @State private var editingItem: MemoryItem?
     @State private var editingText = ""
@@ -499,6 +507,8 @@ struct MemoryView: View {
                 }
             }
             .navigationTitle("AI Memory")
+            .tint(activeTheme.accent)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
