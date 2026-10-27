@@ -47,11 +47,12 @@ enum ChatAITheme: String, CaseIterable, Identifiable {
     }
 
     var surface: Color {
+        let opacity = UserDefaults.standard.object(forKey: "chatAI.themeOpacity") as? Double ?? 0.70
         switch self {
-        case .firePremium: return Color(red: 0.141, green: 0.129, blue: 0.122)
-        case .sunrise: return Color(red: 0.20, green: 0.13, blue: 0.11)
-        case .nature: return Color(red: 0.11, green: 0.16, blue: 0.13)
-        case .minimal: return Color(red: 0.16, green: 0.16, blue: 0.17)
+        case .firePremium: return Color(red: 0.141, green: 0.129, blue: 0.122).opacity(opacity)
+        case .sunrise: return Color(red: 0.20, green: 0.13, blue: 0.11).opacity(opacity)
+        case .nature: return Color(red: 0.11, green: 0.16, blue: 0.13).opacity(opacity)
+        case .minimal: return Color(red: 0.16, green: 0.16, blue: 0.17).opacity(opacity)
         }
     }
 }
