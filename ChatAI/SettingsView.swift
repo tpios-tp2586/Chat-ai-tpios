@@ -20,6 +20,11 @@ struct SettingsView: View {
     @AppStorage("autoMemory")      var autoMemory:     Bool = true
 
     @State private var pickerMode: ModelPickerMode?
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         NavigationStack {
@@ -92,6 +97,8 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Cài đặt")
+            .tint(activeTheme.accent)
+            .preferredColorScheme(.dark)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Xong") {
