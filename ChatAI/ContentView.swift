@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var showProviderMenu = false
     @State private var showCompanion = false
     @State private var showAttachmentMenu = false
+    @State private var showMoreAttachmentOptions = false
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
@@ -109,6 +110,9 @@ struct ContentView: View {
             }
 
             inputBar
+            if showAttachmentMenu {
+                attachmentQuickActions
+            }
             bottomNavigation
         }
         .background(activeTheme.background.ignoresSafeArea())
@@ -119,10 +123,10 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
         .sheet(isPresented: $showMemory) { MemoryView() }
-        .confirmationDialog("Đính kèm", isPresented: $showAttachmentMenu, titleVisibility: .visible) {
+        .confirmationDialog("Thêm tệp đính kèm", isPresented: $showMoreAttachmentOptions, titleVisibility: .visible) {
             Button("Chọn ảnh") { showPhotoPicker = true }
             Button("Chọn tệp") { showFileImporter = true }
-            Button("Hủy", role: .cancel) {}
+            Button("Đóng", role: .cancel) {}
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerItems, maxSelectionCount: 6, matching: .images)
         .onChange(of: photoPickerItems) { items in
@@ -308,6 +312,70 @@ struct ContentView: View {
         .accessibilityLabel(title)
     }
 
+    // MARK: - Attachment quick actions
+
+    private var attachmentQuickActions: some View {
+        HStack(spacing: 0) {
+            attachmentQuickAction(title: "Tệp", symbol: "doc", color: activeTheme.accent) {
+                showAttachmentMenu = false
+                showFileImporter = true
+            }
+            attachmentQuickAction(title: "Hình ảnh", symbol: "photo", color: activeTheme.accent) {
+                showAttachmentMenu = false
+                showPhotoPicker = true
+            }
+            attachmentQuickAction(title: "Giọng nói", symbol: "mic", color: activeTheme.accent) {
+                showAttachmentMenu = false
+                startVoiceInput()
+            }
+            attachmentQuickAction(title: "Thêm", symbol: "ellipsis", color: activeTheme.accent) {
+                showAttachmentMenu = false
+                showMoreAttachmentOptions = true
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(activeTheme.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(activeTheme.accent.opacity(0.18)).frame(height: 0.7)
+        }
+    }
+
+    private func attachmentQuickAction(
+        title: String,
+        symbol: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(color)
+                    .frame(height: 20)
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    private func startVoiceInput() {
+        let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
+        voiceManager.startListening(
+            groqAPIKey: groqKey,
+            onPartialResult: { viewModel.inputText = $0 },
+            onFinish: { text in
+                viewModel.inputText = text
+                viewModel.send()
+            }
+        )
+    }
+
     // MARK: - Input bar
 
     private var inputBar: some View {
@@ -341,23 +409,17 @@ struct ContentView: View {
                 }
             }
             HStack(spacing: 9) {
-                ChatActionButton(kind: .attachment, label: "Đính kèm ảnh hoặc tệp", accent: activeTheme.accent) {
-                    showAttachmentMenu = true
+                ChatActionButton(kind: .attachment, label: "Mở lựa chọn đính kèm", accent: activeTheme.accent) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        showAttachmentMenu.toggle()
+                    }
                 }
                 ChatActionButton(
                     kind: .microphone,
                     label: voiceManager.isListening ? "Dừng nghe" : "Nhập bằng giọng nói",
                     accent: voiceManager.isListening ? .red : activeTheme.accent
                 ) {
-                    let groqKey = KeychainHelper.read(forKey: AIProviderKind.groq.keychainKey) ?? ""
-                    voiceManager.startListening(
-                        groqAPIKey: groqKey,
-                        onPartialResult: { viewModel.inputText = $0 },
-                        onFinish: { text in
-                            viewModel.inputText = text
-                            viewModel.send()
-                        }
-                    )
+                    startVoiceInput()
                 }
                 ChatComposerField(text: $viewModel.inputText, accent: activeTheme.accent, placeholder: "Nhắn tin...")
                 ChatActionButton(kind: .send, label: "Gửi tin nhắn", accent: activeTheme.accent, prominent: true) {
