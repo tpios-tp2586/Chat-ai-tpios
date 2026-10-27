@@ -457,6 +457,9 @@ struct HistoryView: View {
                         .foregroundColor(.secondary)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(activeTheme.background)
+            .listRowBackground(activeTheme.surface)
             .navigationTitle("Lịch sử chat")
             .tint(activeTheme.accent)
             .preferredColorScheme(.dark)
@@ -543,11 +546,14 @@ struct MemoryView: View {
                                 editingItem = item
                                 editingText = item.content
                                 showMemoryEditor = true
-                            } label: { Label("Sửa", systemImage: "pencil") }.tint(.orange)
+                            } label: { Label("Sửa", systemImage: "pencil") }.tint(activeTheme.accent)
                         }
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(activeTheme.background)
+            .listRowBackground(activeTheme.surface)
             .navigationTitle("AI Memory")
             .tint(activeTheme.accent)
             .preferredColorScheme(.dark)
