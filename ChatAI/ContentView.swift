@@ -188,12 +188,12 @@ struct ContentView: View {
                 Button { showHistory = true } label: {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(activeTheme.accent)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                                .stroke(activeTheme.accent.opacity(0.20), lineWidth: 1)
                         }
                 }
                 .accessibilityLabel("Lịch sử chat")
@@ -242,7 +242,7 @@ struct ContentView: View {
                 Button { showCompanion = true } label: {
                     Image(systemName: "person.crop.rectangle.stack")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(activeTheme.accent)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                         .overlay {
@@ -255,7 +255,7 @@ struct ContentView: View {
 
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    Circle().fill(Color.green).frame(width: 6, height: 6)
+                    Circle().fill(activeTheme.accent).frame(width: 6, height: 6)
                     Text("Sẵn sàng trò chuyện")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -433,7 +433,7 @@ struct HistoryView: View {
                                         .lineLimit(2)
                                     Text(session.provider)
                                         .font(.caption2)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(activeTheme.accent)
                                 }
                             }
                             .swipeActions(edge: .trailing) {
@@ -448,7 +448,7 @@ struct HistoryView: View {
                                 } label: {
                                     Label("Đổi tên", systemImage: "pencil")
                                 }
-                                .tint(.orange)
+                                .tint(activeTheme.accent)
                             }
                         }
                     }
