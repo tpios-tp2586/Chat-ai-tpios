@@ -17,12 +17,22 @@ struct SettingsView: View {
     @AppStorage("model_deepseek") private var deepseekModel = AIProviderKind.deepseek.defaultModel
     @AppStorage("model_groq") private var groqModel = AIProviderKind.groq.defaultModel
     @AppStorage("autoSpeakReplies") private var autoSpeakReplies = false
+    @AppStorage("selectedProvider") private var selectedProviderRaw = AIProviderKind.openAI.rawValue
     @AppStorage("voiceGender") private var voiceGenderRaw = VoiceGender.female.rawValue
     @AppStorage("autoMemoryV2") private var autoMemory = false
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
 
     private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
-    private var currentModel: String { openAIModel }
+    private var currentModel: String {
+        switch AIProviderKind(rawValue: selectedProviderRaw) ?? .openAI {
+        case .openAI: return openAIModel
+        case .anthropic: return anthropicModel
+        case .gemini: return geminiModel
+        case .grok: return grokModel
+        case .deepseek: return deepseekModel
+        case .groq: return groqModel
+        }
+    }
 
     var body: some View {
         NavigationStack {
