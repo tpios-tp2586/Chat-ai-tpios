@@ -9,6 +9,11 @@ struct CompanionChatView: View {
     @AppStorage("live_voice") private var liveVoice = "Zephyr"
     @AppStorage("live_persona") private var livePersona = LivePersona.defaultText
     @AppStorage("live_barge_in") private var liveBargeIn = false
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
@@ -19,8 +24,8 @@ struct CompanionChatView: View {
         ZStack {
             LinearGradient(
                 colors: nightMode
-                    ? [Color.black, Color(red: 0.10, green: 0.035, blue: 0.14)]
-                    : [Color(red: 0.035, green: 0.045, blue: 0.09), Color(red: 0.18, green: 0.07, blue: 0.15)],
+                    ? [.black, activeTheme.background]
+                    : [activeTheme.background, activeTheme.surface],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -135,29 +140,44 @@ struct CompanionChatView: View {
         HStack(spacing: 12) {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.down")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
-                    .background(.white.opacity(0.12), in: Circle())
+                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
+                    }
             }
+            .accessibilityLabel("Đóng avatar")
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("ChatAI Companion")
-                    .font(.headline)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                 Text(viewModel.selectedProvider.rawValue)
-                    .font(.caption)
-                    .opacity(0.65)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
             Button { nightMode.toggle() } label: {
                 Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
-                    .background(.white.opacity(0.12), in: Circle())
+                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
+                    }
             }
+            .accessibilityLabel("Đổi chế độ nền")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.top, 8)
+        .padding(.bottom, 8)
     }
 
     private var controls: some View {
@@ -188,8 +208,13 @@ struct CompanionChatView: View {
                 .font(.subheadline.weight(.bold))
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
+                .foregroundStyle(.white)
                 .background(
-                    LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing),
+                    LinearGradient(
+                        colors: [activeTheme.accent, activeTheme.accent.opacity(0.78)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
                     in: Capsule()
                 )
             }
