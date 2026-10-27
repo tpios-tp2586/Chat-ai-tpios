@@ -258,21 +258,44 @@ struct ModelPickerView: View {
                 } else if models.isEmpty {
                     Text("Không tìm thấy model nào.")
                 } else {
-                    List(models, id: \.self) { model in
-                        Button {
-                            currentModel = model
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Text(model)
-                                Spacer()
-                                if model == currentModel {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(activeTheme.accent)
+                    ScrollView {
+                        LazyVStack(spacing: 9) {
+                            ForEach(models, id: \.self) { model in
+                                Button {
+                                    currentModel = model
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "cpu")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(activeTheme.accent)
+                                            .frame(width: 38, height: 38)
+                                            .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                                        Text(model)
+                                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.primary)
+                                            .multilineTextAlignment(.leading)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        if model == currentModel {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.system(size: 19, weight: .semibold))
+                                                .foregroundStyle(activeTheme.accent)
+                                        } else {
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .padding(11)
+                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(activeTheme.accent.opacity(model == currentModel ? 0.65 : 0.18), lineWidth: model == currentModel ? 1.2 : 0.8))
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
+                        .padding(16)
                     }
+                    .background(activeTheme.background)
                 }
             }
             .navigationTitle(title)
