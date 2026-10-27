@@ -775,6 +775,7 @@ struct MemoryView: View {
     @State private var showMemoryEditor = false
     @State private var searchText = ""
     @State private var showClearConfirmation = false
+    @State private var selectedProfileField: String?
 
     private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     private var filteredMemories: [MemoryItem] {
@@ -790,6 +791,7 @@ struct MemoryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     overviewCard
+                    profileSections
                     searchField
                     if historyManager.memories.count >= 50 {
                         Label("Bộ nhớ đã đạt giới hạn 50 mục. Xóa một mục cũ trước khi thêm mới.", systemImage: "exclamationmark.triangle.fill")
@@ -974,6 +976,70 @@ struct MemoryView: View {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(activeTheme.accent.opacity(0.28), lineWidth: 1))
     }
 
+    private let profileFields: [(title: String, icon: String, hint: String)] = [
+        ("Tên của bạn", "person.fill", "Tên anh muốn ChatAI gọi"),
+        ("Công việc / dự án", "briefcase.fill", "Công việc, dự án đang làm"),
+        ("Sở thích", "heart.fill", "Những điều anh yêu thích"),
+        ("Mục tiêu", "target", "Mục tiêu cá nhân hoặc công việc"),
+        ("Cách xưng hô", "bubble.left.and.bubble.right.fill", "Ví dụ: anh – em"),
+        ("Yêu cầu đặc biệt", "star.fill", "Cách trả lời hoặc lưu ý riêng")
+    ]
+
+    private var profileSections: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("HỒ SƠ CỦA ANH")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(activeTheme.accent)
+                Spacer()
+                Text("TÙY CHỈNH")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(profileFields, id: \.title) { field in
+                let matching = historyManager.memories.filter {
+                    $0.content.localizedCaseInsensitiveHasPrefix(field.title + ":")
+                }.sorted { $0.savedAt > $1.savedAt }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Image(systemName: field.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(activeTheme.accent)
+                            .frame(width: 34, height: 34)
+                            .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(field.title).font(.system(size: 14, weight: .semibold))
+                            Text(matching.first.map { String($0.content.dropFirst(field.title.count + 1)).trimmingCharacters(in: .whitespacesAndNewlines) } ?? field.hint)
+                                .font(.system(size: 12))
+                                .foregroundStyle(matching.isEmpty ? Color.secondary : Color.primary)
+                                .lineLimit(2)
+                        }
+                        Spacer(minLength: 4)
+                        Button {
+                            editingItem = matching.first
+                            editingText = matching.first.map { String($0.content.dropFirst(field.title.count + 1)).trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+                            showMemoryEditor = true
+                            selectedProfileField = field.title
+                        } label: {
+                            Image(systemName: matching.isEmpty ? "plus" : "pencil")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(activeTheme.accent)
+                                .frame(width: 30, height: 30)
+                                .background(activeTheme.accent.opacity(0.10), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(historyManager.memories.count >= 50 && matching.isEmpty)
+                    }
+                }
+                .padding(12)
+                .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 15))
+                .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.14), lineWidth: 1))
+            }
+        }
+    }
+
     private var searchField: some View {
         HStack(spacing: 9) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -1039,7 +1105,7 @@ struct MemoryView: View {
         NavigationStack {
             Form {
                 Section("Nội dung") {
-                    TextField("Ví dụ: Ưu tiên trả lời bằng tiếng Việt...", text: $editingText, axis: .vertical)
+                    TextField(selectedProfileField.map { "Nhập nội dung cho: " + $0 } ?? "Ví dụ: Ưu tiên trả lời bằng tiếng Việt...", text: $editingText, axis: .vertical)
                         .lineLimit(4...10)
                 }
                 Section {
@@ -1054,7 +1120,7 @@ struct MemoryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Hủy") { showMemoryEditor = false; editingItem = nil }
+                    Button("Hủy") { showMemoryEditor = false; editingItem = nil; selectedProfileField = nil }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Lưu") { saveEditor() }
@@ -1081,13 +1147,15 @@ struct MemoryView: View {
     private func saveEditor() {
         let value = editingText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
+        let storedValue = selectedProfileField.map { "\($0): \(value)" } ?? value
         if let item = editingItem {
-            historyManager.updateMemory(item, content: value)
+            historyManager.updateMemory(item, content: storedValue)
         } else {
-            historyManager.addMemory(value)
+            historyManager.addMemory(storedValue)
         }
         showMemoryEditor = false
         editingItem = nil
+        selectedProfileField = nil
     }
 
     private func bottomItem(_ title: String, symbol: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
