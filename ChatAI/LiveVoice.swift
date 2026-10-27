@@ -873,7 +873,7 @@ struct LiveCallView: View {
                 }
                 if manager.state != .idle {
                     HStack(spacing: 7) {
-                        Circle().fill(manager.state == .live ? Color.green : Color.orange).frame(width: 7, height: 7)
+                        Circle().fill(manager.state == .live ? activeTheme.accent : Color.orange).frame(width: 7, height: 7)
                         Text(manager.state == .connecting ? "Đang kết nối…" : (manager.aiSpeaking ? "Đang nói…" : "Đang nghe…"))
                             .font(.caption).foregroundColor(.secondary)
                     }.padding(.vertical, 8)
@@ -900,6 +900,8 @@ struct LiveCallView: View {
                 NavigationStack {
                     ScrollView { optionsBody.padding() }
                         .navigationTitle("Cài đặt giọng nói")
+                        .tint(activeTheme.accent)
+                        .preferredColorScheme(.dark)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) { Button("Xong") { showOptions = false } }
