@@ -971,6 +971,11 @@ struct LiveCallView: View {
 
 struct LiveLineRow: View {
     let line: LiveVoiceManager.Line
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -980,9 +985,15 @@ struct LiveLineRow: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(ChatDesignTokens.contentPadding - 4)
                 .frame(maxWidth: 300, alignment: .leading)
-                .background(line.role == .user ? ChatDesignTokens.userBubbleColor : ChatDesignTokens.assistantBubbleColor)
+                .background(
+                    line.role == .user ? activeTheme.accent.opacity(0.92) : activeTheme.surface,
+                    in: RoundedRectangle(cornerRadius: ChatDesignTokens.bubbleRadius, style: .continuous)
+                )
                 .foregroundColor(line.role == .user ? .white : .primary)
-                .clipShape(RoundedRectangle(cornerRadius: ChatDesignTokens.bubbleRadius))
+                .overlay {
+                    RoundedRectangle(cornerRadius: ChatDesignTokens.bubbleRadius, style: .continuous)
+                        .stroke(activeTheme.accent.opacity(line.role == .user ? 0.18 : 0.12), lineWidth: 1)
+                }
 
             if line.role == .assistant { Spacer(minLength: 36) }
         }
