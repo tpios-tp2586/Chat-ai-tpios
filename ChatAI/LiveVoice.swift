@@ -823,6 +823,11 @@ struct LiveCallView: View {
 
     @State private var showOptions = false
     @State private var showModelPicker = false
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         NavigationStack {
@@ -841,7 +846,7 @@ struct LiveCallView: View {
                         .padding(.horizontal, 12).padding(.vertical, 10)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.secondarySystemBackground).opacity(0.25))
+                    .background(activeTheme.surface.opacity(0.65))
                     .onChange(of: manager.lines.count) { _ in
                         onTranscriptChanged?(manager.lines)
                         if let last = manager.lines.last {
@@ -868,7 +873,9 @@ struct LiveCallView: View {
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
             }
-            .background(Color(.systemBackground))
+            .background(activeTheme.background.ignoresSafeArea())
+            .tint(activeTheme.accent)
+            .preferredColorScheme(.dark)
             .navigationTitle("Trò chuyện chibi")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -913,7 +920,7 @@ struct LiveCallView: View {
             onTap: { handleRobotTap() }
         )
         .frame(height: 220).frame(maxWidth: .infinity)
-        .background(Color(red: 0.04, green: 0.05, blue: 0.13))
+        .background(activeTheme.background)
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .padding(.horizontal, 10).padding(.vertical, 8)
     }
