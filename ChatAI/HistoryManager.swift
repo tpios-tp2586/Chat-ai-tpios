@@ -110,11 +110,11 @@ final class HistoryManager: ObservableObject {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = trimmed.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()
         guard !trimmed.isEmpty,
+              memories.count < 50,
               !memories.contains(where: {
                   $0.content.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased() == normalized
               }) else { return }
         memories.append(MemoryItem(content: trimmed))
-        if memories.count > 50 { memories.removeFirst() }
         saveMemory()
     }
 
