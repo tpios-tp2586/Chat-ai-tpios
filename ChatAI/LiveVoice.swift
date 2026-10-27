@@ -766,17 +766,28 @@ struct LiveCallButton: View {
     @StateObject private var manager = LiveVoiceManager()
     @State private var showSheet = false
     @State private var messagesBeforeCall: [ChatMessage] = []
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var activeTheme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
 
     var body: some View {
         Button {
             messagesBeforeCall = viewModel.messages
             showSheet = true
         } label: {
-            Image(systemName: manager.state == .idle ? "waveform.circle" : "waveform.circle.fill")
-                .font(.title3)
-                .foregroundColor(manager.state == .idle ? .accentColor : .red)
+            Image(systemName: manager.state == .idle ? "waveform" : "waveform.circle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(manager.state == .idle ? activeTheme.accent : Color.red)
+                .frame(width: 38, height: 38)
+                .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
+                }
         }
-        .padding(.trailing, 10)
+        .buttonStyle(.plain)
         .accessibilityLabel("Mở trò chuyện chibi")
         .sheet(isPresented: $showSheet, onDismiss: { finishCall() }) {
             LiveCallView(manager: manager) { lines in syncTranscript(lines) }
