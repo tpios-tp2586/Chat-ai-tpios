@@ -38,6 +38,7 @@ struct ContentView: View {
     @State private var showAttachmentMenu = false
     @State private var showMoreAttachmentOptions = false
     @State private var showPhotoPicker = false
+    @State private var showCamera = false
     @State private var showFileImporter = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
@@ -123,6 +124,15 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
         .sheet(isPresented: $showMemory) { MemoryView() }
+        .sheet(isPresented: $showCamera) {
+            CameraCaptureView { image in
+                guard let data = image.jpegData(compressionQuality: 0.88) else {
+                    viewModel.errorMessage = "Không lưu được ảnh chụp."
+                    return
+                }
+                viewModel.addPendingAttachment(ChatAttachment(name: "Ảnh chụp.jpg", mimeType: "image/jpeg", data: data))
+            }
+        }
         .confirmationDialog("Thêm tệp đính kèm", isPresented: $showMoreAttachmentOptions, titleVisibility: .visible) {
             Button("Chọn ảnh") { showPhotoPicker = true }
             Button("Chọn tệp") { showFileImporter = true }
@@ -328,9 +338,13 @@ struct ContentView: View {
                 showAttachmentMenu = false
                 startVoiceInput()
             }
-            attachmentQuickAction(title: "Thêm", symbol: "ellipsis", color: activeTheme.accent) {
+            attachmentQuickAction(title: "Chụp ảnh", symbol: "camera", color: activeTheme.accent) {
                 showAttachmentMenu = false
-                showMoreAttachmentOptions = true
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    showCamera = true
+                } else {
+                    viewModel.errorMessage = "Camera không khả dụng trên thiết bị này."
+                }
             }
         }
         .padding(.horizontal, 12)
@@ -413,13 +427,6 @@ struct ContentView: View {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         showAttachmentMenu.toggle()
                     }
-                }
-                ChatActionButton(
-                    kind: .microphone,
-                    label: voiceManager.isListening ? "Dừng nghe" : "Nhập bằng giọng nói",
-                    accent: voiceManager.isListening ? .red : activeTheme.accent
-                ) {
-                    startVoiceInput()
                 }
                 ChatComposerField(text: $viewModel.inputText, accent: activeTheme.accent, placeholder: "Nhắn tin...")
                 ChatActionButton(kind: .send, label: "Gửi tin nhắn", accent: activeTheme.accent, prominent: true) {
@@ -920,5 +927,35 @@ struct ChatAICustomIcon: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityHidden(true)
+    }
+}
+
+
+private struct CameraCaptureView: UIViewControllerRepresentable {
+    let onCapture: (UIImage) -> Void
+    @Environment(\\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: CameraCaptureView
+        init(_ parent: CameraCaptureView) { self.parent = parent }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage { parent.onCapture(image) }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.dismiss() }
     }
 }
