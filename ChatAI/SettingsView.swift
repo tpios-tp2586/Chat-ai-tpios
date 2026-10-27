@@ -26,6 +26,24 @@ struct SettingsView: View {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium
     }
 
+    private func settingsSectionLabel(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: symbol)
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(activeTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(activeTheme.accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(activeTheme.accent.opacity(0.24), lineWidth: 0.8)
+                }
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(activeTheme.accent)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -39,13 +57,13 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Label("Giọng nói", systemImage: "waveform")
+                    settingsSectionLabel("Giọng nói", symbol: "waveform")
                 }
 
                 Section {
                     Toggle("Tự động ghi nhớ thông tin", isOn: $autoMemory)
                 } header: {
-                    Label("AI Memory", systemImage: "brain.head.profile")
+                    settingsSectionLabel("AI Memory", symbol: "brain.head.profile")
                 }
 
                 DisclosureGroup {
@@ -92,7 +110,7 @@ struct SettingsView: View {
                         mode: .groq
                     )
                 } label: {
-                    Label("Nhà cung cấp AI · API key và model", systemImage: "cpu")
+                    settingsSectionLabel("Nhà cung cấp AI · API key và model", symbol: "cpu")
                 }
 
                 Section {
