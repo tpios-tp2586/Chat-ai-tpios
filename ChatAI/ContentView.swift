@@ -500,7 +500,7 @@ struct HistoryView: View {
 
     private var activeTheme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     @StateObject private var historyManager = HistoryManager.shared
-    @Environment(\\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var showMemory = false
     @State private var renameSession: ChatSession?
     @State private var newTitle = ""
@@ -585,7 +585,7 @@ struct HistoryView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(filters, id: \\.self) { filter in
+                        ForEach(filters, id: \.self) { filter in
                             Button { selectedFilter = filter } label: {
                                 Text(filter)
                                     .font(.system(size: 12, weight: .semibold))
@@ -1082,7 +1082,7 @@ struct ChatAICustomIcon: View {
 
 private struct CameraCaptureView: UIViewControllerRepresentable {
     let onCapture: (UIImage) -> Void
-    @Environment(\\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
