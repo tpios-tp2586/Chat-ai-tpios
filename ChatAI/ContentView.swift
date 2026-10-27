@@ -187,9 +187,7 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 Button { showHistory = true } label: {
                     ChatAICustomIcon(kind: .history, color: activeTheme.accent)
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(activeTheme.accent)
+                        .frame(width: 18, height: 18)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                         .overlay {
@@ -242,9 +240,7 @@ struct ContentView: View {
 
                 Button { showCompanion = true } label: {
                     ChatAICustomIcon(kind: .companion, color: activeTheme.accent)
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(activeTheme.accent)
+                        .frame(width: 18, height: 18)
                         .frame(width: 38, height: 38)
                         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                         .overlay {
@@ -265,10 +261,12 @@ struct ContentView: View {
                 Spacer()
                 LiveCallButton(viewModel: viewModel)
                 Button { showSettings = true } label: {
-                    HStack(spacing: 5) { ChatAICustomIcon(kind: .settings, color: activeTheme.accent); Text("Cài đặt") }
-                        .labelStyle(.titleAndIcon)
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 12, weight: .semibold))
+                    HStack(spacing: 6) {
+                            ChatAICustomIcon(kind: .settings, color: activeTheme.accent)
+                                .frame(width: 14, height: 14)
+                            Text("Cài đặt")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
                         .foregroundStyle(activeTheme.accent)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 8)
