@@ -950,7 +950,7 @@ private struct CompanionExpressionImage: View {
     }
 
     private var imageURL: URL {
-        URL(string: "https://raw.githubusercontent.com/tpios-tp2586/Chat-ai-tpios/main/Reference/FaceExpressions/\\(imageName)")!
+        URL(string: "https://raw.githubusercontent.com/tpios-tp2586/Chat-ai-tpios/main/Reference/FaceExpressions/\(imageName)")!
     }
 
     var body: some View {
@@ -960,7 +960,7 @@ private struct CompanionExpressionImage: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityLabel("Biểu cảm: \\(emotion.label)")
+                    .accessibilityLabel("Biểu cảm: \(emotion.label)")
             } else if phase.error != nil {
                 VStack(spacing: 8) {
                     Image(systemName: "person.crop.rectangle")
