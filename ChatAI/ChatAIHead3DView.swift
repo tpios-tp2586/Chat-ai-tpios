@@ -102,211 +102,109 @@ private struct CompanionRealityView: UIViewRepresentable {
     let onResult: (Bool, String) -> Void
     private let modelResourceName = "Model-02"
 
-    func makeUIView(context: Context) -> ARView {
-        let view = ARView(frame: .zero)
-        view.cameraMode = .nonAR
-        let theme = ChatAIThemeStore.current
-        view.environment.background = .color(UIColor(theme.background))
-        let scene = AnchorEntity(world: .zero)
-        view.scene.addAnchor(scene)
-        let camera = PerspectiveCamera()
-        camera.position = [0, 0.02, 1.75]
-        camera.look(at: [0, 0, 0], from: camera.position, relativeTo: nil)
-        scene.addChild(camera)
-        scene.addChild(makeLight(color: .white, intensity: 1300, position: [-0.45, 0.55, 0.65]))
-        scene.addChild(makeLight(color: UIColor(theme.accent), intensity: 800, position: [0.5, 0.15, 0.4]))
-        scene.addChild(makeLight(color: .white, intensity: 1000, position: [0, 0.45, -0.4]))
-        let bundle = Bundle.main
-        let directURL = bundle.url(forResource: modelResourceName, withExtension: "usdz") ?? bundle.url(forResource: modelResourceName, withExtension: "usdz", subdirectory: "Companion")
-        guard let url = directURL else {
-            let resourceRoot = bundle.resourceURL
-            let bundledFileExists = resourceRoot?.appendingPathComponent("\(modelResourceName).usdz").path
-            let detail = bundledFileExists.map { "Đã kiểm tra: \($0)" } ?? "Không đọc được thư mục tài nguyên ứng dụng."
-            DispatchQueue.main.async { onResult(false, "Không tìm thấy USDZ trong app bundle. \(detail)") }
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView(frame: .zero)
+        view.backgroundColor = UIColor(ChatAIThemeStore.current.background)
+        view.autoenablesDefaultLighting = true
+        view.allowsCameraControl = false
+        view.antialiasingMode = .multisampling4X
+
+        guard let url = Bundle.main.url(forResource: modelResourceName, withExtension: "usdz")
+            ?? Bundle.main.url(forResource: modelResourceName, withExtension: "usdz", subdirectory: "Companion") else {
+            DispatchQueue.main.async { onResult(false, "Không tìm thấy Model-02.usdz trong app bundle.") }
             return view
         }
+
         do {
-            let model = try Entity.load(contentsOf: url)
-            model.name = "ChatAICompanionGLB"
-            let bounds = model.visualBounds(relativeTo: model)
-            let extents = bounds.extents
-            let largestDimension = max(extents.x, max(extents.y, extents.z))
-            guard largestDimension.isFinite, largestDimension > 0 else {
-                throw NSError(domain: "ChatAICompanion", code: 2, userInfo: [NSLocalizedDescriptionKey: "Mô hình GLB không có kích thước hiển thị hợp lệ."])
-            }
-            let normalizedScale: Float = 1.55 / largestDimension
-            model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // Model-02's measured bounds are taller along Z (2.97) than Y (1.83),
-            // indicating a Z-up source orientation. Convert Z-up to RealityKit Y-up.
-            let axisCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
-            model.orientation = axisCorrection
-            model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
-            scene.addChild(model)
-            context.coordinator.baseOrientation = axisCorrection
-            context.coordinator.head = model
-            context.coordinator.basePosition = model.position
-            let animations = Self.collectAnimations(from: model)
-            let rigDetails = Self.inspectSceneKitRig(url: url)
-            if let animation = animations.first {
-                context.coordinator.authoredAnimation = model.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.25, startsPaused: false)
-            }
-            context.coordinator.jaw = Self.findMouthControl(in: model)
-            if let jaw = context.coordinator.jaw { context.coordinator.jawBaseTransform = jaw.transform }
-            context.coordinator.animationSubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator = context.coordinator] event in
-                guard let coordinator, let animatedHead = coordinator.head else { return }
-                coordinator.elapsed += Float(event.deltaTime)
-                let bob = sin(coordinator.elapsed * 1.8) * 0.025
-                animatedHead.position = coordinator.basePosition + SIMD3<Float>(0, bob, 0)
-                let yaw = simd_quatf(angle: coordinator.currentHeadRotation, axis: [0, 1, 0])
-                animatedHead.transform.rotation = yaw * coordinator.baseOrientation
-                coordinator.updateJaw(deltaTime: Float(event.deltaTime))
-            }
-            DispatchQueue.main.async {
-                let mouthStatus = context.coordinator.jaw == nil ? "KHÔNG TÌM THẤY jaw/mouth node theo tên" : "ĐÃ TÌM THẤY jaw/mouth node: \(context.coordinator.jaw?.name ?? "<unnamed>")"
-                let animationStatus = animations.isEmpty ? "animations=0" : "animations=\(animations.count)"
-                let rootTransform = model.transform
-                let rootRotation = rootTransform.rotation
-                let rootScale = rootTransform.scale
-                let rootPosition = rootTransform.translation
-                var hierarchyLines: [String] = []
-                func inspectEntity(_ entity: Entity, depth: Int) {
-                    guard hierarchyLines.count < 60 else { return }
-                    let t = entity.transform
-                    let b = entity.visualBounds(relativeTo: model)
-                    let indent = String(repeating: "  ", count: depth)
-                    let entityName = entity.name.isEmpty ? "<unnamed>" : entity.name
-                    hierarchyLines.append("\(indent)\(entityName): pos=\(t.translation), rot=\(t.rotation), scale=\(t.scale), boundsCenter=\(b.center), boundsSize=\(b.extents)")
-                    for child in entity.children { inspectEntity(child, depth: depth + 1) }
+            let scene = try SCNScene(url: url, options: nil)
+            let camera = SCNCamera()
+            let cameraNode = SCNNode()
+            cameraNode.camera = camera
+            cameraNode.position = SCNVector3(0, 0.02, 1.75)
+            scene.rootNode.addChildNode(cameraNode)
+            scene.background.contents = UIColor(ChatAIThemeStore.current.background)
+
+            var geometryCount = 0
+            var morpherNode: SCNNode?
+            var morphCount = 0
+            func inspect(_ node: SCNNode) {
+                if node.geometry != nil { geometryCount += 1 }
+                if let morpher = node.morpher, !morpher.targets.isEmpty {
+                    morpherNode = node
+                    morphCount = morpher.targets.count
+                    morpher.calculationMode = .normalized
+                    morpher.targets.forEach { $0.name = $0.name ?? "" }
                 }
-                inspectEntity(model, depth: 0)
-                let orientationDetails = "REALITYKIT_ROOT: pos=\(rootPosition), rot=\(rootRotation), scale=\(rootScale)\nREALITYKIT_HIERARCHY (max 60 nodes):\n\(hierarchyLines.joined(separator: "\n"))"
-                let diagnostic = "[ChatAI-RIG] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\n\(orientationDetails)\nUSDZ_\(rigDetails)"
-                onResult(true, diagnostic)
+                node.childNodes.forEach(inspect)
+            }
+            inspect(scene.rootNode)
+
+            // Model-02 has 42 numeric morph slots. Geometry inspection found slot 19
+            // affects the lower central face; slots 0 and 1 affect opposite side regions.
+            // Keep the existing model transform and drive only the lower-face morph while speaking.
+            let modelRoot = SCNNode()
+            modelRoot.name = "ChatAICompanionGLB"
+            modelRoot.eulerAngles.x = -.pi / 2
+            let contentRoot = scene.rootNode
+            let children = contentRoot.childNodes
+            children.forEach { $0.removeFromParentNode(); modelRoot.addChildNode($0) }
+            scene.rootNode.addChildNode(modelRoot)
+
+            let (minV, maxV) = modelRoot.boundingBox
+            let largest = max(maxV.x - minV.x, max(maxV.y - minV.y, maxV.z - minV.z))
+            if largest.isFinite && largest > 0 {
+                modelRoot.scale = SCNVector3(1.55 / largest, 1.55 / largest, 1.55 / largest)
+                modelRoot.position = SCNVector3(-(minV.x + maxV.x) * 0.5, -(minV.y + maxV.y) * 0.5, -(minV.z + maxV.z) * 0.5)
+            }
+            context.coordinator.modelRoot = modelRoot
+            context.coordinator.morpherNode = morpherNode
+            context.coordinator.morphCount = morphCount
+            context.coordinator.speaking = speaking
+            context.coordinator.currentHeadRotation = headRotation
+            view.scene = scene
+            view.pointOfView = cameraNode
+            view.isPlaying = true
+            view.delegate = context.coordinator
+            DispatchQueue.main.async {
+                onResult(true, "[ChatAI-RIG] renderer=SceneKit\ngeometryNodes=\(geometryCount)\nmorphTargets=\(morphCount)\nmouthMorph=19 (lower-face candidate)\nSpeaking drives morph weight; chatbot/voice pipeline unchanged.")
             }
         } catch {
             DispatchQueue.main.async { onResult(false, "Không tải được USDZ: \(error.localizedDescription)") }
         }
-        context.coordinator.view = view
         return view
     }
 
-    func updateUIView(_ uiView: ARView, context: Context) {
-        guard let head = context.coordinator.head else { return }
-        context.coordinator.currentHeadRotation = headRotation
+    func updateUIView(_ uiView: SCNView, context: Context) {
         context.coordinator.speaking = speaking
-        let yaw = simd_quatf(angle: headRotation, axis: [0, 1, 0])
-        head.transform.rotation = yaw * context.coordinator.baseOrientation
+        context.coordinator.currentHeadRotation = headRotation
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator {
-        var head: Entity?
-        var jaw: Entity?
-        var jawBaseTransform = Transform()
-        var baseOrientation = simd_quatf()
-        var basePosition = SIMD3<Float>(repeating: 0)
+    final class Coordinator: NSObject, SCNSceneRendererDelegate {
+        weak var modelRoot: SCNNode?
+        weak var morpherNode: SCNNode?
+        var morphCount = 0
+        var speaking = false
         var currentHeadRotation: Float = 0
         var elapsed: Float = 0
-        var jawPhase: Float = 0
-        var speaking = false
-        var animationSubscription: (any Cancellable)?
-        var authoredAnimation: AnimationPlaybackController?
-        weak var view: ARView?
 
-        func updateJaw(deltaTime: Float) {
-            guard let jaw else { return }
-            if speaking {
-                jawPhase += deltaTime * 12.0
-                let pulse = max(0, sin(jawPhase) * 0.5 + sin(jawPhase * 1.73) * 0.25)
-                let amount = 0.055 * pulse
-                let rotation = simd_quatf(angle: amount, axis: [1, 0, 0])
-                jaw.transform.rotation = rotation * jawBaseTransform.rotation
-            } else {
-                jaw.transform.rotation = jawBaseTransform.rotation
+        func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+            let delta = Float(min(1.0 / 20.0, max(0, time - (lastTime ?? time))))
+            lastTime = time
+            elapsed += delta
+            DispatchQueue.main.async {
+                guard let root = self.modelRoot else { return }
+                root.eulerAngles = SCNVector3(-Float.pi / 2, self.currentHeadRotation, 0)
+                guard let morpher = self.morpherNode?.morpher, self.morphCount > 19 else { return }
+                let pulse: CGFloat = self.speaking
+                    ? CGFloat(max(0, sin(self.elapsed * 11) * 0.5 + sin(self.elapsed * 18.7) * 0.25))
+                    : 0
+                morpher.setWeight(pulse * 0.85, forTargetAt: 19)
             }
         }
-    }
 
-    private static func collectAnimations(from entity: Entity) -> [AnimationResource] {
-        var result = entity.availableAnimations
-        for child in entity.children { result.append(contentsOf: collectAnimations(from: child)) }
-        return result
-    }
-
-    private static func inspectSceneKitRig(url: URL) -> String {
-        let scene: SCNScene
-        do {
-            scene = try SCNScene(url: url, options: nil)
-        } catch {
-            return "SCENEKIT_RIG: không đọc được USDZ bằng SceneKit: \(error.localizedDescription)"
-        }
-
-        var skinnerNodes = 0
-        var boneNames: [String] = []
-        var morpherNodes = 0
-        var morphNames: [String] = []
-        var geometryNodes = 0
-        var sceneAnimationCount = 0
-
-        func walk(_ node: SCNNode) {
-            if node.geometry != nil { geometryNodes += 1 }
-            if let skinner = node.skinner {
-                skinnerNodes += 1
-                for bone in skinner.bones {
-                    if let name = bone.name, !name.isEmpty { boneNames.append(name) }
-                }
-            }
-            if let morpher = node.morpher {
-                morpherNodes += 1
-                for target in morpher.targets {
-                    if let name = target.name, !name.isEmpty { morphNames.append(name) }
-                }
-            }
-            sceneAnimationCount += node.animationKeys.count
-            for child in node.childNodes { walk(child) }
-        }
-
-        walk(scene.rootNode)
-        boneNames = Array(NSOrderedSet(array: boneNames)) as? [String] ?? boneNames
-        morphNames = Array(NSOrderedSet(array: morphNames)) as? [String] ?? morphNames
-
-        var lines = [
-            "SCENEKIT_RIG: geometryNodes=\(geometryNodes), skinnerNodes=\(skinnerNodes), morpherNodes=\(morpherNodes), animations=\(sceneAnimationCount)"
-        ]
-        if boneNames.isEmpty {
-            lines.append("BONES: none")
-        } else {
-            lines.append("BONES(\(boneNames.count)): \(boneNames.prefix(120).joined(separator: ", "))")
-        }
-        if morphNames.isEmpty {
-            lines.append("MORPHS: none")
-        } else if morphNames.allSatisfy({ $0.range(of: "^_?[0-9]+$", options: .regularExpression) != nil }) {
-            lines.append("MORPHS(\(morphNames.count)): unnamed numeric targets")
-        } else {
-            lines.append("MORPHS(\(morphNames.count)): \(morphNames.prefix(8).joined(separator: ", "))")
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private static func findMouthControl(in entity: Entity) -> Entity? {
-        let normalizedName = entity.name.lowercased().replacingOccurrences(of: "_", with: "").replacingOccurrences(of: "-", with: "").replacingOccurrences(of: " ", with: "")
-        let candidates = ["jaw", "lowerjaw", "mandible", "mouth", "lowerlip", "liplower", "mixamorigrigjaw", "mixamorigjaw"]
-        if candidates.contains(where: { normalizedName == $0 || normalizedName.contains($0) }) { return entity }
-        for child in entity.children {
-            if let match = findMouthControl(in: child) { return match }
-        }
-        return nil
-    }
-
-    private func makeLight(color: UIColor, intensity: Float, position: SIMD3<Float>) -> Entity {
-        let light = Entity()
-        var component = PointLightComponent()
-        component.color = color
-        component.intensity = intensity
-        light.components.set(component)
-        light.position = position
-        return light
+        private var lastTime: TimeInterval?
     }
 }
 
