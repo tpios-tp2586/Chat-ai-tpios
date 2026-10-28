@@ -273,7 +273,10 @@ struct ThemeAndModelView: View {
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(ChatAITheme.allCases) { option in
-                    Button { selectedTheme = option.rawValue } label: {
+                    Button {
+                        selectedTheme = option.rawValue
+                        accentHex = ""
+                    } label: {
                         VStack(alignment: .leading, spacing: 7) {
                             ZStack(alignment: .topTrailing) {
                                 RoundedRectangle(cornerRadius: 13, style: .continuous)
@@ -307,9 +310,15 @@ struct ThemeAndModelView: View {
             }
 
             Text("Màu sắc").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 2)
-            HStack(spacing: 13) {
-                paletteDot("F05A36"); paletteDot("D98245"); paletteDot("C7BAA8"); paletteDot("6B4DD8")
-                paletteDot("579973"); paletteDot("2B2B30"); paletteDot("8C8C91"); paletteDot("1A1A1C")
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
+                paletteDot("F05A36"); paletteDot("D98245"); paletteDot("C7BAA8")
+                paletteDot("6B4DD8"); paletteDot("579973"); paletteDot("2B2B30")
+                paletteDot("8C8C91"); paletteDot("1A1A1C"); paletteDot("E84A5F")
+                paletteDot("FF8A5B"); paletteDot("FFC857"); paletteDot("F4E285")
+                paletteDot("A8DADC"); paletteDot("457B9D"); paletteDot("1D3557")
+                paletteDot("6D597A"); paletteDot("B56576"); paletteDot("E56B6F")
+                paletteDot("355070"); paletteDot("4F772D"); paletteDot("90A955")
+                paletteDot("00A896"); paletteDot("028090"); paletteDot("F7F7FF")
             }
             .padding(.horizontal, 2)
 
