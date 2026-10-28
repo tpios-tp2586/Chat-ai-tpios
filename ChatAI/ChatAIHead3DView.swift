@@ -136,9 +136,10 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            let upAxisCorrection = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
-            let uprightCorrection = simd_quatf(angle: .pi, axis: [0, 0, 1])
-            let axisCorrection = uprightCorrection * upAxisCorrection
+            // Model-02 is authored as a front-facing 2D face in the XY plane.
+            // Do not apply the old X/Z axis rotations: they turn the face edge-on
+            // and expose the backing geometry instead of the face.
+            let axisCorrection = simd_quatf()
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
