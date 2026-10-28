@@ -148,7 +148,6 @@ private struct CompanionRealityView: UIViewRepresentable {
             context.coordinator.basePosition = model.position
             let animations = Self.collectAnimations(from: model)
             let rigDetails = Self.inspectSceneKitRig(url: url)
-            Self.dumpModelStructure(from: model, resourceURL: url, animationCount: animations.count)
             if let animation = animations.first {
                 context.coordinator.authoredAnimation = model.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.25, startsPaused: false)
             }
@@ -166,9 +165,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             DispatchQueue.main.async {
                 let mouthStatus = context.coordinator.jaw == nil ? "KHÔNG TÌM THẤY jaw/mouth node theo tên" : "ĐÃ TÌM THẤY jaw/mouth node: \(context.coordinator.jaw?.name ?? "<unnamed>")"
                 let animationStatus = animations.isEmpty ? "animations=0" : "animations=\(animations.count)"
-                let entityLines = Self.collectEntityDiagnostics(from: model)
-                let glbDetails = Self.inspectGLBResource(bundle: bundle)
-                let diagnostic = "[ChatAI-RIG-DIAGNOSTIC] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\nUSDZ_\(rigDetails)\n\(glbDetails)\nENTITIES:\n\(entityLines)"
+                let diagnostic = "[ChatAI-RIG] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\nUSDZ_\(rigDetails)"
                 onResult(true, diagnostic)
             }
         } catch {
@@ -216,147 +213,10 @@ private struct CompanionRealityView: UIViewRepresentable {
         }
     }
 
-    /// Reads the GLB container's JSON chunk directly; RealityKit/SceneKit don't reliably import GLB URLs.
-    private static func inspectGLBResource(bundle: Bundle) -> String {
-        guard let url = bundle.url(forResource: "Model-02", withExtension: "glb")
-            ?? bundle.url(forResource: "Model-02", withExtension: "glb", subdirectory: "Companion") else {
-            return "GLB_TEST: original GLB not found in app bundle"
-        }
-
-        do {
-            let data = try Data(contentsOf: url)
-            guard data.count >= 20 else { return "GLB_TEST: file too small (\(data.count) bytes)" }
-
-            func uint32LE(at offset: Int) -> UInt32 {
-                UInt32(data[offset]) |
-                (UInt32(data[offset + 1]) << 8) |
-                (UInt32(data[offset + 2]) << 16) |
-                (UInt32(data[offset + 3]) << 24)
-            }
-
-            let magic = uint32LE(at: 0)
-            let version = uint32LE(at: 4)
-            let declaredLength = Int(uint32LE(at: 8))
-            guard magic == 0x46546C67 else {
-                return "GLB_TEST: invalid magic/header; bytes=\(data.count)"
-            }
-            guard version == 2 else {
-                return "GLB_TEST: unsupported GLB version \(version)"
-            }
-            guard declaredLength <= data.count, declaredLength >= 20 else {
-                return "GLB_TEST: invalid declared length \(declaredLength), actual \(data.count)"
-            }
-
-            var offset = 12
-            var jsonData: Data?
-            while offset + 8 <= declaredLength {
-                let chunkLength = Int(uint32LE(at: offset))
-                let chunkType = uint32LE(at: offset + 4)
-                offset += 8
-                guard chunkLength >= 0, offset + chunkLength <= declaredLength else {
-                    return "GLB_TEST: invalid chunk length"
-                }
-                if chunkType == 0x4E4F534A {
-                    jsonData = data.subdata(in: offset..<(offset + chunkLength))
-                    break
-                }
-                offset += chunkLength
-            }
-
-            guard let jsonData else { return "GLB_TEST: JSON chunk not found" }
-            let object = try JSONSerialization.jsonObject(with: jsonData, options: [.fragmentsAllowed])
-            guard let gltf = object as? [String: Any] else {
-                return "GLB_TEST: JSON root is not an object"
-            }
-
-            let nodes = gltf["nodes"] as? [[String: Any]] ?? []
-            let skins = gltf["skins"] as? [[String: Any]] ?? []
-            let meshes = gltf["meshes"] as? [[String: Any]] ?? []
-            let animations = gltf["animations"] as? [[String: Any]] ?? []
-            let nodeNames = nodes.enumerated().map { index, node in
-                (node["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "node_\(index)"
-            }
-
-            var jointNames: [String] = []
-            for skin in skins {
-                for index in (skin["joints"] as? [Int] ?? []) where nodeNames.indices.contains(index) {
-                    jointNames.append(nodeNames[index])
-                }
-            }
-
-            var targetNames: [String] = []
-            var targetCount = 0
-            for mesh in meshes {
-                if let names = (mesh["extras"] as? [String: Any])?["targetNames"] as? [String] {
-                    targetNames.append(contentsOf: names)
-                }
-                for primitive in (mesh["primitives"] as? [[String: Any]] ?? []) {
-                    targetCount = max(targetCount, (primitive["targets"] as? [[String: Any]] ?? []).count)
-                }
-            }
-
-            let uniqueJoints = Array(NSOrderedSet(array: jointNames)) as? [String] ?? jointNames
-            let uniqueTargets = Array(NSOrderedSet(array: targetNames)) as? [String] ?? targetNames
-            let animationNames = animations.enumerated().map { index, animation in
-                (animation["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "animation_\(index)"
-            }
-            let likelyMouth = nodeNames.filter {
-                let name = $0.lowercased()
-                return ["jaw", "mouth", "lip", "teeth", "tongue", "mandible"].contains { name.contains($0) }
-            }
-            let likelyMorphs = uniqueTargets.filter {
-                let name = $0.lowercased()
-                return ["jaw", "mouth", "lip", "open", "viseme", "phoneme", "talk"].contains { name.contains($0) }
-            }
-
-            var lines = [
-                "GLB_TEST: file=\(url.lastPathComponent), bytes=\(data.count), format=GLB2",
-                "GLB_COUNTS: nodes=\(nodes.count), skins=\(skins.count), meshes=\(meshes.count), animations=\(animations.count), morphTargets=\(targetCount)",
-                "GLB_JOINTS: \(uniqueJoints.isEmpty ? "none" : uniqueJoints.prefix(100).joined(separator: ", "))",
-                "GLB_MORPHS: \(uniqueTargets.isEmpty ? "none" : uniqueTargets.prefix(100).joined(separator: ", "))",
-                "GLB_ANIMATIONS: \(animationNames.isEmpty ? "none" : animationNames.prefix(40).joined(separator: ", "))",
-                "GLB_MOUTH_CANDIDATES: nodes=\(likelyMouth.isEmpty ? "none" : likelyMouth.joined(separator: ", ")); morphs=\(likelyMorphs.isEmpty ? "none" : likelyMorphs.joined(separator: ", "))"
-            ]
-            lines.append("GLB_NODE_NAMES: \(nodeNames.prefix(100).joined(separator: ", "))")
-            return lines.joined(separator: "\n")
-        } catch {
-            return "GLB_TEST: JSON parse failed: \(error.localizedDescription)"
-        }
-    }
-
     private static func collectAnimations(from entity: Entity) -> [AnimationResource] {
         var result = entity.availableAnimations
         for child in entity.children { result.append(contentsOf: collectAnimations(from: child)) }
         return result
-    }
-
-    private static func collectEntityDiagnostics(from root: Entity) -> String {
-        var lines: [String] = []
-        var visited = 0
-        var modelEntityCount = 0
-        var animatedEntityCount = 0
-        func walk(_ entity: Entity, depth: Int) {
-            visited += 1
-            let hasModel = entity.components[ModelComponent.self] != nil
-            if hasModel { modelEntityCount += 1 }
-            let animationCount = entity.availableAnimations.count
-            if animationCount > 0 { animatedEntityCount += 1 }
-            guard lines.count < 40 else { return }
-            let indent = String(repeating: "  ", count: min(depth, 6))
-            let name = entity.name.isEmpty ? "<unnamed>" : entity.name
-            let kind = String(describing: type(of: entity))
-            let components = String(describing: entity.components).replacingOccurrences(of: "\n", with: " ")
-            lines.append("\(indent)• \(name) | type=\(kind) | model=\(hasModel ? "YES" : "no") | animations=\(animationCount)")
-            lines.append("\(indent)  components: \(components)")
-            for child in entity.children {
-                walk(child, depth: depth + 1)
-                if lines.count >= 40 { break }
-            }
-        }
-        walk(root, depth: 0)
-        let summary = "SUMMARY: entities=\(visited), ModelComponent=\(modelEntityCount), entitiesWithAnimations=\(animatedEntityCount)"
-        if lines.count >= 40 { lines.append("… danh sách chẩn đoán giới hạn ở 40 dòng") }
-        return ([summary] + lines).joined(separator: "\n")
     }
 
     private static func inspectSceneKitRig(url: URL) -> String {
@@ -406,24 +266,12 @@ private struct CompanionRealityView: UIViewRepresentable {
         }
         if morphNames.isEmpty {
             lines.append("MORPHS: none")
+        } else if morphNames.allSatisfy({ $0.range(of: "^_?[0-9]+$", options: .regularExpression) != nil }) {
+            lines.append("MORPHS(\(morphNames.count)): unnamed numeric targets")
         } else {
-            lines.append("MORPHS(\(morphNames.count)): \(morphNames.prefix(120).joined(separator: ", "))")
+            lines.append("MORPHS(\(morphNames.count)): \(morphNames.prefix(8).joined(separator: ", "))")
         }
         return lines.joined(separator: "\n")
-    }
-
-    private static func dumpModelStructure(from entity: Entity, resourceURL: URL, animationCount: Int) {
-        print("[ChatAI-RIG-DIAGNOSTIC] resource=\(resourceURL.lastPathComponent)")
-        print("[ChatAI-RIG-DIAGNOSTIC] rootAnimations=\(animationCount)")
-        dumpEntity(entity, depth: 0)
-        print("[ChatAI-RIG-DIAGNOSTIC] end")
-    }
-
-    private static func dumpEntity(_ entity: Entity, depth: Int) {
-        let indent = String(repeating: "  ", count: min(depth, 20))
-        let componentSummary = String(describing: entity.components).replacingOccurrences(of: "\n", with: " ")
-        print("[ChatAI-RIG-DIAGNOSTIC] \(indent)entity=\(entity.name.isEmpty ? "<unnamed>" : entity.name) type=\(String(describing: type(of: entity))) animations=\(entity.availableAnimations.count) components=\(componentSummary)")
-        for child in entity.children { dumpEntity(child, depth: depth + 1) }
     }
 
     private static func findMouthControl(in entity: Entity) -> Entity? {

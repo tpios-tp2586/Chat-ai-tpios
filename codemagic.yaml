@@ -96,22 +96,6 @@ workflows:
             exit 1
           fi
 
-          # Ensure the GLB is physically inside ChatAI.app, even if XcodeGen's
-          # resource phase changes how it handles the file path.
-          GLB_SOURCE="ChatAI/Resources/Companion/Model-02.glb"
-          if [ ! -f "$GLB_SOURCE" ]; then
-            echo "ERROR: Source GLB missing: $GLB_SOURCE"
-            find ChatAI -iname "*.glb" -print
-            exit 1
-          fi
-          cp "$GLB_SOURCE" "$APP_PATH/Model-02.glb"
-          if [ ! -s "$APP_PATH/Model-02.glb" ]; then
-            echo "ERROR: GLB copy into app bundle failed"
-            exit 1
-          fi
-          echo "=== GLB bundled successfully ==="
-          ls -lh "$APP_PATH/Model-02.glb"
-
           USDZ_SOURCE="ChatAI/Resources/Companion/Model-02.usdz"
           if [ ! -s "$USDZ_SOURCE" ]; then
             echo "ERROR: Converted USDZ missing: $USDZ_SOURCE"
