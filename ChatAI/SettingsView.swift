@@ -48,7 +48,6 @@ struct SettingsView: View {
                             .labelsHidden()
                             .tint(theme.accent)
                         }
-                        settingRow("Vai trò", value: "Bạn đồng hành", icon: .companion)
                         NavigationLink {
                             ThemeAndModelView(
                                 openAIKey: $openAIKey, anthropicKey: $anthropicKey, geminiKey: $geminiKey,
@@ -60,8 +59,6 @@ struct SettingsView: View {
                         } label: {
                             settingRowLabel("Model AI", value: currentModel, icon: .provider)
                         }
-                        settingRow("Avatar", value: "Kawaii Girl", icon: .companion)
-                        settingRow("Ngôn ngữ", value: "Tiếng Việt", icon: .settings)
                         settingToggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies, icon: .voice)
                     }
 
@@ -78,14 +75,10 @@ struct SettingsView: View {
                         } label: {
                             settingRowLabel("Chủ đề", value: theme.title, icon: .settings)
                         }
-                        settingRow("Kiểu hiển thị", value: "Cân bằng", icon: .history)
-                        settingRow("Hiệu ứng", value: "Mượt mà", icon: .voice)
                     }
 
-                    settingsSection("TÀI KHOẢN", icon: .memory) {
-                        settingRow("Thông tin cá nhân", value: "Anh Phong", icon: .companion)
+                    settingsSection("AI MEMORY", icon: .memory) {
                         settingToggle("AI Memory", isOn: $autoMemory, icon: .memory)
-                        settingRow("Lịch sử chat", value: "Mở từ thanh dưới", icon: .history)
                     }
 
                     Text("API key được lưu trong Keychain của máy và chỉ dùng với provider tương ứng.")
