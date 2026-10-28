@@ -19,7 +19,6 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
     @State private var nightMode = false
-    @State private var headRotation: Float = 0
 
     var body: some View {
         ZStack {
@@ -33,26 +32,10 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        ChatAIHead3DView(
-                            headRotation: headRotation,
-                            speaking: liveManager.aiSpeaking
-                        )
+                        CompanionExpressionImage(emotion: emotion)
                         .frame(
                             width: min(proxy.size.width - 12, 410),
                             height: min(proxy.size.height * 0.72, 450)
-                        )
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 8)
-                                .onChanged { value in
-                                    // One view-width of horizontal dragging represents a full 360-degree turn.
-                                    headRotation = Float(value.translation.width / max(proxy.size.width, 1)) * 2 * .pi
-                                }
-                                .onEnded { _ in
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
-                                        headRotation = 0
-                                    }
-                                }
                         )
                         .onTapGesture {
                             let sequence: [CompanionEmotion] = [
@@ -229,8 +212,6 @@ struct CompanionChatView: View {
     }
 
     private func startLive() {
-        // Start each voice conversation facing the camera, without carrying over a prior turn.
-        headRotation = 0
         liveManager.start(
             model: liveModel,
             voice: liveVoice,
@@ -947,5 +928,54 @@ private struct FinShape: Shape {
         )
         p.closeSubpath()
         return p
+    }
+}
+
+
+/// Displays the existing expression reference photos; no 3D model or rig is loaded.
+private struct CompanionExpressionImage: View {
+    let emotion: CompanionEmotion
+
+    private var imageName: String {
+        switch emotion {
+        case .angry: "companion_angry.jpg"
+        case .happy: "companion_happy.jpg"
+        case .speaking: "companion_speaking.jpg"
+        case .surprised: "companion_surprised.jpg"
+        case .thinking, .confused: "companion_thinking.jpg"
+        case .sleepy: "companion_sleepy.jpg"
+        case .sad: "companion_neutral.jpg"
+        case .idle, .listening: "companion_neutral.jpg"
+        }
+    }
+
+    private var imageURL: URL {
+        URL(string: "https://raw.githubusercontent.com/tpios-tp2586/Chat-ai-tpios/main/Reference/FaceExpressions/\\(imageName)")!
+    }
+
+    var body: some View {
+        AsyncImage(url: imageURL) { phase in
+            if let image = phase.image {
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel("Biểu cảm: \\(emotion.label)")
+            } else if phase.error != nil {
+                VStack(spacing: 8) {
+                    Image(systemName: "person.crop.rectangle")
+                        .font(.system(size: 42))
+                    Text("Không tải được ảnh biểu cảm")
+                        .font(.caption)
+                }
+                .foregroundStyle(.white.opacity(0.8))
+            } else {
+                ProgressView("Đang tải ảnh…")
+                    .tint(.white)
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }
