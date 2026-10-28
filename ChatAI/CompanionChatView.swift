@@ -1,3 +1,4 @@
+import UIKit
 import SwiftUI
 
 struct CompanionChatView: View {
@@ -932,7 +933,7 @@ private struct FinShape: Shape {
 }
 
 
-/// Displays the existing expression reference photos; no 3D model or rig is loaded.
+/// Loads bundled expression photos so Chat Voice works without network access.
 private struct CompanionExpressionImage: View {
     let emotion: CompanionEmotion
 
@@ -944,35 +945,36 @@ private struct CompanionExpressionImage: View {
         case .surprised: "companion_surprised.jpg"
         case .thinking, .confused: "companion_thinking.jpg"
         case .sleepy: "companion_sleepy.jpg"
-        case .sad: "companion_neutral.jpg"
-        case .idle, .listening: "companion_neutral.jpg"
+        case .sad, .idle, .listening: "companion_neutral.jpg"
         }
     }
 
-    private var imageURL: URL {
-        URL(string: "https://raw.githubusercontent.com/tpios-tp2586/Chat-ai-tpios/main/Reference/FaceExpressions/\(imageName)")!
+    private var localImage: UIImage? {
+        let url = Bundle.main.url(forResource: imageName, withExtension: nil)
+            ?? Bundle.main.url(
+                forResource: String(imageName.dropLast(4)),
+                withExtension: "jpg",
+                subdirectory: "FaceExpressions"
+            )
+        guard let url else { return nil }
+        return UIImage(contentsOfFile: url.path)
     }
 
     var body: some View {
-        AsyncImage(url: imageURL) { phase in
-            if let image = phase.image {
-                image
+        Group {
+            if let image = localImage {
+                Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityLabel("Biểu cảm: \(emotion.label)")
-            } else if phase.error != nil {
+                    .accessibilityLabel("Biểu cảm: \\(emotion.label)")
+            } else {
                 VStack(spacing: 8) {
                     Image(systemName: "person.crop.rectangle")
                         .font(.system(size: 42))
-                    Text("Không tải được ảnh biểu cảm")
+                    Text("Không tìm thấy ảnh biểu cảm trong ứng dụng")
                         .font(.caption)
                 }
                 .foregroundStyle(.white.opacity(0.8))
-            } else {
-                ProgressView("Đang tải ảnh…")
-                    .tint(.white)
-                    .foregroundStyle(.white)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
