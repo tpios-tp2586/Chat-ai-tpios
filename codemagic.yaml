@@ -59,7 +59,7 @@ workflows:
             exit 1
           fi
 
-      - name: Copy and verify 8 expression images
+      - name: Copy and verify 8 transparent expression PNGs
         script: |
           set -eu
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
@@ -70,37 +70,36 @@ workflows:
           fi
           if [ ! -d "$SOURCE_DIR" ]; then
             echo "ERROR: Image source folder not found: $SOURCE_DIR"
-            find . -type f -iname 'companion_*.jpg' -print || true
             exit 1
           fi
 
-          echo "=== Source images in repository ==="
-          find "$SOURCE_DIR" -maxdepth 1 -type f -iname '*.jpg' -print
-          mkdir -p "$APP_PATH/FaceExpressions"
-          cp "$SOURCE_DIR"/companion_*.jpg "$APP_PATH/FaceExpressions/"
-
-          echo "=== JPG files copied into ChatAI.app ==="
-          find "$APP_PATH" -type f -iname '*.jpg' -print
-
           images=(
-            companion_angry.jpg
-            companion_happy.jpg
-            companion_neutral.jpg
-            companion_sleepy.jpg
-            companion_speaking.jpg
-            companion_surprised.jpg
-            companion_thinking.jpg
-            companion_wink.jpg
+            companion_angry.png
+            companion_happy.png
+            companion_neutral.png
+            companion_sleepy.png
+            companion_speaking.png
+            companion_surprised.png
+            companion_thinking.png
+            companion_wink.png
           )
+
+          echo "=== Copy transparent PNGs into ChatAI.app ==="
+          mkdir -p "$APP_PATH/FaceExpressions"
           for image in "${images[@]}"; do
+            if [ ! -s "$SOURCE_DIR/$image" ]; then
+              echo "ERROR: Source PNG missing or empty: $SOURCE_DIR/$image"
+              exit 1
+            fi
+            cp "$SOURCE_DIR/$image" "$APP_PATH/FaceExpressions/$image"
             if [ -s "$APP_PATH/FaceExpressions/$image" ]; then
               echo "OK: $image"
             else
-              echo "ERROR: Missing or empty image: $image"
+              echo "ERROR: Failed to bundle $image"
               exit 1
             fi
           done
-          echo "SUCCESS: All 8 expression images are bundled."
+          echo "SUCCESS: All 8 transparent PNGs are bundled."
           
       - name: Package IPA
         script: |
