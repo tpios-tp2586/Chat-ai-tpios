@@ -31,6 +31,13 @@ workflows:
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
           sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
 
+      - name: Verify expression images in repo
+        script: |
+          echo "=== Contents of Reference/ ==="
+          ls -la Reference/ || echo "Reference/ folder NOT FOUND"
+          echo "=== Contents of Reference/FaceExpressions/ ==="
+          ls -la Reference/FaceExpressions/ || echo "FaceExpressions/ folder NOT FOUND"
+
       - name: Generate Xcode project
         script: xcodegen generate
 
@@ -108,4 +115,3 @@ workflows:
 
     artifacts:
       - chat-ai-tpios-*.ipa
-    
