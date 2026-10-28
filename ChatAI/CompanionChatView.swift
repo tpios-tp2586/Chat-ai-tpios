@@ -1015,15 +1015,20 @@ private struct CompanionExpressionImage: View {
     }
 
     private var localImage: UIImage? {
-        let url = Bundle.main.url(forResource: imageName, withExtension: nil)
-            ?? Bundle.main.url(
-                forResource: String(imageName.dropLast(4)),
-                withExtension: "jpg",
-                subdirectory: "FaceExpressions"
-            )
-        guard let url else { return nil }
-        return UIImage(contentsOfFile: url.path)
+    // Direct path — folder reference bundles at FaceExpressions/
+    let directURL = Bundle.main.bundleURL
+        .appendingPathComponent("FaceExpressions")
+        .appendingPathComponent(imageName)
+    if FileManager.default.fileExists(atPath: directURL.path) {
+        return UIImage(contentsOfFile: directURL.path)
     }
+    // Fallback: flat bundle root
+    let rootURL = Bundle.main.bundleURL.appendingPathComponent(imageName)
+    if FileManager.default.fileExists(atPath: rootURL.path) {
+        return UIImage(contentsOfFile: rootURL.path)
+    }
+    return nil
+}
 
     var body: some View {
         Group {
