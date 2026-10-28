@@ -22,6 +22,9 @@ targets:
           - UIInterfaceOrientationPortrait
         LSRequiresIPhoneOS: true
         NSMicrophoneUsageDescription: "Ứng dụng cần quyền micro để ghi âm giọng nói khi trò chuyện."
+    resources:
+      - path: Reference/FaceExpressions
+        type: folder
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: Speech.framework
