@@ -165,7 +165,16 @@ private struct CompanionRealityView: UIViewRepresentable {
             DispatchQueue.main.async {
                 let mouthStatus = context.coordinator.jaw == nil ? "KHÔNG TÌM THẤY jaw/mouth node theo tên" : "ĐÃ TÌM THẤY jaw/mouth node: \(context.coordinator.jaw?.name ?? "<unnamed>")"
                 let animationStatus = animations.isEmpty ? "animations=0" : "animations=\(animations.count)"
-                let diagnostic = "[ChatAI-RIG] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\nUSDZ_\(rigDetails)"
+                let rootTransform = model.transform
+                let rootRotation = rootTransform.rotation
+                let rootScale = rootTransform.scale
+                let rootPosition = rootTransform.translation
+                let childTransforms = model.children.prefix(12).map { child in
+                    let t = child.transform
+                    return "\(child.name.isEmpty ? "<unnamed>" : child.name): pos=\(t.translation), rot=\(t.rotation), scale=\(t.scale)"
+                }.joined(separator: "\n")
+                let orientationDetails = "REALITYKIT_ROOT: pos=\(rootPosition), rot=\(rootRotation), scale=\(rootScale)\nREALITYKIT_CHILDREN:\n\(childTransforms)"
+                let diagnostic = "[ChatAI-RIG] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\n\(orientationDetails)\nUSDZ_\(rigDetails)"
                 onResult(true, diagnostic)
             }
         } catch {

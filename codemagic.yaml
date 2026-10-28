@@ -58,7 +58,7 @@ workflows:
             exit 1
           fi
 
-          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; bpy.ops.wm.usd_export(filepath='$USD_FILE', check_existing=False, export_materials=True, export_textures_mode='NEW', generate_preview_surface=True)"
+          "$BLENDER" --background --python-expr "import bpy; bpy.ops.wm.read_factory_settings(use_empty=True); bpy.ops.import_scene.gltf(filepath='$GLB_SOURCE'); assert len(bpy.context.scene.objects)>0, 'GLB import produced no objects'; print('=== ORIENTATION_DIAG_BLENDER_BEGIN ==='); [print('OBJECT', o.name, 'type=', o.type, 'world_location=', tuple(round(v, 5) for v in o.matrix_world.translation), 'world_rotation_deg=', tuple(round(v, 3) for v in o.matrix_world.to_euler('XYZ')), 'world_scale=', tuple(round(v, 5) for v in o.matrix_world.to_scale()), 'dimensions=', tuple(round(v, 5) for v in o.dimensions)) for o in bpy.context.scene.objects if o.type in {'MESH','EMPTY','ARMATURE'}]; print('=== ORIENTATION_DIAG_BLENDER_END ==='); bpy.ops.wm.usd_export(filepath='$USD_FILE', check_existing=False, export_materials=True, export_textures_mode='NEW', generate_preview_surface=True)"
 
           test -s "$USD_FILE"
           usdzip --arkitAsset "$USD_FILE" "$USDZ_FILE"
