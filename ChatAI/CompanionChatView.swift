@@ -209,9 +209,9 @@ struct CompanionChatView: View {
     }
 
     private var imageDiagnosticLines: [String] {
-        let names = ["companion_angry.jpg", "companion_happy.jpg", "companion_neutral.jpg",
-            "companion_sleepy.jpg", "companion_speaking.jpg", "companion_surprised.jpg",
-            "companion_thinking.jpg", "companion_wink.jpg"]
+        let names = ["companion_angry.png", "companion_happy.png", "companion_neutral.png",
+            "companion_sleepy.png", "companion_speaking.png", "companion_surprised.png",
+            "companion_thinking.png", "companion_wink.png"]
         return names.map { name in
             let found = Bundle.main.url(forResource: name, withExtension: nil) != nil
                 || Bundle.main.url(forResource: String(name.dropLast(4)), withExtension: "jpg", subdirectory: "FaceExpressions") != nil
@@ -1004,13 +1004,13 @@ private struct CompanionExpressionImage: View {
 
     private var imageName: String {
         switch emotion {
-        case .angry: "companion_angry.jpg"
-        case .happy: "companion_happy.jpg"
-        case .speaking: "companion_speaking.jpg"
-        case .surprised: "companion_surprised.jpg"
-        case .thinking, .confused: "companion_thinking.jpg"
-        case .sleepy: "companion_sleepy.jpg"
-        case .sad, .idle, .listening: "companion_neutral.jpg"
+        case .angry: "companion_angry.png"
+        case .happy: "companion_happy.png"
+        case .speaking: "companion_speaking.png"
+        case .surprised: "companion_surprised.png"
+        case .thinking, .confused: "companion_thinking.png"
+        case .sleepy: "companion_sleepy.png"
+        case .sad, .idle, .listening: "companion_neutral.png"
         }
     }
 
