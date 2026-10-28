@@ -67,4 +67,4 @@ workflows:
 
     artifacts:
       - chat-ai-tpios-*.ipa
-      - build_output.txt
+    
