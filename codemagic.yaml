@@ -52,6 +52,42 @@ workflows:
             exit 1
           fi
 
+      - name: Verify 8 expression images are bundled
+        script: |
+          set -eu
+          APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: Built app not found: $APP_PATH"
+            exit 1
+          fi
+
+          images=(
+            companion_angry.jpg
+            companion_happy.jpg
+            companion_neutral.jpg
+            companion_sleepy.jpg
+            companion_speaking.jpg
+            companion_surprised.jpg
+            companion_thinking.jpg
+            companion_wink.jpg
+          )
+          missing=0
+          for image in "${images[@]}"; do
+            if [ -f "$APP_PATH/$image" ] || [ -f "$APP_PATH/FaceExpressions/$image" ]; then
+              echo "OK: $image"
+            else
+              echo "ERROR: Missing from app bundle: $image"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "ERROR: One or more expression images are missing. IPA packaging stopped."
+            echo "Check project.yml resource paths and XcodeGen resource copying."
+            exit 1
+          fi
+          echo "SUCCESS: All 8 expression images are bundled. Continue to IPA packaging."
+
       - name: Package IPA
         script: |
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
