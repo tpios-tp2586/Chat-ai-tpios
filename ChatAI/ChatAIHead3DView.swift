@@ -136,10 +136,9 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // Model-02's GLB already defines its own mesh transforms. Do not rotate
-            // the entire imported hierarchy around X: that turns the face upward/downward.
-            // Keep the imported orientation neutral and apply only a vertical-axis yaw.
-            let axisCorrection = simd_quatf()
+            // Model-02's measured bounds are taller along Z (2.97) than Y (1.83),
+            // indicating a Z-up source orientation. Convert Z-up to RealityKit Y-up.
+            let axisCorrection = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
