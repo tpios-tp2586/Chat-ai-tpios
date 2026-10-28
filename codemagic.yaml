@@ -42,8 +42,6 @@ workflows:
 
           test -s "$GLB_SOURCE"
 
-          # Reuse a valid USDZ when it is already present and at least as new as the GLB.
-          # On a clean checkout without a committed/cached USDZ, conversion is still required.
           if [ -s "$USDZ_FILE" ] && [ "$USDZ_FILE" -nt "$GLB_SOURCE" ]; then
             echo "Reusing existing USDZ: $USDZ_FILE"
             ls -lh "$USDZ_FILE"
@@ -111,3 +109,4 @@ workflows:
 
     artifacts:
       - chat-ai-tpios-*.ipa
+      - build_output.txt
