@@ -7,7 +7,8 @@ struct ChatAIHead3DView: View {
     var headRotation: Float = 0
     var speaking: Bool = false
 
-    @State private var loadMessage = "Đang tải mô hình 3D…"
+    @State private var logText = "Đang tải mô hình 3D…"
+    @State private var showLog = true
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
 
     private var activeTheme: ChatAITheme {
@@ -19,22 +20,40 @@ struct ChatAIHead3DView: View {
             LinearGradient(colors: [activeTheme.background, activeTheme.surface], startPoint: .top, endPoint: .bottom)
 
             CompanionSceneView(headRotation: headRotation, speaking: speaking) { message in
-                loadMessage = message
+                logText = message
             }
 
-            VStack {
-                Spacer()
-                if !loadMessage.isEmpty {
-                    Text(loadMessage)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
-                        .padding(8)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Button(showLog ? "Ẩn log" : "Hiện log") { showLog.toggle() }
+                    Spacer()
+                    Button("Copy log") {
+                        UIPasteboard.general.string = logText
+                    }
+                    Button("Xoá log") {
+                        logText = ""
+                    }
                 }
+                .font(.system(size: 12, weight: .semibold))
+                .buttonStyle(.bordered)
+                .tint(activeTheme.accent)
+
+                if showLog {
+                    ScrollView {
+                        Text(logText.isEmpty ? "Log trống" : logText)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxHeight: 110)
+                    .padding(8)
+                    .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 8))
+                }
+                Spacer(minLength: 0)
             }
+            .padding(8)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .tint(activeTheme.accent)
@@ -96,7 +115,6 @@ private struct CompanionSceneView: UIViewRepresentable {
             let modelRoot = SCNNode()
             modelRoot.name = "ChatAICompanionModel"
 
-            // Keep the camera outside the model hierarchy.
             scene.rootNode.childNodes
                 .filter { $0 !== cameraNode }
                 .forEach {
@@ -104,7 +122,6 @@ private struct CompanionSceneView: UIViewRepresentable {
                     modelRoot.addChildNode($0)
                 }
 
-            // Preserve the imported orientation, then fit the complete model to the camera.
             let (minV, maxV) = modelRoot.boundingBox
             let width = maxV.x - minV.x
             let height = maxV.y - minV.y
