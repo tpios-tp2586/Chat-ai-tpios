@@ -10,7 +10,7 @@ targets:
       - path: ChatAI
         excludes:
           - Resources/**
-    resources:
+          - ChatAIHead3DView.swift
     info:
       path: ChatAI-Info.plist
       properties:
