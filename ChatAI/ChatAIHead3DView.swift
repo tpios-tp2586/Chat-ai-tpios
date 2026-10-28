@@ -146,7 +146,7 @@ private struct CompanionRealityView: UIViewRepresentable {
             modelRoot.name = "ChatAICompanionGLB"
             modelRoot.eulerAngles.x = -.pi / 2
             let contentRoot = scene.rootNode
-            let children = contentRoot.childNodes
+            let children = contentRoot.childNodes.filter { $0 !== cameraNode }
             children.forEach { $0.removeFromParentNode(); modelRoot.addChildNode($0) }
             scene.rootNode.addChildNode(modelRoot)
 
