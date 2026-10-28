@@ -100,7 +100,7 @@ private struct CompanionRealityView: UIViewRepresentable {
     let headRotation: Float
     let speaking: Bool
     let onResult: (Bool, String) -> Void
-    private let modelResourceName = "model-1792924579279"
+    private let modelResourceName = "Model-02"
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero)
@@ -217,8 +217,8 @@ private struct CompanionRealityView: UIViewRepresentable {
 
     /// Reads the GLB container's JSON chunk directly; RealityKit/SceneKit don't reliably import GLB URLs.
     private static func inspectGLBResource(bundle: Bundle) -> String {
-        guard let url = bundle.url(forResource: "model-1792924579279", withExtension: "glb")
-            ?? bundle.url(forResource: "model-1792924579279", withExtension: "glb", subdirectory: "Companion") else {
+        guard let url = bundle.url(forResource: "Model-02", withExtension: "glb")
+            ?? bundle.url(forResource: "Model-02", withExtension: "glb", subdirectory: "Companion") else {
             return "GLB_TEST: original GLB not found in app bundle"
         }
 
