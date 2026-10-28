@@ -1,8 +1,4 @@
-ChatAI 
-ChatAI/Assets.xcassets 
-ChatAI/Assets.xcassets/AppIcon.appiconset
 
----
 
 ## Quy tắc làm việc bắt buộc — do chủ repo đặt ra
 
