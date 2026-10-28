@@ -136,9 +136,10 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // Keep a fixed model correction separate from user yaw. A half-turn around X
-            // corrects the exported face's reversed front/back and vertical orientation.
-            let axisCorrection = simd_quatf(angle: .pi, axis: [1, 0, 0])
+            // Model-02's GLB already defines its own mesh transforms. Do not rotate
+            // the entire imported hierarchy around X: that turns the face upward/downward.
+            // Keep the imported orientation neutral and apply only a vertical-axis yaw.
+            let axisCorrection = simd_quatf()
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
