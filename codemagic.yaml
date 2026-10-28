@@ -101,6 +101,22 @@ workflows:
           done
           echo "SUCCESS: All 8 transparent PNGs are bundled."
           
+      - name: Losslessly optimize transparent PNGs
+        script: |
+          set -eu
+          APP_IMAGE_DIR="build/Build/Products/Release-iphoneos/ChatAI.app/FaceExpressions"
+          if [ ! -d "$APP_IMAGE_DIR" ]; then
+            echo "ERROR: Bundled expression image folder not found: $APP_IMAGE_DIR"
+            exit 1
+          fi
+          brew install oxipng
+          echo "=== PNG sizes before lossless optimization ==="
+          du -ch "$APP_IMAGE_DIR"/*.png | tail -1
+          oxipng -o 4 --strip safe "$APP_IMAGE_DIR"/*.png
+          echo "=== PNG sizes after lossless optimization ==="
+          du -ch "$APP_IMAGE_DIR"/*.png | tail -1
+          echo "Lossless PNG optimization complete; pixel data and transparency are preserved."
+
       - name: Package IPA
         script: |
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
