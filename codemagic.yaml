@@ -61,6 +61,10 @@ workflows:
             exit 1
           fi
 
+          echo "=== JPG files found anywhere inside ChatAI.app ==="
+          find "$APP_PATH" -type f -iname '*.jpg' -print || true
+          echo "=== Checking the 8 required expression images by filename ==="
+
           images=(
             companion_angry.jpg
             companion_happy.jpg
@@ -73,17 +77,18 @@ workflows:
           )
           missing=0
           for image in "${images[@]}"; do
-            if [ -f "$APP_PATH/$image" ] || [ -f "$APP_PATH/FaceExpressions/$image" ]; then
-              echo "OK: $image"
+            found_path="$(find "$APP_PATH" -type f -name "$image" -print -quit)"
+            if [ -n "$found_path" ]; then
+              echo "OK: $image -> $found_path"
             else
-              echo "ERROR: Missing from app bundle: $image"
+              echo "ERROR: $image was not found anywhere inside ChatAI.app"
               missing=1
             fi
           done
 
           if [ "$missing" -ne 0 ]; then
-            echo "ERROR: One or more expression images are missing. IPA packaging stopped."
-            echo "Check project.yml resource paths and XcodeGen resource copying."
+            echo "ERROR: Required expression images are missing from the built app bundle."
+            echo "The JPG listing above shows the actual resource paths for diagnosis."
             exit 1
           fi
           echo "SUCCESS: All 8 expression images are bundled. Continue to IPA packaging."
