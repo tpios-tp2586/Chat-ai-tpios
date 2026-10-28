@@ -214,7 +214,7 @@ struct CompanionChatView: View {
             "companion_thinking.png", "companion_wink.png"]
         return names.map { name in
             let found = Bundle.main.url(forResource: name, withExtension: nil) != nil
-                || Bundle.main.url(forResource: String(name.dropLast(4)), withExtension: "jpg", subdirectory: "FaceExpressions") != nil
+                || Bundle.main.url(forResource: String(name.dropLast(4)), withExtension: "png", subdirectory: "FaceExpressions") != nil
             return "[IMAGE] \(name): \(found ? "OK" : "MISSING")"
         } + ["[IMAGE] Biểu cảm hiện tại: \(emotion.label)",
              "[VOICE] Trạng thái hiện tại: \(String(describing: liveManager.state))"]
