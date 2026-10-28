@@ -169,11 +169,18 @@ private struct CompanionRealityView: UIViewRepresentable {
                 let rootRotation = rootTransform.rotation
                 let rootScale = rootTransform.scale
                 let rootPosition = rootTransform.translation
-                let childTransforms = model.children.prefix(12).map { child in
-                    let t = child.transform
-                    return "\(child.name.isEmpty ? "<unnamed>" : child.name): pos=\(t.translation), rot=\(t.rotation), scale=\(t.scale)"
-                }.joined(separator: "\n")
-                let orientationDetails = "REALITYKIT_ROOT: pos=\(rootPosition), rot=\(rootRotation), scale=\(rootScale)\nREALITYKIT_CHILDREN:\n\(childTransforms)"
+                var hierarchyLines: [String] = []
+                func inspectEntity(_ entity: Entity, depth: Int) {
+                    guard hierarchyLines.count < 60 else { return }
+                    let t = entity.transform
+                    let b = entity.visualBounds(relativeTo: model)
+                    let indent = String(repeating: "  ", count: depth)
+                    let entityName = entity.name.isEmpty ? "<unnamed>" : entity.name
+                    hierarchyLines.append("\(indent)\(entityName): pos=\(t.translation), rot=\(t.rotation), scale=\(t.scale), boundsCenter=\(b.center), boundsSize=\(b.extents)")
+                    for child in entity.children { inspectEntity(child, depth: depth + 1) }
+                }
+                inspectEntity(model, depth: 0)
+                let orientationDetails = "REALITYKIT_ROOT: pos=\(rootPosition), rot=\(rootRotation), scale=\(rootScale)\nREALITYKIT_HIERARCHY (max 60 nodes):\n\(hierarchyLines.joined(separator: "\n"))"
                 let diagnostic = "[ChatAI-RIG] resource=\(url.lastPathComponent)\n\(animationStatus)\n\(mouthStatus)\n\(orientationDetails)\nUSDZ_\(rigDetails)"
                 onResult(true, diagnostic)
             }
