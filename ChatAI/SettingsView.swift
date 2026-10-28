@@ -219,14 +219,6 @@ struct ThemeAndModelView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 3) {
-                    themeTab("Chủ đề", 0)
-                    themeTab("Mô hình", 1)
-                }
-                .padding(3)
-                .background(Color.black.opacity(0.32), in: Capsule())
-                .overlay(Capsule().stroke(theme.accent.opacity(0.18), lineWidth: 1))
-
                 if tab == 0 { themeDesign } else { modelDesign }
             }
             .padding(.horizontal, 14)
@@ -234,7 +226,7 @@ struct ThemeAndModelView: View {
             .padding(.bottom, 22)
         }
         .background(theme.background.ignoresSafeArea())
-        .navigationTitle("Chủ đề & Mô hình")
+        .navigationTitle(tab == 0 ? "Chủ đề" : "Model AI")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .tint(theme.accent)
@@ -343,17 +335,6 @@ struct ThemeAndModelView: View {
             .background(theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(theme.accent.opacity(0.16), lineWidth: 1))
 
-            Text("Vai trò AI").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 2)
-            VStack(spacing: 0) {
-                roleRow("Bạn đồng hành", "Thân thiện · Tự nhiên · Hỗ trợ", selected: true)
-                roleRow("Trợ lý công việc", "Gọn gàng · Chính xác · Năng suất", selected: false)
-                roleRow("Chuyên gia", "Chuyên sâu · Phân tích", selected: false)
-                roleRow("Sáng tạo nội dung", "Ý tưởng · Viết · Biên tập", selected: false)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(theme.accent.opacity(0.16), lineWidth: 1))
         }
     }
 
