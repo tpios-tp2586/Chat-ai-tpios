@@ -13,8 +13,8 @@ targets:
     resources:
       # Add the GLB as an explicit bundle resource so XcodeGen copies it
       # into the app bundle instead of relying on directory-copy semantics.
-      - path: ChatAI/Resources/Companion/model-1792924579279.glb
-      - path: ChatAI/Resources/Companion/model-1792924579279.usdz
+      - path: ChatAI/Resources/Companion/Model-02.glb
+      - path: ChatAI/Resources/Companion/Model-02.usdz
     info:
       path: ChatAI-Info.plist
       properties:
