@@ -836,6 +836,7 @@ struct LiveCallView: View {
     @State private var showOptions = false
     @State private var showModelPicker = false
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var activeTheme: ChatAITheme {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium

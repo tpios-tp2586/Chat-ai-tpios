@@ -352,7 +352,7 @@ struct ThemeAndModelView: View {
             HStack {
                 Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer()
-                Text("\\(Int(value.wrappedValue * 100))%").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                Text("\(Int(value.wrappedValue * 100))%").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
             }
             Slider(value: value, in: range).tint(theme.accent)
         }

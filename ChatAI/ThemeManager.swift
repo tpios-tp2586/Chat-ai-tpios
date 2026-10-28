@@ -97,6 +97,7 @@ struct ChatAIThemeBackground: View {
     @AppStorage("chatAI.wallpaperDarkness") private var darkness = 0.55
     @AppStorage("chatAI.wallpaperBrightness") private var brightness = 1.0
     @AppStorage("chatAI.wallpaperSaturation") private var saturation = 1.0
+    @AppStorage(ChatAIThemeStore.wallpaperKey) private var wallpaperFilename = ""
     var body: some View {
         GeometryReader { proxy in
             ZStack {
