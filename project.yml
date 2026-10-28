@@ -23,7 +23,14 @@ targets:
         LSRequiresIPhoneOS: true
         NSMicrophoneUsageDescription: "Ứng dụng cần quyền micro để ghi âm giọng nói khi trò chuyện."
     resources:
-      - path: Reference/FaceExpressions
+  - path: Reference/FaceExpressions/companion_angry.jpg
+  - path: Reference/FaceExpressions/companion_happy.jpg
+  - path: Reference/FaceExpressions/companion_neutral.jpg
+  - path: Reference/FaceExpressions/companion_sleepy.jpg
+  - path: Reference/FaceExpressions/companion_speaking.jpg
+  - path: Reference/FaceExpressions/companion_surprised.jpg
+  - path: Reference/FaceExpressions/companion_thinking.jpg
+  - path: Reference/FaceExpressions/companion_wink.jpg
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: Speech.framework
