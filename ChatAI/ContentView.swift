@@ -42,6 +42,7 @@ struct ContentView: View {
     @State private var showFileImporter = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var activeTheme: ChatAITheme {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium
@@ -116,7 +117,7 @@ struct ContentView: View {
             }
             bottomNavigation
         }
-        .background(activeTheme.background.ignoresSafeArea())
+        .background { ChatAIThemeBackground(theme: activeTheme) }
         .foregroundStyle(.primary)
         .tint(activeTheme.accent)
         .preferredColorScheme(.dark)
@@ -707,7 +708,7 @@ struct HistoryView: View {
                     Rectangle().fill(activeTheme.accent.opacity(0.22)).frame(height: 0.7)
                 })
             }
-            .background(activeTheme.background.ignoresSafeArea())
+            .background { ChatAIThemeBackground(theme: activeTheme) }
             .foregroundStyle(.primary)
             .tint(activeTheme.accent)
             .preferredColorScheme(.dark)
@@ -885,7 +886,7 @@ struct MemoryView: View {
                 Rectangle().fill(activeTheme.accent.opacity(0.24)).frame(height: 0.7)
             })
         }
-        .background(activeTheme.background.ignoresSafeArea())
+        .background { ChatAIThemeBackground(theme: activeTheme) }
         .foregroundStyle(.primary)
         .tint(activeTheme.accent)
         .preferredColorScheme(.dark)

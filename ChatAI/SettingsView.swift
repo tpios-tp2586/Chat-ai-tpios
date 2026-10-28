@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -21,6 +23,7 @@ struct SettingsView: View {
     @AppStorage("voiceGender") private var voiceGenderRaw = VoiceGender.female.rawValue
     @AppStorage("autoMemoryV2") private var autoMemory = false
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     private var currentModel: String {
@@ -90,7 +93,7 @@ struct SettingsView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 18)
             }
-            .background(theme.background.ignoresSafeArea())
+            .background { ChatAIThemeBackground(theme: theme) }
             .foregroundStyle(.primary)
             .tint(theme.accent)
             .preferredColorScheme(.dark)
@@ -186,6 +189,12 @@ struct SettingsView: View {
 struct ThemeAndModelView: View {
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
     @AppStorage("chatAI.themeOpacity") private var themeOpacity = 0.70
+    @AppStorage("chatAI.wallpaperDarkness") private var wallpaperDarkness = 0.55
+    @AppStorage("chatAI.wallpaperBrightness") private var wallpaperBrightness = 1.0
+    @AppStorage("chatAI.wallpaperSaturation") private var wallpaperSaturation = 1.0
+    @AppStorage(ChatAIThemeStore.accentKey) private var accentHex = ""
+    @State private var wallpaperItem: PhotosPickerItem?
+    @State private var wallpaperError: String?
     @State private var tab: Int
 
     @Binding var openAIKey: String
@@ -225,7 +234,17 @@ struct ThemeAndModelView: View {
             .padding(.top, 10)
             .padding(.bottom, 22)
         }
-        .background(theme.background.ignoresSafeArea())
+        .background { ChatAIThemeBackground(theme: theme) }
+        .onChange(of: wallpaperItem) { item in
+            guard let item else { return }
+            Task {
+                guard let data = try? await item.loadTransferable(type: Data.self) else {
+                    wallpaperError = "Không đọc được ảnh đã chọn."
+                    return
+                }
+                wallpaperError = ChatAIThemeStore.saveWallpaper(data: data) ? nil : "Không thể lưu ảnh nền."
+            }
+        }
         .navigationTitle(tab == 0 ? "Chủ đề" : "Model AI")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
@@ -289,14 +308,8 @@ struct ThemeAndModelView: View {
 
             Text("Màu sắc").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary).padding(.top, 2)
             HStack(spacing: 13) {
-                paletteDot(theme.accent)
-                paletteDot(Color(red: 0.35, green: 0.16, blue: 0.11))
-                paletteDot(Color(red: 0.78, green: 0.73, blue: 0.66))
-                paletteDot(Color(red: 0.42, green: 0.30, blue: 0.82))
-                paletteDot(Color(red: 0.34, green: 0.60, blue: 0.48))
-                paletteDot(Color(red: 0.17, green: 0.17, blue: 0.19))
-                paletteDot(Color(red: 0.55, green: 0.55, blue: 0.57))
-                paletteDot(Color(red: 0.10, green: 0.10, blue: 0.11))
+                paletteDot("F05A36"); paletteDot("D98245"); paletteDot("C7BAA8"); paletteDot("6B4DD8")
+                paletteDot("579973"); paletteDot("2B2B30"); paletteDot("8C8C91"); paletteDot("1A1A1C")
             }
             .padding(.horizontal, 2)
 
@@ -311,11 +324,47 @@ struct ThemeAndModelView: View {
             .padding(12)
             .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.accent.opacity(0.14), lineWidth: 1))
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Ảnh nền toàn màn hình").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                PhotosPicker(selection: $wallpaperItem, matching: .images) {
+                    Label("Chọn ảnh từ thư viện", systemImage: "photo.on.rectangle.angled")
+                        .font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity).padding(12)
+                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                }.buttonStyle(.plain)
+                if ChatAIThemeStore.wallpaperURL != nil {
+                    Button("Xóa ảnh nền", role: .destructive) {
+                        if let url = ChatAIThemeStore.wallpaperURL { try? FileManager.default.removeItem(at: url) }
+                        UserDefaults.standard.removeObject(forKey: ChatAIThemeStore.wallpaperKey)
+                    }.font(.system(size: 12, weight: .medium))
+                }
+                if let wallpaperError { Text(wallpaperError).font(.system(size: 11)).foregroundStyle(.red) }
+                themeSlider("Lớp phủ tối", value: $wallpaperDarkness, range: 0...0.85)
+                themeSlider("Độ sáng", value: $wallpaperBrightness, range: 0.5...1.5)
+                themeSlider("Độ bão hòa", value: $wallpaperSaturation, range: 0...2)
+            }
+            .padding(12).background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.accent.opacity(0.14), lineWidth: 1))
         }
     }
 
-    private func paletteDot(_ color: Color) -> some View {
-        Circle().fill(color).frame(width: 22, height: 22).overlay(Circle().stroke(Color.white.opacity(0.22), lineWidth: 1))
+    private func themeSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Text("\\(Int(value.wrappedValue * 100))%").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: range).tint(theme.accent)
+        }
+    }
+
+    private func paletteDot(_ hex: String) -> some View {
+        let color = Color(hex: hex) ?? .white
+        return Button { accentHex = hex } label: {
+            Circle().fill(color).frame(width: 25, height: 25)
+                .overlay(Circle().stroke(Color.white.opacity(accentHex == hex ? 0.95 : 0.22), lineWidth: accentHex == hex ? 2 : 1))
+                .overlay { if accentHex == hex { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white) } }
+        }.buttonStyle(.plain).accessibilityLabel("Chọn màu nhấn")
     }
 
     private var modelDesign: some View {
@@ -467,7 +516,7 @@ struct ModelPickerView: View {
                     }
                 }
             }
-            .background(theme.background.ignoresSafeArea())
+            .background { ChatAIThemeBackground(theme: theme) }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .preferredColorScheme(.dark)

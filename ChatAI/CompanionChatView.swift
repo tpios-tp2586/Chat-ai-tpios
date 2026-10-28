@@ -10,6 +10,7 @@ struct CompanionChatView: View {
     @AppStorage("live_persona") private var livePersona = LivePersona.defaultText
     @AppStorage("live_barge_in") private var liveBargeIn = false
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var activeTheme: ChatAITheme {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium
@@ -22,14 +23,10 @@ struct CompanionChatView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: nightMode
-                    ? [.black, activeTheme.background]
-                    : [activeTheme.background, activeTheme.surface],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            ZStack {
+                ChatAIThemeBackground(theme: activeTheme)
+                if nightMode { Color.black.opacity(0.28).ignoresSafeArea() }
+            }
 
             VStack(spacing: 0) {
                 header

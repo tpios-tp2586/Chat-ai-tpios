@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Shared persisted theme selection for ChatAI.
 /// Existing chat, provider and voice logic remains independent of the selected theme.
@@ -29,6 +30,7 @@ enum ChatAITheme: String, CaseIterable, Identifiable {
     }
 
     var accent: Color {
+        if let hex = UserDefaults.standard.string(forKey: ChatAIThemeStore.accentKey), let custom = Color(hex: hex) { return custom }
         switch self {
         case .firePremium: return Color(red: 0.941, green: 0.353, blue: 0.212)
         case .sunrise: return Color(red: 1.0, green: 0.49, blue: 0.25)
@@ -59,9 +61,53 @@ enum ChatAITheme: String, CaseIterable, Identifiable {
 
 enum ChatAIThemeStore {
     static let storageKey = "chatAI.selectedTheme"
+    static let accentKey = "chatAI.customAccent"
+    static let wallpaperKey = "chatAI.wallpaperFilename"
+    static func saveWallpaper(data: Data) -> Bool {
+        guard let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.88),
+              let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
+        do {
+            try jpeg.write(to: directory.appendingPathComponent("ChatAI-wallpaper.jpg"), options: .atomic)
+            UserDefaults.standard.set("ChatAI-wallpaper.jpg", forKey: wallpaperKey)
+            return true
+        } catch { return false }
+    }
+    static var wallpaperURL: URL? {
+        guard let name = UserDefaults.standard.string(forKey: wallpaperKey), !name.isEmpty,
+              let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+        return directory.appendingPathComponent(name)
+    }
 
     static var current: ChatAITheme {
         ChatAITheme(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "")
             ?? .firePremium
+    }
+}
+
+extension Color {
+    init?(hex: String) {
+        let value = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        guard value.count == 6, let number = UInt64(value, radix: 16) else { return nil }
+        self.init(red: Double((number >> 16) & 255) / 255, green: Double((number >> 8) & 255) / 255, blue: Double(number & 255) / 255)
+    }
+}
+
+struct ChatAIThemeBackground: View {
+    let theme: ChatAITheme
+    @AppStorage("chatAI.wallpaperDarkness") private var darkness = 0.55
+    @AppStorage("chatAI.wallpaperBrightness") private var brightness = 1.0
+    @AppStorage("chatAI.wallpaperSaturation") private var saturation = 1.0
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                theme.background
+                if let url = ChatAIThemeStore.wallpaperURL, let image = UIImage(contentsOfFile: url.path) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height).clipped()
+                        .saturation(saturation).brightness(brightness - 1)
+                    Color.black.opacity(darkness)
+                }
+            }.frame(width: proxy.size.width, height: proxy.size.height).clipped()
+        }.ignoresSafeArea()
     }
 }

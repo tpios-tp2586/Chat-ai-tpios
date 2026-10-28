@@ -767,6 +767,7 @@ struct LiveCallButton: View {
     @State private var showSheet = false
     @State private var messagesBeforeCall: [ChatMessage] = []
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var activeTheme: ChatAITheme {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium
@@ -884,7 +885,7 @@ struct LiveCallView: View {
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
             }
-            .background(activeTheme.background.ignoresSafeArea())
+            .background { ChatAIThemeBackground(theme: activeTheme) }
             .tint(activeTheme.accent)
             .preferredColorScheme(.dark)
             .navigationTitle("Trò chuyện chibi")
@@ -899,7 +900,7 @@ struct LiveCallView: View {
             .sheet(isPresented: $showOptions) {
                 NavigationStack {
                     ScrollView { optionsBody.padding() }
-                        .background(activeTheme.background.ignoresSafeArea())
+                        .background { ChatAIThemeBackground(theme: activeTheme) }
                         .navigationTitle("Cài đặt giọng nói")
                         .tint(activeTheme.accent)
                         .preferredColorScheme(.dark)
