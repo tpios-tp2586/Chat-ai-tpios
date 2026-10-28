@@ -338,6 +338,17 @@ struct ThemeAndModelView: View {
         }
     }
 
+    private func fetchModels(for provider: AIProviderKind, apiKey: String) async throws -> [String] {
+        switch provider {
+        case .openAI: return try await OpenAIModelFetcher.fetchModels(apiKey: apiKey)
+        case .anthropic: return try await AnthropicModelFetcher.fetchModels(apiKey: apiKey)
+        case .gemini: return try await GeminiModelFetcher.fetchModels(apiKey: apiKey)
+        case .grok: return try await GrokModelFetcher.fetchModels(apiKey: apiKey)
+        case .deepseek: return try await DeepSeekModelFetcher.fetchModels(apiKey: apiKey)
+        case .groq: return try await GroqModelFetcher.fetchModels(apiKey: apiKey)
+        }
+    }
+
     private func modelRow(_ provider: AIProviderKind, subtitle: String, model: Binding<String>, key: Binding<String>) -> some View {
         VStack(spacing: 0) {
             Button {
@@ -367,9 +378,17 @@ struct ThemeAndModelView: View {
                         .padding(.horizontal, 9)
                         .frame(height: 32)
                         .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    Button("Mặc định") { model.wrappedValue = provider.defaultModel }
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(theme.accent)
+                    NavigationLink {
+                        ModelPickerView(
+                            title: "Chọn model",
+                            currentModel: model,
+                            fetch: { try await fetchModels(for: provider, apiKey: key.wrappedValue) }
+                        )
+                    } label: {
+                        Text("Tải model")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(theme.accent)
+                    }
                 }
                 .padding(.bottom, 8)
             }
