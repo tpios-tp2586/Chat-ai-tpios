@@ -86,7 +86,7 @@ struct CompanionChatView: View {
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
         .onChange(of: liveManager.lines.count) { _ in
             guard let line = liveManager.lines.last else { return }
-            addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \\(line.role)")
+            addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
             message = line.text
             withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
                 // Keep the conversational emotion while the mouth animation runs.
@@ -94,7 +94,7 @@ struct CompanionChatView: View {
             }
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
-            addDiagnostic("[VOICE] AI đang nói: \\(speaking)")
+            addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
                     // Speech is a mouth animation, not a facial emotion.
@@ -107,7 +107,7 @@ struct CompanionChatView: View {
             }
         }
         .onChange(of: liveManager.state) { state in
-            addDiagnostic("[VOICE] Trạng thái: \\(String(describing: state))")
+            addDiagnostic("[VOICE] Trạng thái: \(String(describing: state))")
             guard !liveManager.aiSpeaking else { return }
             switch state {
             case .idle:
@@ -187,14 +187,14 @@ struct CompanionChatView: View {
                 Text("Ghi trạng thái giọng nói và kiểm tra ảnh biểu cảm. Không ghi API key.")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView {
-                    Text((diagnosticLogs + imageDiagnosticLines).joined(separator: "\\n"))
+                    Text((diagnosticLogs + imageDiagnosticLines).joined(separator: "\n"))
                         .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled).padding(12)
                         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 }
                 Button {
-                    UIPasteboard.general.string = (diagnosticLogs + imageDiagnosticLines).joined(separator: "\\n")
+                    UIPasteboard.general.string = (diagnosticLogs + imageDiagnosticLines).joined(separator: "\n")
                 } label: {
                     Label("Sao chép log", systemImage: "doc.on.doc")
                         .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -215,14 +215,14 @@ struct CompanionChatView: View {
         return names.map { name in
             let found = Bundle.main.url(forResource: name, withExtension: nil) != nil
                 || Bundle.main.url(forResource: String(name.dropLast(4)), withExtension: "jpg", subdirectory: "FaceExpressions") != nil
-            return "[IMAGE] \\(name): \\(found ? "OK" : "MISSING")"
-        } + ["[IMAGE] Biểu cảm hiện tại: \\(emotion.label)",
-             "[VOICE] Trạng thái hiện tại: \\(String(describing: liveManager.state))"]
+            return "[IMAGE] \(name): \(found ? "OK" : "MISSING")"
+        } + ["[IMAGE] Biểu cảm hiện tại: \(emotion.label)",
+             "[VOICE] Trạng thái hiện tại: \(String(describing: liveManager.state))"]
     }
 
     private func addDiagnostic(_ line: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        diagnosticLogs.append("[\\(timestamp)] \\(line)")
+        diagnosticLogs.append("[\(timestamp)] \(line)")
         if diagnosticLogs.count > 150 { diagnosticLogs.removeFirst(diagnosticLogs.count - 150) }
     }
 
@@ -1031,7 +1031,7 @@ private struct CompanionExpressionImage: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .accessibilityLabel("Biểu cảm: \\(emotion.label)")
+                    .accessibilityLabel("Biểu cảm: \(emotion.label)")
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "person.crop.rectangle")
