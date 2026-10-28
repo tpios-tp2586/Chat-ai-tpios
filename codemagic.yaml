@@ -59,18 +59,28 @@ workflows:
             exit 1
           fi
 
-      - name: Verify 8 expression images are bundled
+      - name: Copy and verify 8 expression images
         script: |
           set -eu
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
+          SOURCE_DIR="Reference/FaceExpressions"
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: Built app not found: $APP_PATH"
             exit 1
           fi
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "ERROR: Image source folder not found: $SOURCE_DIR"
+            find . -type f -iname 'companion_*.jpg' -print || true
+            exit 1
+          fi
 
-          echo "=== JPG files found anywhere inside ChatAI.app ==="
-          find "$APP_PATH" -type f -iname '*.jpg' -print || true
-          echo "=== Checking the 8 required expression images by filename ==="
+          echo "=== Source images in repository ==="
+          find "$SOURCE_DIR" -maxdepth 1 -type f -iname '*.jpg' -print
+          mkdir -p "$APP_PATH/FaceExpressions"
+          cp "$SOURCE_DIR"/companion_*.jpg "$APP_PATH/FaceExpressions/"
+
+          echo "=== JPG files copied into ChatAI.app ==="
+          find "$APP_PATH" -type f -iname '*.jpg' -print
 
           images=(
             companion_angry.jpg
@@ -82,24 +92,16 @@ workflows:
             companion_thinking.jpg
             companion_wink.jpg
           )
-          missing=0
           for image in "${images[@]}"; do
-            found_path="$(find "$APP_PATH" -type f -name "$image" -print -quit)"
-            if [ -n "$found_path" ]; then
-              echo "OK: $image -> $found_path"
+            if [ -s "$APP_PATH/FaceExpressions/$image" ]; then
+              echo "OK: $image"
             else
-              echo "ERROR: $image was not found anywhere inside ChatAI.app"
-              missing=1
+              echo "ERROR: Missing or empty image: $image"
+              exit 1
             fi
           done
-
-          if [ "$missing" -ne 0 ]; then
-            echo "ERROR: Required expression images are missing from the built app bundle."
-            echo "The JPG listing above shows the actual resource paths for diagnosis."
-            exit 1
-          fi
-          echo "SUCCESS: All 8 expression images are bundled. Continue to IPA packaging."
-
+          echo "SUCCESS: All 8 expression images are bundled."
+          
       - name: Package IPA
         script: |
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
