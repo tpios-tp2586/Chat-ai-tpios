@@ -45,8 +45,8 @@ struct CompanionChatView: View {
                         .gesture(
                             DragGesture(minimumDistance: 8)
                                 .onChanged { value in
-                                    let rotation = Float(value.translation.width / 180)
-                                    headRotation = max(-0.66, min(0.66, rotation))
+                                    // One view-width of horizontal dragging represents a full 360-degree turn.
+                                    headRotation = Float(value.translation.width / max(proxy.size.width, 1)) * 2 * .pi
                                 }
                                 .onEnded { _ in
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
@@ -229,6 +229,8 @@ struct CompanionChatView: View {
     }
 
     private func startLive() {
+        // Start each voice conversation facing the camera, without carrying over a prior turn.
+        headRotation = 0
         liveManager.start(
             model: liveModel,
             voice: liveVoice,

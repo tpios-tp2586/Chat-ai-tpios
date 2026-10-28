@@ -136,10 +136,9 @@ private struct CompanionRealityView: UIViewRepresentable {
             }
             let normalizedScale: Float = 1.55 / largestDimension
             model.scale = SIMD3<Float>(repeating: normalizedScale)
-            // Model-02's current export is tilted relative to RealityKit's camera.
-            // Correct the vertical axis only; do not add the 180-degree Z flip,
-            // which previously exposed the back of the face.
-            let axisCorrection = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
+            // Keep a fixed model correction separate from user yaw. A half-turn around X
+            // corrects the exported face's reversed front/back and vertical orientation.
+            let axisCorrection = simd_quatf(angle: .pi, axis: [1, 0, 0])
             model.orientation = axisCorrection
             model.position = -(axisCorrection.act(bounds.center) * normalizedScale)
             scene.addChild(model)
