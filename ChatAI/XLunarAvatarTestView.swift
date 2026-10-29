@@ -42,6 +42,7 @@ private struct XLunarWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.navigationDelegate = context.coordinator
+        context.coordinator.webView = webView
         webView.load(URLRequest(url: URL(string: "https://xlunar-ai-avatar.vercel.app/")!))
         NotificationCenter.default.addObserver(
             context.coordinator,
@@ -59,9 +60,10 @@ private struct XLunarWebView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
+        weak var webView: WKWebView?
+
         @objc func reload() {
-            // The notification is received by the coordinator; actual reload is handled by
-            // the web view's navigation lifecycle in this initial test surface.
+            webView?.reload()
         }
     }
 }
