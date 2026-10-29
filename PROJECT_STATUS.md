@@ -19,8 +19,5 @@ Phát triển avatar cô gái AI 3D trong ChatAI, tách biệt hợp lý với g
 - Không tích hợp thử nghiệm vào luồng chat chính cho đến khi có demo chạy được và được kiểm tra.
 
 ## Quy trình mở chat mới
-Dán đoạn sau vào chat mới:
+Tiếp tục dự án ChatAI từ repo https://github.com/tpios-tp2586/Chat-ai-tpios. Trước tiên đọc PROJECT_STATUS.md
 
-> Tiếp tục dự án ChatAI từ repo https://github.com/tpios-tp2586/Chat-ai-tpios. Trước tiên đọc PROJECT_STATUS.md
-- Tạo tài liệu bàn giao tập trung để chat mới nắm mục tiêu, quy tắc và bước tiếp theo.
-- Chưa thực hiện thay đổi code ứng dụng trong lần cập nhật tài liệu này.
