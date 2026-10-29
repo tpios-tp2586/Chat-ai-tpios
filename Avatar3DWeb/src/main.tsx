@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Canvas } from "@react-three/fiber";
 import { AvatarStage, AvatarSpeechScene, getExpressionById } from "../../xlunar-source/src/lib/avatar";
 import "./style.css";
 
@@ -14,17 +13,14 @@ function App() {
     <main className="screen">
       <header><span className="orb">✦</span><div><strong>ChatAI 3D</strong><small>Avatar riêng · chạy cục bộ</small></div></header>
       <section className="stage">
-        <Canvas camera={{ position: [0, 1.35, 2.8], fov: 35 }} dpr={[1, 1.5]}>
-          <color attach="background" args={["#151820"]} />
-          <AvatarStage stage={{ backgroundColor: "#151820", ambientLightIntensity: 0.8, directionalLightIntensity: 1 }} camera={{ position: [0, 1.35, 2.8], fov: 35, controlsTarget: [0, 1.05, 0], enableZoom: false, enablePan: false, enableRotate: true }}>
-            <AvatarSpeechScene
-              appearance={{ modelUrl: "./models/Aisa.vrm" }}
-              audioRef={audioRef}
-              expression={getExpressionById(expression)}
-              onLoad={() => { setReady(true); setLoadError(""); }}
-            />
-          </AvatarStage>
-        </Canvas>
+        <AvatarStage stage={{ backgroundColor: "#151820", ambientLightIntensity: 0.8, directionalLightIntensity: 1 }} camera={{ position: [0, 1.35, 2.8], fov: 35, controlsTarget: [0, 1.05, 0], enableZoom: false, enablePan: false, enableRotate: true }}>
+          <AvatarSpeechScene
+            appearance={{ modelUrl: "./models/Aisa.vrm" }}
+            audioRef={audioRef}
+            expression={getExpressionById(expression)}
+            onLoad={() => { setReady(true); setLoadError(""); }}
+          />
+        </AvatarStage>
         {!ready && !loadError && <div className="status">Đang tải mô hình 3D…</div>}
         {loadError && <div className="error">{loadError}</div>}
       </section>
