@@ -22,8 +22,6 @@ targets:
           - UIInterfaceOrientationPortrait
         LSRequiresIPhoneOS: true
         NSMicrophoneUsageDescription: "Ứng dụng cần quyền micro để ghi âm giọng nói khi trò chuyện."
-    resources:
-      - path: ChatAI/Avatar3DBundle
     dependencies:
       - sdk: AVFoundation.framework
       - sdk: Speech.framework
