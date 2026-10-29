@@ -11,6 +11,9 @@ targets:
         excludes:
           - Resources/**
           - ChatAIHead3DView.swift
+    resources:
+      - path: Reference/FaceExpressions
+        type: folder
     info:
       path: ChatAI-Info.plist
       properties:
