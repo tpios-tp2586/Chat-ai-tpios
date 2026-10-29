@@ -8,6 +8,7 @@ function App() {
   const [expression, setExpression] = useState("neutral");
   const [loadError, setLoadError] = useState("");
   const [ready, setReady] = useState(false);
+  const expressionLabels: Record<string, string> = { neutral: "Bình thường", happy: "Vui", thinking: "Suy nghĩ", surprised: "Ngạc nhiên", shy: "Ngại" };
 
   return (
     <main className="screen">
@@ -27,7 +28,7 @@ function App() {
       <nav className="expressions">
         {["neutral", "happy", "thinking", "surprised", "shy"].map((id) =>
           <button className={expression === id ? "selected" : ""} key={id} onClick={() => setExpression(id)}>
-            {{neutral:"Bình thường",happy:"Vui",thinking:"Suy nghĩ",surprised:"Ngạc nhiên",shy:"Ngại"}[id]}
+            {expressionLabels[id]}
           </button>
         )}
       </nav>
