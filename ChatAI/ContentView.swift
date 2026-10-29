@@ -35,6 +35,7 @@ struct ContentView: View {
     @State private var showMemory = false
     @State private var showProviderMenu = false
     @State private var showCompanion = false
+    @State private var showXLunarAvatarTest = false
     @State private var showAttachmentMenu = false
     @State private var showMoreAttachmentOptions = false
     @State private var showPhotoPicker = false
@@ -123,6 +124,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
+        .fullScreenCover(isPresented: $showXLunarAvatarTest) { XLunarAvatarTestView() }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
         .sheet(isPresented: $showMemory) { MemoryView() }
         .sheet(isPresented: $showCamera) {
@@ -249,6 +251,19 @@ struct ContentView: View {
             Spacer(minLength: 4)
 
             LiveCallButton(viewModel: viewModel)
+
+            Button { showXLunarAvatarTest = true } label: {
+                Image(systemName: "cube.transparent")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(activeTheme.accent)
+                    .frame(width: 40, height: 40)
+                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(activeTheme.accent.opacity(0.25), lineWidth: 1)
+                    }
+            }
+            .accessibilityLabel("Mở XLunar 3D Lab")
 
             Button { showCompanion = true } label: {
                 ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
