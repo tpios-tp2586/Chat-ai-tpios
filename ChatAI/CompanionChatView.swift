@@ -35,7 +35,7 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        CompanionExpressionImage(emotion: emotion)
+                        ApprovedRobotHead(emotion: emotion, isSpeaking: liveManager.aiSpeaking, onTap: {})
                         .frame(
                             width: min(proxy.size.width - 12, 410),
                             height: min(proxy.size.height * 0.72, 450)
@@ -192,14 +192,14 @@ struct CompanionChatView: View {
                 Text("Ghi trạng thái giọng nói và kiểm tra ảnh biểu cảm. Không ghi API key.")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView {
-                    Text((diagnosticLogs + imageDiagnosticLines).joined(separator: "\n"))
+                    Text(diagnosticLogs.joined(separator: "\n"))
                         .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled).padding(12)
                         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 }
                 Button {
-                    UIPasteboard.general.string = (diagnosticLogs + imageDiagnosticLines).joined(separator: "\n")
+                    UIPasteboard.general.string = diagnosticLogs.joined(separator: "\n")
                 } label: {
                     Label("Sao chép log", systemImage: "doc.on.doc")
                         .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -211,18 +211,6 @@ struct CompanionChatView: View {
                     Button("Đóng") { showDiagnosticLog = false }
                 } }
         }
-    }
-
-    private var imageDiagnosticLines: [String] {
-        let names = ["companion_angry.png", "companion_happy.png", "companion_neutral.png",
-            "companion_sleepy.png", "companion_speaking.png", "companion_surprised.png",
-            "companion_thinking.png", "companion_wink.png"]
-        return names.map { name in
-            let found = Bundle.main.url(forResource: name, withExtension: nil) != nil
-                || Bundle.main.url(forResource: String(name.dropLast(4)), withExtension: "png", subdirectory: "FaceExpressions") != nil
-            return "[IMAGE] \(name): \(found ? "OK" : "MISSING")"
-        } + ["[IMAGE] Biểu cảm hiện tại: \(emotion.label)",
-             "[VOICE] Trạng thái hiện tại: \(String(describing: liveManager.state))"]
     }
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
