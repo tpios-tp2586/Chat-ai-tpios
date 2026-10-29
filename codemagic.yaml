@@ -39,6 +39,7 @@ workflows:
           cp xlunar-source/public/models/Aisa.vrm Avatar3DWeb/public/models/Aisa.vrm
           cd Avatar3DWeb
           npm install
+          ln -s "$PWD/node_modules" ../node_modules
           npm run build
           cd ..
           mkdir -p ChatAI/Avatar3DBundle
