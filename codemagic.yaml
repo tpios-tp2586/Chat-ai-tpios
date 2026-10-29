@@ -31,6 +31,20 @@ workflows:
           sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
           sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
 
+      - name: Build bundled XLunar avatar engine
+        script: |
+          set -e
+          git clone --depth 1 https://github.com/iamenahs/xlunar-ai-avatar.git xlunar-source
+          mkdir -p Avatar3DWeb/public/models
+          cp xlunar-source/public/models/Aisa.vrm Avatar3DWeb/public/models/Aisa.vrm
+          cd Avatar3DWeb
+          npm install
+          npm run build
+          cd ..
+          mkdir -p ChatAI/Avatar3DBundle
+          cp -R Avatar3DWeb/dist/. ChatAI/Avatar3DBundle/
+          echo "Bundled local avatar engine and starter VRM model."
+
       - name: Generate Xcode project
         script: xcodegen generate
 
