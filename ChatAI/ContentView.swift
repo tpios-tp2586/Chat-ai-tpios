@@ -253,8 +253,8 @@ struct ContentView: View {
             LiveCallButton(viewModel: viewModel)
 
             Button { showXLunarAvatarTest = true } label: {
-                Image(systemName: "cube.transparent")
-                    .font(.system(size: 17, weight: .semibold))
+                Image(systemName: "person.3d")
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 40, height: 40)
                     .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -263,7 +263,7 @@ struct ContentView: View {
                             .stroke(activeTheme.accent.opacity(0.25), lineWidth: 1)
                     }
             }
-            .accessibilityLabel("Mở XLunar 3D Lab")
+            .accessibilityLabel("Mở khung chat 3D")
 
             Button { showCompanion = true } label: {
                 ChatAICustomIcon(kind: .companion, color: activeTheme.accent, theme: activeTheme)
