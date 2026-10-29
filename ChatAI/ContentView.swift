@@ -253,7 +253,7 @@ struct ContentView: View {
             LiveCallButton(viewModel: viewModel)
 
             Button { showXLunarAvatarTest = true } label: {
-                Image(systemName: "person.3d")
+                Image(systemName: "cube.fill")
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 40, height: 40)
