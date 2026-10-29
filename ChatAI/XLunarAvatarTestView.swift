@@ -9,7 +9,7 @@ struct XLunarAvatarTestView: View {
         NavigationStack {
             XLunarWebView()
                 .ignoresSafeArea(edges: .bottom)
-                .navigationTitle("XLunar 3D Lab")
+                .navigationTitle("ChatAI 3D")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -37,13 +37,19 @@ private struct XLunarWebView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView(frame: .zero)
-        webView.backgroundColor = UIColor.black
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.backgroundColor = UIColor(red: 0.06, green: 0.07, blue: 0.09, alpha: 1)
         webView.isOpaque = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
-        webView.load(URLRequest(url: URL(string: "https://xlunar-ai-avatar.vercel.app/")!))
+        if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Avatar3DBundle") {
+            webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
+        } else {
+            webView.loadHTMLString("3D engine bundle missing. Rebuild with Codemagic.", baseURL: nil)
+        }
         NotificationCenter.default.addObserver(
             context.coordinator,
             selector: #selector(Coordinator.reload),
