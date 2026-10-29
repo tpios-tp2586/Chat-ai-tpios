@@ -17,7 +17,3 @@ Phát triển avatar cô gái AI 3D trong ChatAI, tách biệt hợp lý với g
 - Đồng bộ cử chỉ với TTS/nội dung câu trả lời; tránh chuyển động ngẫu nhiên, lặp lại hoặc máy móc.
 - Khẩu hình đồng bộ giọng nói vẫn là mục tiêu quan trọng; gương mặt ban đầu có thể đơn giản với mắt, miệng và biểu cảm cơ bản.
 - Không tích hợp thử nghiệm vào luồng chat chính cho đến khi có demo chạy được và được kiểm tra.
-
-## Quy trình mở chat mới
-Tiếp tục dự án ChatAI từ repo https://github.com/tpios-tp2586/Chat-ai-tpios. Trước tiên đọc PROJECT_STATUS.md
-
