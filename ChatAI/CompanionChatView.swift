@@ -35,7 +35,7 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        ApprovedRobotHead(emotion: emotion, isSpeaking: liveManager.aiSpeaking, onTap: {})
+                        CompanionExpressionImage(emotion: emotion)
                         .frame(
                             width: min(proxy.size.width - 12, 410),
                             height: min(proxy.size.height * 0.72, 450)
@@ -84,6 +84,16 @@ struct CompanionChatView: View {
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
+        .onAppear {
+            let folder = Bundle.main.bundleURL.appendingPathComponent("FaceExpressions")
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+            let imageCount = names.filter { $0.lowercased().hasSuffix(".png") }.count
+            addDiagnostic("[ASSET] FaceExpressions path: \(folder.path)")
+            addDiagnostic("[ASSET] PNG found: \(imageCount)/8")
+            if imageCount == 0 {
+                addDiagnostic("[ERROR] Không tìm thấy ảnh trong bundle; kiểm tra cấu hình XcodeGen resources.")
+            }
+        }
         .onChange(of: liveManager.lines.count) { _ in
             guard let line = liveManager.lines.last else { return }
             addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
@@ -247,8 +257,7 @@ struct CompanionChatView: View {
 
             Button {
                 if liveManager.state == .idle {
-                    startLive()
-                }
+                    startLive()                }
             } label: {
                 Label(
                     liveManager.state == .live
@@ -497,8 +506,7 @@ private struct ApprovedRobotHead: View {
                     speaking: isSpeaking,
                     open: mouthOpen
                 )
-                .position(x: 205 * scale, y: 294 * scale)
-            }
+                .position(x: 205 * scale, y: 294 * scale)            }
             .frame(width: 410 * scale, height: 450 * scale)
             .offset(y: floating ? -3 * scale : 3 * scale)
             .rotation3DEffect(
@@ -747,8 +755,7 @@ private struct ConceptEye: View {
                     LinearGradient(
                         colors: [Color(red: 0.08, green: 0.72, blue: 0.82), Color(red: 0.01, green: 0.25, blue: 0.34)],
                         startPoint: .top,
-                        endPoint: .bottom
-                    )
+                        endPoint: .bottom                    )
                 )
                 .frame(width: width * 0.70 * scale, height: height * 0.78 * scale)
                 .offset(x: pupilOffset * scale)
@@ -997,8 +1004,7 @@ private struct FinShape: Shape {
             control2: CGPoint(x: w * 0.35, y: h * 0.00)
         )
         p.closeSubpath()
-        return p
-    }
+        return p    }
 }
 
 
