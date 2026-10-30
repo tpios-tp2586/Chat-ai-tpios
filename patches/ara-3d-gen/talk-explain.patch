@@ -1,9 +1,11 @@
 diff --git a/src/core/anim/clips/emotes.ts b/src/core/anim/clips/emotes.ts
 --- a/src/core/anim/clips/emotes.ts
 +++ b/src/core/anim/clips/emotes.ts
-@@ -99,4 +99,27 @@
-       },
-     };
+@@
+ export const talk: Clip = {
+   id: 'talk', name: 'Talk', category: 'Emotes', duration: TALK_LEN, loop: true,
+   sample: (t) => {
+@@
    },
  };
 +
@@ -33,11 +35,10 @@ diff --git a/src/core/anim/clips/emotes.ts b/src/core/anim/clips/emotes.ts
 diff --git a/src/core/anim/clips/index.ts b/src/core/anim/clips/index.ts
 --- a/src/core/anim/clips/index.ts
 +++ b/src/core/anim/clips/index.ts
-@@ -9,1 +9,1 @@
+@@
 -import { cheer, laugh, talk, wave } from './emotes';
 +import { cheer, laugh, talk, talkExplain, wave } from './emotes';
-@@ -57,4 +57,5 @@
-     cheer,
+@@
      laugh,
      talk,
 +    talkExplain,
@@ -45,7 +46,7 @@ diff --git a/src/core/anim/clips/index.ts b/src/core/anim/clips/index.ts
 diff --git a/src/core/anim/clips/faces.ts b/src/core/anim/clips/faces.ts
 --- a/src/core/anim/clips/faces.ts
 +++ b/src/core/anim/clips/faces.ts
-@@ -55,5 +55,10 @@
+@@
    talk: (t) => {
      const st = speechStress(t);
      return { ...speechFace(t), browInnerUp: 0.25 * st, browOuterUpLeft: 0.3 * st, browOuterUpRight: 0.3 * st };
