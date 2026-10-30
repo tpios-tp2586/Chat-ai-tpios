@@ -19,6 +19,7 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var avatarClip: AraAvatarView.Clip = .idle
+    @State private var didTriggerExplainGesture = false
     @State private var message: String?
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
@@ -77,22 +78,22 @@ struct CompanionChatView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
         .onChange(of: liveManager.lines.count) { _ in
-            guard let line = liveManager.lines.last else { return }
-            addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
-            message = line.text
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
-                if line.role == .user {
-                    // Anh đang nói: giữ gương mặt trung tính/chăm chú.
-                    emotion = .listening
-                } else {
-                    // Chỉ chọn cảm xúc khi có tín hiệu rõ trong câu trả lời.
-                    emotion = emotionForAssistantText(line.text)
-                }
+            didTriggerExplainGesture = false
+            if let line = liveManager.lines.last {
+                addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
             }
+            handleLatestTranscript()
+        }
+        .onChange(of: liveManager.lines.last?.text) { _ in
+            handleLatestTranscript()
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             avatarClip = speaking ? .talk : .idle
+            if speaking {
+                didTriggerExplainGesture = false
+                handleLatestTranscript()
+            }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
                     // Speech is a mouth animation, not a facial emotion.
@@ -115,7 +116,7 @@ struct CompanionChatView: View {
             case .live:
                 emotion = .listening
                 avatarClip = .wave
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                     if liveManager.state == .live && !liveManager.aiSpeaking { avatarClip = .idle }
                 }
             }
@@ -208,6 +209,38 @@ struct CompanionChatView: View {
                     Button("Đóng") { showDiagnosticLog = false }
                 } }
         }
+    }
+
+    private func handleLatestTranscript() {
+        guard let line = liveManager.lines.last else { return }
+        message = line.text
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
+            emotion = line.role == .user ? .listening : emotionForAssistantText(line.text)
+        }
+
+        guard line.role == .assistant,
+              liveManager.aiSpeaking,
+              !didTriggerExplainGesture,
+              hasExplainCue(line.text) else { return }
+
+        didTriggerExplainGesture = true
+        avatarClip = .talkExplain
+        addDiagnostic("[ARA] TalkExplain triggered from assistant transcript")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+            if liveManager.aiSpeaking && avatarClip == .talkExplain {
+                avatarClip = .talk
+            }
+        }
+    }
+
+    private func hasExplainCue(_ text: String) -> Bool {
+        let value = text.lowercased()
+        let cues = [
+            "để em giải thích", "để em nói rõ", "đầu tiên", "ví dụ",
+            "cụ thể là", "tóm lại", "quan trọng là",
+            "let me explain", "for example", "in summary"
+        ]
+        return cues.contains(where: value.contains)
     }
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
