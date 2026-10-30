@@ -132,3 +132,5 @@
 3. Thiết kế mapping rõ ràng giữa trạng thái nghe/suy nghĩ/nói/chào và các clip thực có trong USDZ; không gọi các mood UI là biểu cảm 3D khi chưa có mapping.
 4. Đánh giá riêng phương án cho happy/surprised và gesture nghe/suy nghĩ; hiện chưa có animation phù hợp được nối vào runtime.
 5. Không sửa voice pipeline, Text Chat, Chibi Chat hoặc asset animation khi chưa xác định clip/rig cần dùng. Ưu tiên sửa tối thiểu và kiểm tra bằng log trên iPhone.
+
+- Bổ sung sau khi rà thứ tự cập nhật SwiftUI: có trường hợp `onChange(of: clip)` không nhận được trạng thái trung gian `.talk`. Trong cùng callback `aiSpeaking = true`, code gán `.talk` rồi gọi `handleLatestTranscript()`; nếu transcript đã có cue, hàm này gán ngay `.talkExplain`. SwiftUI có thể render giá trị cuối cùng `.talkExplain` và bỏ qua trạng thái `.talk`, vì vậy logic reset góc nhìn đang gắn riêng với `newClip == .talk` không bảo đảm chạy ở mọi lượt nói. Nên chuyển reset về tín hiệu bắt đầu nói độc lập với lựa chọn clip (ví dụ token/reset event), nhưng chưa sửa trong lượt audit này.
