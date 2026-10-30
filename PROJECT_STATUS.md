@@ -78,7 +78,7 @@
 - Đã cập nhật pipeline trên `main` để tạo một animation tuần tự 14s, xuất manifest `animation-timeline.json`, yêu cầu USDZ có đúng `skelAnimations: 1` và `endTimeCode: 420`; upload/release kèm manifest.
 - `AraAvatarView.swift` đã chuyển sang đọc manifest và tạo các `AnimationResource` bằng `AnimationView` từ resource `global scene animation`; có kiểm tra thời lượng USDZ trước khi tạo clip.
 - `codemagic.yaml` đã kiểm tra và bundle cả `Ara-Avatar.usdz` lẫn `animation-timeline.json`; ZIP chỉ là file tạm nội bộ, artifact build vẫn chỉ là IPA.
-- Các commit sửa mới trên `main`: script `172c87f4c7ebc51902cdda8c6e851dfb5e153f6e`; workflow `971b16f1ab5486c182c01d9eb56bbed59b7a9cfa`; Swift `b0f084852d6009f8f66824524eda9e1c5f82aa39`; Codemagic `f2d7abfe68602b32f74733d47d8ad48f9d776872`.
+- Các commit sửa mới trên `main`: script timeline `172c87f4c7ebc51902cdda8c6e851dfb5e153f6e` và kiểm tra metadata track `f73ba809c1f3dd8a7d564a84dc76b29dd99e29da`; workflow `971b16f1ab5486c182c01d9eb56bbed59b7a9cfa`; Swift `b0f084852d6009f8f66824524eda9e1c5f82aa39`; Codemagic `f2d7abfe68602b32f74733d47d8ad48f9d776872`.
 - Đã test script ghép timeline trực tiếp trên GLB artifact thật: tạo một animation `AraConversation`, 71 channels, tổng 14.0s; manifest có đúng các khoảng Idle 0–3.2s, Wave 3.2001–4.8s, Talk 4.8001–11.2s, TalkExplain 11.2001–14.0s. Kiểm tra header GLB và cấu trúc channel thành công.
 - Chưa chạy lại GitHub Actions vì connector hiện không có thao tác dispatch workflow; thay đổi conversion chưa được xác minh trên macOS/usdzconvert. Chưa build Codemagic hoặc test IPA mới.
 
