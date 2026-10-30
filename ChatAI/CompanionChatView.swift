@@ -20,6 +20,10 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var avatarClip: AraAvatarView.Clip = .idle
     @State private var didTriggerExplainGesture = false
+    @State private var previousAssistantLineIDForTurn: UUID?
+    @State private var explainGestureGeneration = UUID()
+    @State private var explainGestureTask: Task<Void, Never>?
+    @State private var speechStartToken = 0
     @State private var message: String?
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
@@ -37,7 +41,7 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        AraAvatarView(clip: avatarClip) { log in
+                        AraAvatarView(clip: avatarClip, resetToFrontToken: speechStartToken) { log in
                             addDiagnostic(log)
                         }
                         .frame(
@@ -80,6 +84,9 @@ struct CompanionChatView: View {
         .onChange(of: liveManager.lines.count) { _ in
             didTriggerExplainGesture = false
             if let line = liveManager.lines.last {
+                if line.role == .user {
+                    previousAssistantLineIDForTurn = liveManager.lines.dropLast().last(where: { $0.role == .assistant })?.id
+                }
                 addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
             }
             handleLatestTranscript()
@@ -89,10 +96,15 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
-            avatarClip = speaking ? .talk : .idle
             if speaking {
+                cancelExplainGesture()
                 didTriggerExplainGesture = false
+                speechStartToken &+= 1
+                avatarClip = .talk
                 handleLatestTranscript()
+            } else {
+                cancelExplainGesture()
+                avatarClip = .idle
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
@@ -122,6 +134,7 @@ struct CompanionChatView: View {
             }
         }
         .onDisappear {
+            cancelExplainGesture()
             liveManager.end()
         }
     }
@@ -219,18 +232,35 @@ struct CompanionChatView: View {
         }
 
         guard line.role == .assistant,
+              line.id != previousAssistantLineIDForTurn,
               liveManager.aiSpeaking,
               !didTriggerExplainGesture,
               hasExplainCue(line.text) else { return }
 
         didTriggerExplainGesture = true
+        cancelExplainGesture()
+        let generation = UUID()
+        explainGestureGeneration = generation
         avatarClip = .talkExplain
-        addDiagnostic("[ARA] TalkExplain triggered from assistant transcript")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-            if liveManager.aiSpeaking && avatarClip == .talkExplain {
-                avatarClip = .talk
+        addDiagnostic("[ARA] TalkExplain triggered for current assistant line")
+        explainGestureTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 2_800_000_000)
+            } catch {
+                return
             }
+            guard explainGestureGeneration == generation,
+                  liveManager.aiSpeaking,
+                  avatarClip == .talkExplain else { return }
+            avatarClip = .talk
+            explainGestureTask = nil
         }
+    }
+
+    private func cancelExplainGesture() {
+        explainGestureGeneration = UUID()
+        explainGestureTask?.cancel()
+        explainGestureTask = nil
     }
 
     private func hasExplainCue(_ text: String) -> Bool {
@@ -312,6 +342,7 @@ struct CompanionChatView: View {
     }
 
     private func startLive() {
+        previousAssistantLineIDForTurn = liveManager.lines.last(where: { $0.role == .assistant })?.id
         liveManager.start(
             model: liveModel,
             voice: liveVoice,
