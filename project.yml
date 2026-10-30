@@ -18,6 +18,8 @@ targets:
         CFBundleDisplayName: "Chat AI"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        ChatAISourceCommit: "$(CHAT_AI_SOURCE_COMMIT)"
+        ChatAIBuildNumber: "$(CHAT_AI_BUILD_NUMBER)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
