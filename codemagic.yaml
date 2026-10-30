@@ -3,6 +3,8 @@ workflows:
     name: Chat AI TPiOS - Build IPA
     max_build_duration: 60
     environment:
+      groups:
+        - ara_secrets
       xcode: 16.4
       cocoapods: default
     scripts:
@@ -12,6 +14,36 @@ workflows:
           test -s project.yml
           test -s IMG_0290.png
           echo "Required project and icon files are present."
+
+      - name: Download Ara USDZ Actions artifact into app resources
+        script: |
+          set -euo pipefail
+          : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
+
+          ARTIFACTS_JSON="$(curl --fail --silent --show-error --get \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --data-urlencode "name=ara-avatar-usdz" \
+            --data-urlencode "per_page=100" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts")"
+          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-usdz" and not x.get("expired")]; print(max(a,key=lambda x:x["created_at"])["id"] if a else "")')"
+          test -n "$ARTIFACT_ID"
+
+          mkdir -p ChatAI/Resources
+          curl --fail --location --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts/$ARTIFACT_ID/zip" \
+            --output ara-avatar-usdz.zip
+          unzip -oq ara-avatar-usdz.zip -d ChatAI/Resources
+          rm ara-avatar-usdz.zip
+
+          for CLIP in Idle Wave Talk; do
+            test -s "ChatAI/Resources/Ara-$CLIP.usdz"
+          done
+          echo "All three Ara USDZ clips are ready to be bundled."
 
       - name: Install XcodeGen
         script: brew install xcodegen
@@ -63,7 +95,7 @@ workflows:
 
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
-          zip -r "chat-ai-tpios-$BUILD_NUMBER.ipa" Payload
+          zip -qr "chat-ai-tpios-$BUILD_NUMBER.ipa" Payload
 
     artifacts:
       - chat-ai-tpios-*.ipa
