@@ -95,7 +95,7 @@ jobs:
         working-directory: usdz-forge
         run: ./engine/setup-engine.sh
 
-      - name: Convert one multi-animation avatar USDZ
+      - name: Convert one sequential-animation avatar USDZ
         run: |
           set -euo pipefail
           GLB="$(find input -maxdepth 1 -type f -name '*.glb' -print -quit)"
@@ -106,10 +106,12 @@ jobs:
           COMPACT="clips/Ara-Avatar.compact.glb"
           DEST="output-usdz/Ara-Avatar.usdz"
           PY="$GITHUB_WORKSPACE/usdz-forge/engine/python/bin/python3.14"
+          cp clips/animation-timeline.json output-usdz/animation-timeline.json
           node scripts/compact-glb-primitives.mjs "$SOURCE" "$COMPACT"
           "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST"
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
-          grep -q "skelAnimations: 4" output-usdz/usdz-report.txt
+          grep -q "skelAnimations: 1" output-usdz/usdz-report.txt
+          grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*420" output-usdz/usdz-report.txt
           ANIMATED="$("$PY" usdz-forge/engine/native/probe_usdz.py "$DEST")"
           test "$ANIMATED" = "1"
           shasum -a 256 "$DEST" | tee output-usdz/SHA256SUMS.txt
@@ -129,9 +131,10 @@ jobs:
           name: Ara Avatar USDZ Assets v2
           body: |
             Generated from the pinned Ara 3D Gen source with the ChatAI TalkExplain gesture patch.
-            One USDZ contains Idle, Wave, Talk and TalkExplain animations on one rig.
+            The four clips are concatenated on one 14-second timeline and sliced into named RealityKit AnimationResources at runtime.
           files: |
             output-usdz/Ara-Avatar.usdz
+            output-usdz/animation-timeline.json
             output-usdz/SHA256SUMS.txt
             output-usdz/usdz-report.txt
           fail_on_unmatched_files: true
