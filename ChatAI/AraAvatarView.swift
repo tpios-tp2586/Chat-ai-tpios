@@ -13,6 +13,7 @@ struct AraAvatarView: View {
     }
 
     let clip: Clip
+    let resetToFrontToken: Int
     let onLog: (String) -> Void
     @StateObject private var loader = AraAvatarLoader()
     @AppStorage("ara_avatar_zoom_scale_v3") private var savedZoomScale = 2.5
@@ -76,11 +77,12 @@ struct AraAvatarView: View {
         }
         .onChange(of: clip) { newClip in
             loader.show(newClip)
-            if newClip == .talk && abs(rotationY) > 0.001 {
-                rotationY = 0
-                dragStartRotation = 0
-                onLog("[ARA] Reset to front for AI speech")
-            }
+        }
+        .onChange(of: resetToFrontToken) { _ in
+            guard abs(rotationY) > 0.001 else { return }
+            rotationY = 0
+            dragStartRotation = 0
+            onLog("[ARA] Reset to front at AI speech start")
         }
         .onReceive(loader.$status.dropFirst()) { status in
             onLog("[ARA] \(status)")
