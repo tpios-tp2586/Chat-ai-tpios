@@ -19,6 +19,8 @@ workflows:
         script: |
           set -euo pipefail
           : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
+          : "${CM_COMMIT:?Missing Codemagic source commit SHA}"
+          : "${BUILD_NUMBER:?Missing Codemagic build number}"
 
           ARTIFACTS_JSON="$(curl --fail --silent --show-error --get \
             --header "Accept: application/vnd.github+json" \
@@ -27,8 +29,12 @@ workflows:
             --data-urlencode "name=ara-avatar-usdz" \
             --data-urlencode "per_page=100" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts")"
-          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-usdz" and not x.get("expired")]; print(max(a,key=lambda x:x["created_at"])["id"] if a else "")')"
-          test -n "$ARTIFACT_ID"
+          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; sha=sys.argv[1]; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-usdz" and not x.get("expired") and x.get("workflow_run",{}).get("head_sha")==sha]; print(max(a,key=lambda x:x["created_at"])["id"] if a else "")' "$CM_COMMIT")"
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "ERROR: No ara-avatar-usdz artifact was generated from this exact source commit: $CM_COMMIT"
+            exit 1
+          fi
+          echo "Using Ara artifact $ARTIFACT_ID generated from source commit $CM_COMMIT"
 
           mkdir -p ChatAI/Resources
           curl --fail --location --silent --show-error \
@@ -76,6 +82,8 @@ workflows:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            CHAT_AI_SOURCE_COMMIT="$CM_COMMIT" \
+            CHAT_AI_BUILD_NUMBER="$BUILD_NUMBER" \
             build 2>&1 | tee build_output.txt
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "=== BUILD ERRORS ==="
