@@ -1,8 +1,9 @@
 diff --git a/src/core/anim/clips/emotes.ts b/src/core/anim/clips/emotes.ts
-index 0000000..0000000 100644
 --- a/src/core/anim/clips/emotes.ts
 +++ b/src/core/anim/clips/emotes.ts
-@@ -95,3 +95,24 @@ export const talk: Clip = {
+@@ -99,4 +99,27 @@
+       },
+     };
    },
  };
 +
@@ -30,26 +31,21 @@ index 0000000..0000000 100644
 +  },
 +};
 diff --git a/src/core/anim/clips/index.ts b/src/core/anim/clips/index.ts
-index 0000000..0000000 100644
 --- a/src/core/anim/clips/index.ts
 +++ b/src/core/anim/clips/index.ts
-@@ -8,7 +8,7 @@ import { type Clip } from './types';
- import { turn } from './gait';
- import { crouch, idle, walkBack } from './basic';
- import { fall, hit, jumpAir, jumpLand, jumpRunning, jumpStart, punch } from './actions';
+@@ -9,1 +9,1 @@
 -import { cheer, laugh, talk, wave } from './emotes';
 +import { cheer, laugh, talk, talkExplain, wave } from './emotes';
-@@ -48,6 +48,7 @@ export const CLIPS: Clip[] = withFaces(
+@@ -57,4 +57,5 @@
      cheer,
      laugh,
      talk,
 +    talkExplain,
      mocap('cry', 'Cry', 'Emotes'),
 diff --git a/src/core/anim/clips/faces.ts b/src/core/anim/clips/faces.ts
-index 0000000..0000000 100644
 --- a/src/core/anim/clips/faces.ts
 +++ b/src/core/anim/clips/faces.ts
-@@ -51,6 +51,7 @@ const FACES: Record<string, FaceFn> = {
+@@ -55,5 +55,10 @@
    talk: (t) => {
      const st = speechStress(t);
      return { ...speechFace(t), browInnerUp: 0.25 * st, browOuterUpLeft: 0.3 * st, browOuterUpRight: 0.3 * st };
