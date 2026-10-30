@@ -56,6 +56,7 @@ private final class AraAvatarLoader: ObservableObject {
     private var activeClip: AraAvatarView.Clip?
     private var loadID = 0
     private var loadSubscription: AnyCancellable?
+    private var cache: [AraAvatarView.Clip: Entity] = [:]
 
     func show(_ clip: AraAvatarView.Clip) {
         guard activeClip != clip || entity == nil else { return }
@@ -63,8 +64,18 @@ private final class AraAvatarLoader: ObservableObject {
         loadID += 1
         let requestID = loadID
         loadSubscription?.cancel()
-        entity = nil
-        status = "Đang nạp \(clip.rawValue) từ app bundle…"
+
+        if let cachedModel = cache[clip] {
+            play(cachedModel, clip: clip)
+            entity = cachedModel
+            status = "Đã chuyển sang \(clip.rawValue) (cache)"
+            onLog?("[ARA] Reused cached clip: \(clip.rawValue)")
+            return
+        }
+
+        status = entity == nil
+            ? "Đang nạp \(clip.rawValue) từ app bundle…"
+            : "Đang chuẩn bị \(clip.rawValue); giữ Ara hiện tại…"
 
         guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
             status = "Không tìm thấy \(clip.rawValue).usdz trong app bundle"
@@ -77,18 +88,26 @@ private final class AraAvatarLoader: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
                 if case .failure = completion {
-                    self?.status = "Lỗi nạp model"
+                    self?.status = "Lỗi nạp \(clip.rawValue)"
+                    self?.onLog?("[ARA] Load failed: \(clip.rawValue)")
                 }
             }, receiveValue: { [weak self] model in
                 guard let self, requestID == self.loadID else { return }
-                guard let animation = model.availableAnimations.first else {
+                guard model.availableAnimations.first != nil else {
                     self.status = "Đã nạp model nhưng không có animation"
                     return
                 }
-                model.playAnimation(animation.repeat())
+                self.cache[clip] = model
+                self.play(model, clip: clip)
                 self.entity = model
                 self.status = "Đã nạp \(clip.rawValue) từ app bundle"
+                self.onLog?("[ARA] Clip ready and cached: \(clip.rawValue)")
             })
+    }
+
+    private func play(_ model: Entity, clip: AraAvatarView.Clip) {
+        guard let animation = model.availableAnimations.first else { return }
+        model.playAnimation(animation.repeat())
     }
 }
 
