@@ -100,7 +100,8 @@ private final class AraAvatarLoader: ObservableObject {
             onLog?("[ARA] Bundle lookup failed: Ara-Avatar.usdz")
             return
         }
-        onLog?("[ARA] Found bundled asset: \(url.lastPathComponent)")
+        let assetBytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        onLog?("[ARA] Found bundled asset: \(url.lastPathComponent), size=\(assetBytes) bytes")
 
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
@@ -137,6 +138,8 @@ private final class AraAvatarLoader: ObservableObject {
 
                 let requiredDuration = timeline.clips.map(\.end).max() ?? 0
                 let sourceDuration = source.definition.duration
+                let ranges = timeline.clips.map { "\($0.name)(\(String(format: "%.2f", $0.start))-\(String(format: "%.2f", $0.end))s)" }.joined(separator: ", ")
+                self.onLog?("[ARA] Manifest: \(timeline.clips.count) clips [\(ranges)]; duration=\(String(format: "%.2f", requiredDuration))s; USDZ=\(String(format: "%.2f", sourceDuration))s; JSON=\(timelineData.count) bytes")
                 guard sourceDuration + 0.01 >= requiredDuration else {
                     self.status = "Timeline USDZ ngắn hơn manifest"
                     self.onLog?("[ARA] Timeline duration mismatch: USDZ \(sourceDuration)s; manifest \(requiredDuration)s")
