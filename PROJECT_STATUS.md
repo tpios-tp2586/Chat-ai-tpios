@@ -102,3 +102,33 @@
 - Nếu Actions thành công, chạy Codemagic để build IPA. Kiểm tra iPhone: log phải báo tạo 4 `AnimationViews` từ global scene animation, duration khoảng 14s, sau đó phát Idle/Talk/Wave/TalkExplain không còn Missing.
 - Nếu Actions báo USDZ duration không đúng 14s hoặc không tạo được đúng 1 SkelAnimation, dừng và sửa converter trước khi build app.
 - Chỉ sau khi kiểm tra thiết bị mới đánh giá tiếp chất lượng gesture và quyết định có cần chỉnh code hay asset.
+
+## Cập nhật sau build và kiểm tra hành động Ara — 2026-10-31
+### Đã xác nhận trên iPhone
+- User đã test bản build mới: kéo xoay Ara và pinch-to-zoom đều hoạt động đúng.
+- Xoay ngang bằng một ngón và thu phóng bằng hai ngón được giữ lại làm chức năng đã kiểm chứng; không cần coi đây là việc đang chờ triển khai.
+- Commit thêm tương tác xoay và tự quay về chính diện khi bắt đầu Talk: `2d4f1cd172ae8ed17bcf6d5f6f749b54d00e5853`.
+- Việc xoay/zoom đã được user xác nhận chạy đúng; các hành động animation theo ngữ cảnh bên dưới vẫn cần đánh giá riêng, không suy ra là đã hoạt động chỉ từ test xoay/zoom.
+
+### Audit luồng gọi hành động hiện tại — đọc code main
+- `LiveVoiceManager.handle()` đặt `aiSpeaking = true` khi nhận chunk âm thanh đầu ra từ Gemini; đặt false khi nhận `turnComplete` hoặc `interrupted`. `CompanionChatView` dùng trạng thái này để chọn `Talk`/ `Idle`. Đây là đường gọi chính của animation nói.
+- `Wave` được gọi khi trạng thái cuộc gọi chuyển sang `live`; sau 1,6 giây tự về `Idle` nếu cuộc gọi vẫn live và AI chưa nói. Đây là cử chỉ chào lúc kết nối, không phải cử chỉ phản hồi theo từng câu.
+- `TalkExplain` chỉ được gọi khi transcript assistant đang nói chứa một trong các cụm cue hard-code: `để em giải thích`, `để em nói rõ`, `đầu tiên`, `ví dụ`, `cụ thể là`, `tóm lại`, `quan trọng là`, `let me explain`, `for example`, `in summary`. Mỗi lượt assistant chỉ cho chạy một lần theo cờ `didTriggerExplainGesture`; timer 2,8 giây dự kiến đưa về `Talk` nếu AI vẫn nói.
+- `AraAvatarLoader.show()` lưu clip được yêu cầu khi USDZ chưa nạp xong; sau khi tạo 4 AnimationViews, nó phát clip mới nhất. Khi đã nạp, clip được ánh xạ bằng tên lowercase từ enum: `idle`, `wave`, `talk`, `talkExplain`. Không thấy đường gọi nhầm tên clip trong mapping hiện tại.
+- Các clip hiện được phát thay thế nhau trên cùng Entity, không layer đồng thời; phù hợp giới hạn full-rig tracks đã ghi ở trên.
+
+### Các điểm đang bị bỏ qua hoặc chưa nối vào Ara
+- `CompanionEmotion` (listening/thinking/happy/surprised...) hiện chỉ điều khiển dòng trạng thái và icon giao diện; không điều khiển animation hay blendshape của Ara.
+- `LiveVoiceManager.faceExpression` được cập nhật trong luồng Gemini (thinking/listening/speaking/mood), nhưng `CompanionChatView` không đọc thuộc tính này để điều khiển Ara. Vì vậy các mood này hiện không truyền sang avatar 3D.
+- Những cue cảm xúc như vui, ngạc nhiên, đùa, buồn, giận... không có clip tương ứng trong `AraAvatarView.Clip`; phần nhận diện chữ chỉ đổi trạng thái UI.
+- Khi người dùng đang nói/nghe, Ara hiện chủ yếu giữ `Idle`; chưa có hành động nghe chủ động hoặc suy nghĩ riêng. `Talk` cũng chỉ là clip nguồn có chuyển động đầu/cổ nhẹ; không có cử chỉ tay liên tục.
+- `TalkExplain` dựa vào khớp cụm từ trên transcript, không có timestamp từ audio; do đó gesture có thể bắt đầu trễ/sớm so với câu nói, và có thể không kích hoạt nếu AI diễn đạt khác các cụm cue.
+- Có một rủi ro timing cần xử lý khi chỉnh tiếp: callback 2,8 giây của một lần `TalkExplain` chỉ kiểm tra `aiSpeaking` và clip hiện tại. Nếu một lần `TalkExplain` mới bắt đầu trước khi callback cũ chạy, callback cũ có thể kết thúc nhầm lần mới. Chưa tái hiện trên thiết bị; đây là rủi ro logic từ code.
+- Không có bằng chứng hiện tại cho thấy các clip bị gọi nhầm tên; vấn đề chính là số hành động được nối vào Ara còn ít, mood bị bỏ qua, và cue phụ thuộc văn bản/timing.
+
+### Hướng audit/triển khai tiếp theo
+1. Giữ nguyên tương tác xoay/zoom đã test thành công.
+2. Trước khi thêm cử chỉ mới, xử lý rủi ro callback cũ của `TalkExplain` bằng định danh lượt/Task cancellation để không thể ghi đè clip của lượt mới.
+3. Thiết kế mapping rõ ràng giữa trạng thái nghe/suy nghĩ/nói/chào và các clip thực có trong USDZ; không gọi các mood UI là biểu cảm 3D khi chưa có mapping.
+4. Đánh giá riêng phương án cho happy/surprised và gesture nghe/suy nghĩ; hiện chưa có animation phù hợp được nối vào runtime.
+5. Không sửa voice pipeline, Text Chat, Chibi Chat hoặc asset animation khi chưa xác định clip/rig cần dùng. Ưu tiên sửa tối thiểu và kiểm tra bằng log trên iPhone.
