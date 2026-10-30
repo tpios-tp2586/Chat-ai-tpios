@@ -66,7 +66,7 @@ private final class AraAvatarLoader: ObservableObject {
         loadSubscription?.cancel()
 
         if let cachedModel = cache[clip] {
-            play(cachedModel, clip: clip)
+            play(cachedModel)
             entity = cachedModel
             status = "Đã chuyển sang \(clip.rawValue) (cache)"
             onLog?("[ARA] Reused cached clip: \(clip.rawValue)")
@@ -98,14 +98,14 @@ private final class AraAvatarLoader: ObservableObject {
                     return
                 }
                 self.cache[clip] = model
-                self.play(model, clip: clip)
+                self.play(model)
                 self.entity = model
                 self.status = "Đã nạp \(clip.rawValue) từ app bundle"
                 self.onLog?("[ARA] Clip ready and cached: \(clip.rawValue)")
             })
     }
 
-    private func play(_ model: Entity, clip: AraAvatarView.Clip) {
+    private func play(_ model: Entity) {
         guard let animation = model.availableAnimations.first else { return }
         model.playAnimation(animation.repeat())
     }
