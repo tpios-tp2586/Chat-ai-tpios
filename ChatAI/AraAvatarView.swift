@@ -56,6 +56,16 @@ struct AraAvatarView: View {
     }
 }
 
+private struct AraAnimationTimeline: Decodable {
+    let clips: [AraAnimationClipRange]
+}
+
+private struct AraAnimationClipRange: Decodable {
+    let name: String
+    let start: TimeInterval
+    let end: TimeInterval
+}
+
 @MainActor
 private final class AraAvatarLoader: ObservableObject {
     @Published var entity: Entity?
@@ -99,15 +109,68 @@ private final class AraAvatarLoader: ObservableObject {
                 }
             }, receiveValue: { [weak self] model in
                 guard let self else { return }
-                self.entity = model
-                self.animations.removeAll()
-                for animation in model.availableAnimations {
-                    if let name = animation.name {
-                        self.animations[name.lowercased()] = animation
-                    }
+                self.loadSubscription = nil
+
+                let imported = model.availableAnimations
+                let importedNames = imported.compactMap(\.name).joined(separator: ", ")
+                self.onLog?("[ARA] Imported source animations (\(imported.count)): \(importedNames)")
+
+                guard let source = imported.first else {
+                    self.status = "USDZ không có animation nguồn"
+                    self.onLog?("[ARA] No AnimationResource found on the imported model")
+                    return
                 }
-                let names = model.availableAnimations.compactMap(\.name).joined(separator: ", ")
-                self.onLog?("[ARA] Imported animations (\(model.availableAnimations.count)): \(names)")
+
+                guard
+                    let timelineURL = Bundle.main.url(forResource: "animation-timeline", withExtension: "json"),
+                    let timelineData = try? Data(contentsOf: timelineURL),
+                    let timeline = try? JSONDecoder().decode(AraAnimationTimeline.self, from: timelineData)
+                else {
+                    self.status = "Không tìm thấy animation-timeline.json trong app bundle"
+                    self.onLog?("[ARA] Timeline manifest missing or invalid")
+                    return
+                }
+
+                let requiredDuration = timeline.clips.map(\.end).max() ?? 0
+                let sourceDuration = source.definition.duration
+                guard sourceDuration + 0.01 >= requiredDuration else {
+                    self.status = "Timeline USDZ ngắn hơn manifest"
+                    self.onLog?("[ARA] Timeline duration mismatch: USDZ \(sourceDuration)s; manifest \(requiredDuration)s")
+                    return
+                }
+
+                var clips: [String: AnimationResource] = [:]
+                do {
+                    for range in timeline.clips {
+                        let view = AnimationView(
+                            source: source.definition,
+                            name: range.name,
+                            trimStart: range.start,
+                            trimEnd: range.end
+                        )
+                        clips[range.name.lowercased()] = try AnimationResource.generate(with: view)
+                    }
+                } catch {
+                    self.status = "Không tạo được các clip animation Ara"
+                    self.onLog?("[ARA] AnimationView generation failed: \(error.localizedDescription)")
+                    return
+                }
+
+                let requiredNames = ["idle", "wave", "talk", "talkexplain"]
+                let missing = requiredNames.filter { clips[$0] == nil }
+                guard missing.isEmpty else {
+                    self.status = "Thiếu clip animation: \(missing.joined(separator: ", "))"
+                    self.onLog?("[ARA] Timeline manifest missing clips: \(missing.joined(separator: ", "))")
+                    return
+                }
+
+                self.animations = clips
+                self.entity = model
+                let clipSummary = timeline.clips.map {
+                    "\($0.name)(\(String(format: "%.2f", $0.start))-\(String(format: "%.2f", $0.end))s)"
+                }.joined(separator: ", ")
+                self.onLog?("[ARA] Built \(clips.count) AnimationViews from \(source.name ?? "unnamed source"); source duration \(String(format: "%.2f", sourceDuration))s; \(clipSummary)")
+
                 guard let clip = self.requestedClip else { return }
                 self.play(clip, on: model)
             })
@@ -115,8 +178,8 @@ private final class AraAvatarLoader: ObservableObject {
 
     private func play(_ clip: AraAvatarView.Clip, on model: Entity) {
         guard let animation = animations[clip.rawValue.lowercased()] else {
-            status = "Không tìm thấy animation \(clip.rawValue) trong Ara-Avatar.usdz"
-            onLog?("[ARA] Missing animation: \(clip.rawValue); available: \(animations.keys.sorted().joined(separator: ", "))")
+            status = "Không tìm thấy animation \(clip.rawValue) trong timeline Ara"
+            onLog?("[ARA] Missing generated clip: \(clip.rawValue); available: \(animations.keys.sorted().joined(separator: ", "))")
             return
         }
 
@@ -126,7 +189,7 @@ private final class AraAvatarLoader: ObservableObject {
         )
         activeClip = clip
         status = "Đang phát animation \(clip.rawValue)"
-        onLog?("[ARA] Playing \(clip.rawValue) on the same Entity")
+        onLog?("[ARA] Playing \(clip.rawValue) from the global timeline")
     }
 }
 
