@@ -1,0 +1,62 @@
+diff --git a/src/core/anim/clips/emotes.ts b/src/core/anim/clips/emotes.ts
+index 0000000..0000000 100644
+--- a/src/core/anim/clips/emotes.ts
++++ b/src/core/anim/clips/emotes.ts
+@@ -95,3 +95,24 @@ export const talk: Clip = {
+   },
+ };
++
++/** A restrained, one-shot open-hand gesture for a spoken explanation. */
++export const talkExplain: Clip = {
++  id: 'talk_explain', name: 'TalkExplain', category: 'Emotes', duration: 2.8, loop: false,
++  sample: (t) => {
++    const progress = Math.max(0, Math.min(1, t / 2.8));
++    const reach = Math.sin(progress * Math.PI);
++    const base = talk.sample((t / 2.8) * TALK_LEN);
++    const bones = { ...base.bones };
++    fingers(bones, 3);
++    return {
++      ...base,
++      bones,
++      ik: {
++        Right: {
++          pos: v(-0.30 - 0.08 * reach, -0.18 + 0.08 * reach, 0.18 + 0.04 * reach),
++          pole: v(-0.7, -1, -0.2),
++          dir: v(-0.1, 0.2, 1),
++          palm: v(0, 0, 1),
++        },
++      },
++    };
++  },
++};
+diff --git a/src/core/anim/clips/index.ts b/src/core/anim/clips/index.ts
+index 0000000..0000000 100644
+--- a/src/core/anim/clips/index.ts
++++ b/src/core/anim/clips/index.ts
+@@ -8,7 +8,7 @@ import { type Clip } from './types';
+ import { turn } from './gait';
+ import { crouch, idle, walkBack } from './basic';
+ import { fall, hit, jumpAir, jumpLand, jumpRunning, jumpStart, punch } from './actions';
+-import { cheer, laugh, talk, wave } from './emotes';
++import { cheer, laugh, talk, talkExplain, wave } from './emotes';
+@@ -48,6 +48,7 @@ export const CLIPS: Clip[] = withFaces(
+     cheer,
+     laugh,
+     talk,
++    talkExplain,
+     mocap('cry', 'Cry', 'Emotes'),
+diff --git a/src/core/anim/clips/faces.ts b/src/core/anim/clips/faces.ts
+index 0000000..0000000 100644
+--- a/src/core/anim/clips/faces.ts
++++ b/src/core/anim/clips/faces.ts
+@@ -51,6 +51,7 @@ const FACES: Record<string, FaceFn> = {
+   talk: (t) => {
+     const st = speechStress(t);
+     return { ...speechFace(t), browInnerUp: 0.25 * st, browOuterUpLeft: 0.3 * st, browOuterUpRight: 0.3 * st };
+   },
++  talk_explain: (t, d) => {
++    const speechTime = (t / d) * 6.4;
++    const st = speechStress(speechTime);
++    return { ...speechFace(speechTime), browInnerUp: 0.25 * st, browOuterUpLeft: 0.3 * st, browOuterUpRight: 0.3 * st };
++  },
+   laugh: (t, d) => {
