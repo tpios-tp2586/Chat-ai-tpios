@@ -40,10 +40,8 @@ workflows:
           unzip -oq ara-avatar-usdz.zip -d ChatAI/Resources
           rm ara-avatar-usdz.zip
 
-          for CLIP in Idle Wave Talk; do
-            test -s "ChatAI/Resources/Ara-$CLIP.usdz"
-          done
-          echo "All three Ara USDZ clips are ready to be bundled."
+          test -s "ChatAI/Resources/Ara-Avatar.usdz"
+          echo "Single Ara USDZ with named animation clips is ready to be bundled."
 
       - name: Install XcodeGen
         script: brew install xcodegen
