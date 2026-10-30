@@ -18,6 +18,7 @@ struct CompanionChatView: View {
     }
 
     @State private var emotion: CompanionEmotion = .idle
+    @State private var avatarClip: AraAvatarView.Clip = .idle
     @State private var message: String?
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
@@ -35,7 +36,7 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        AraAvatarView(clip: liveManager.aiSpeaking ? .talk : .idle) { log in
+                        AraAvatarView(clip: avatarClip) { log in
                             addDiagnostic(log)
                         }
                         .frame(
@@ -112,6 +113,10 @@ struct CompanionChatView: View {
                 emotion = .thinking
             case .live:
                 emotion = .listening
+                avatarClip = .wave
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    if liveManager.state == .live && !liveManager.aiSpeaking { avatarClip = .idle }
+                }
             }
         }
         .onDisappear {
