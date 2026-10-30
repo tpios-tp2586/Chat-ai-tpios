@@ -124,7 +124,7 @@ for (const animation of selected) {
       throw new Error("Output shape changed for " + key);
     }
     const shiftedTimes = track.times.map((time, index) => cursor + time + (cursor > 0 && index === 0 ? 0.0001 : 0));
-    list.push({ times: shiftedTimes, values: track.values, outputType: track.outputType });
+    list.push({ times: shiftedTimes, values: track.values, outputType: track.outputType, valuesPerKeyframe: track.valuesPerKeyframe });
   }
   const clipStart = cursor + (cursor > 0 ? 0.0001 : 0);
   timeline.push({ name: animation.name, start: clipStart, end: cursor + duration, duration: duration - (clipStart - cursor) });
