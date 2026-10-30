@@ -17,6 +17,8 @@ struct AraAvatarView: View {
     @StateObject private var loader = AraAvatarLoader()
     @AppStorage("ara_avatar_zoom_scale_v3") private var savedZoomScale = 2.5
     @State private var pinchStartScale = 1.0
+    @State private var rotationY: Float = 0
+    @State private var dragStartRotation: Float = 0
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
@@ -29,10 +31,28 @@ struct AraAvatarView: View {
             }
     }
 
+    private var rotationGesture: some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                let radiansPerPoint = Float.pi / 360
+                rotationY = dragStartRotation + Float(value.translation.width) * radiansPerPoint
+            }
+            .onEnded { _ in
+                dragStartRotation = rotationY
+                let degrees = rotationY * 180 / Float.pi
+                onLog("[ARA] User rotation: \(String(format: "%.0f", degrees))°")
+            }
+    }
+
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                AraRealityView(entity: entity, zoomScale: Float(savedZoomScale))
+                AraRealityView(
+                    entity: entity,
+                    zoomScale: Float(savedZoomScale),
+                    rotationY: rotationY,
+                    clip: clip
+                )
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -44,6 +64,7 @@ struct AraAvatarView: View {
         }
         .contentShape(Rectangle())
         .simultaneousGesture(zoomGesture)
+        .simultaneousGesture(rotationGesture)
         .task {
             pinchStartScale = savedZoomScale
             loader.onLog = onLog
@@ -53,7 +74,14 @@ struct AraAvatarView: View {
             onLog("[BUILD] source=\(sourceCommit.prefix(12)) build=\(buildNumber)")
             loader.show(clip)
         }
-        .onChange(of: clip) { loader.show($0) }
+        .onChange(of: clip) { newClip in
+            loader.show(newClip)
+            if newClip == .talk && abs(rotationY) > 0.001 {
+                rotationY = 0
+                dragStartRotation = 0
+                onLog("[ARA] Reset to front for AI speech")
+            }
+        }
         .onReceive(loader.$status.dropFirst()) { status in
             onLog("[ARA] \(status)")
         }
@@ -203,37 +231,56 @@ private final class AraAvatarLoader: ObservableObject {
 private struct AraRealityView: UIViewRepresentable {
     let entity: Entity
     let zoomScale: Float
+    let rotationY: Float
+    let clip: AraAvatarView.Clip
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
-        attach(entity, zoomScale: zoomScale, to: view, coordinator: context.coordinator)
+        attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         return view
     }
 
     func updateUIView(_ view: ARView, context: Context) {
         if context.coordinator.currentEntity !== entity {
-            attach(entity, zoomScale: zoomScale, to: view, coordinator: context.coordinator)
-        } else if context.coordinator.currentZoom != zoomScale {
-            applyZoom(zoomScale, to: entity, coordinator: context.coordinator)
+            attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
+        } else {
+            if context.coordinator.currentZoom != zoomScale {
+                applyZoom(zoomScale, to: entity, coordinator: context.coordinator)
+            }
+            if context.coordinator.currentRotationY != rotationY {
+                applyRotation(rotationY, coordinator: context.coordinator)
+            }
+            if context.coordinator.currentClip != clip {
+                context.coordinator.currentClip = clip
+            }
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    private func attach(_ model: Entity, zoomScale: Float, to view: ARView, coordinator: Coordinator) {
+    private func attach(
+        _ model: Entity,
+        zoomScale: Float,
+        rotationY: Float,
+        to view: ARView,
+        coordinator: Coordinator
+    ) {
         let bounds = model.visualBounds(recursive: true, relativeTo: model)
         let height = bounds.extents.y
         let baseScale: Float = height.isFinite && height > 0 ? 1.35 / height : 1
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = -bounds.center * baseScale
         coordinator.currentEntity = model
+        coordinator.currentClip = clip
 
         let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.4))
         anchor.addChild(model)
+        coordinator.rotationPivot = anchor
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
         applyZoom(zoomScale, to: model, coordinator: coordinator)
+        applyRotation(rotationY, coordinator: coordinator)
     }
 
     private func applyZoom(_ zoom: Float, to model: Entity, coordinator: Coordinator) {
@@ -242,10 +289,19 @@ private struct AraRealityView: UIViewRepresentable {
         coordinator.currentZoom = zoom
     }
 
+    private func applyRotation(_ rotation: Float, coordinator: Coordinator) {
+        guard let pivot = coordinator.rotationPivot else { return }
+        pivot.orientation = simd_quatf(angle: rotation, axis: SIMD3<Float>(0, 1, 0))
+        coordinator.currentRotationY = rotation
+    }
+
     final class Coordinator {
         var currentEntity: Entity?
+        var rotationPivot: AnchorEntity?
         var baseScale = SIMD3<Float>(repeating: 1)
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentZoom: Float = 1
+        var currentRotationY: Float = 0
+        var currentClip: AraAvatarView.Clip = .idle
     }
 }
