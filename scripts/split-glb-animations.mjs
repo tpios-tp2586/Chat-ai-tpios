@@ -25,36 +25,33 @@ while (offset < data.length) {
 }
 if (!json || !binaryChunk) throw new Error("GLB is missing JSON or BIN chunk");
 
-fs.mkdirSync(outputDir, { recursive: true });
-
-function writeGLB(name, animations) {
-  const jsonBytes = Buffer.from(JSON.stringify({ ...json, animations }));
-  const jsonPadding = (4 - jsonBytes.length % 4) % 4;
-  const paddedJson = Buffer.concat([jsonBytes, Buffer.alloc(jsonPadding, 0x20)]);
-  const binPadding = (4 - binaryChunk.length % 4) % 4;
-  const paddedBin = Buffer.concat([binaryChunk, Buffer.alloc(binPadding)]);
-  const totalLength = 12 + 8 + paddedJson.length + 8 + paddedBin.length;
-  const header = Buffer.alloc(12);
-  header.write("glTF", 0);
-  header.writeUInt32LE(2, 4);
-  header.writeUInt32LE(totalLength, 8);
-  const jsonHeader = Buffer.alloc(8);
-  jsonHeader.writeUInt32LE(paddedJson.length, 0);
-  jsonHeader.writeUInt32LE(0x4E4F534A, 4);
-  const binHeader = Buffer.alloc(8);
-  binHeader.writeUInt32LE(paddedBin.length, 0);
-  binHeader.writeUInt32LE(0x004E4942, 4);
-  fs.writeFileSync(path.join(outputDir, `Ara-${name}.glb`),
-    Buffer.concat([header, jsonHeader, paddedJson, binHeader, paddedBin]));
-}
-
-const clips = ["Idle", "Wave", "Talk"].map(name => {
+const selectedNames = ["Idle", "Wave", "Talk", "TalkExplain"];
+const animations = selectedNames.map(name => {
   const animation = (json.animations ?? []).find(a => a.name?.toLowerCase() === name.toLowerCase());
-  if (!animation) throw new Error(`Required animation not found: ${name}`);
+  if (!animation) throw new Error(`Required animation not found in GLB: ${name}`);
   return animation;
 });
 
-for (const [index, name] of ["Idle", "Wave", "Talk"].entries()) {
-  writeGLB(name, [clips[index]]);
-  console.log(`Created isolated ${name} clip`);
-}
+fs.mkdirSync(outputDir, { recursive: true });
+
+const jsonBytes = Buffer.from(JSON.stringify({ ...json, animations }));
+const jsonPadding = (4 - jsonBytes.length % 4) % 4;
+const paddedJson = Buffer.concat([jsonBytes, Buffer.alloc(jsonPadding, 0x20)]);
+const binPadding = (4 - binaryChunk.length % 4) % 4;
+const paddedBin = Buffer.concat([binaryChunk, Buffer.alloc(binPadding)]);
+const totalLength = 12 + 8 + paddedJson.length + 8 + paddedBin.length;
+
+const header = Buffer.alloc(12);
+header.write("glTF", 0);
+header.writeUInt32LE(2, 4);
+header.writeUInt32LE(totalLength, 8);
+const jsonHeader = Buffer.alloc(8);
+jsonHeader.writeUInt32LE(paddedJson.length, 0);
+jsonHeader.writeUInt32LE(0x4E4F534A, 4);
+const binHeader = Buffer.alloc(8);
+binHeader.writeUInt32LE(paddedBin.length, 0);
+binHeader.writeUInt32LE(0x004E4942, 4);
+
+const output = path.join(outputDir, "Ara-Avatar.glb");
+fs.writeFileSync(output, Buffer.concat([header, jsonHeader, paddedJson, binHeader, paddedBin]));
+console.log(`Created one Ara model with animations: ${selectedNames.join(", ")}`);
