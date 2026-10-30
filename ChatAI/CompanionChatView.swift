@@ -92,6 +92,7 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
+            avatarClip = speaking ? .talk : .idle
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
                     // Speech is a mouth animation, not a facial emotion.
