@@ -7,13 +7,13 @@ struct AraAvatarView: View {
     let clip: Clip
     let onLog: (String) -> Void
     @StateObject private var loader = AraAvatarLoader()
-    @AppStorage("ara_avatar_zoom_scale_v2") private var savedZoomScale = 1.8
+    @AppStorage("ara_avatar_zoom_scale_v3") private var savedZoomScale = 2.5
     @State private var pinchStartScale = 1.0
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
             .onChanged { magnification in
-                savedZoomScale = min(max(pinchStartScale * Double(magnification), 0.7), 3.0)
+                savedZoomScale = min(max(pinchStartScale * Double(magnification), 0.7), 4.5)
             }
             .onEnded { _ in
                 pinchStartScale = savedZoomScale
