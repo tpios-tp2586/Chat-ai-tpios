@@ -23,7 +23,9 @@ struct AraAvatarView: View {
         }
         .task { loader.onLog = onLog; loader.show(clip) }
         .onChange(of: clip) { loader.show($0) }
-        .onReceive(loader.$status.dropFirst()) { onLog("[ARA] \\($0)") }
+        .onReceive(loader.$status.dropFirst()) { status in
+            onLog("[ARA] \(status)")
+        }
     }
 }
 
@@ -43,20 +45,20 @@ private final class AraAvatarLoader: ObservableObject {
         let requestID = loadID
         loadSubscription?.cancel()
         entity = nil
-        status = "Đang nạp \\(clip.rawValue) từ app bundle…"
+        status = "Đang nạp \(clip.rawValue) từ app bundle…"
 
         guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
-            status = "Không tìm thấy \\(clip.rawValue).usdz trong app bundle"
-            onLog?("[ARA] Bundle lookup failed: \\(clip.rawValue).usdz")
+            status = "Không tìm thấy \(clip.rawValue).usdz trong app bundle"
+            onLog?("[ARA] Bundle lookup failed: \(clip.rawValue).usdz")
             return
         }
-        onLog?("[ARA] Found bundled asset: \\(url.lastPathComponent)")
+        onLog?("[ARA] Found bundled asset: \(url.lastPathComponent)")
 
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
-                if case .failure(let error) = completion {
-                    self?.status = "Lỗi nạp model: \\(error.localizedDescription)"
+                if case .failure = completion {
+                    self?.status = "Lỗi nạp model"
                 }
             }, receiveValue: { [weak self] model in
                 guard let self, requestID == self.loadID else { return }
@@ -66,7 +68,7 @@ private final class AraAvatarLoader: ObservableObject {
                 }
                 model.playAnimation(animation.repeat())
                 self.entity = model
-                self.status = "Đã nạp \\(clip.rawValue) từ app bundle"
+                self.status = "Đã nạp \(clip.rawValue) từ app bundle"
             })
     }
 }
