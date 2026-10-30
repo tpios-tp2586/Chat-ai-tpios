@@ -1,7 +1,7 @@
 diff --git a/src/core/anim/clips/emotes.ts b/src/core/anim/clips/emotes.ts
 --- a/src/core/anim/clips/emotes.ts
 +++ b/src/core/anim/clips/emotes.ts
-@@ -100,3 +100,26 @@
+@@ -100,3 +100,27 @@
      };
    },
  };
