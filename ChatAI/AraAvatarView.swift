@@ -47,6 +47,10 @@ struct AraAvatarView: View {
         .task {
             pinchStartScale = savedZoomScale
             loader.onLog = onLog
+            let info = Bundle.main.infoDictionary
+            let sourceCommit = info?["ChatAISourceCommit"] as? String ?? "unknown"
+            let buildNumber = info?["ChatAIBuildNumber"] as? String ?? "unknown"
+            onLog("[BUILD] source=\(sourceCommit.prefix(12)) build=\(buildNumber)")
             loader.show(clip)
         }
         .onChange(of: clip) { loader.show($0) }
