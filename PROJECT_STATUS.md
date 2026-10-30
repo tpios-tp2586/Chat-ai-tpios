@@ -87,3 +87,39 @@
 - Đã xóa `ChatAI/ChatAIHead3DView.swift`, phần triển khai SceneKit cũ có tham chiếu `Model-02.usdz`.
 - Đã bỏ exclusion tương ứng khỏi `project.yml`.
 - Không còn tích hợp Model-02 trong luồng Chat Voice.
+
+## Nghiên cứu sâu RealityKit và phương án kỹ thuật — chưa được duyệt triển khai
+### 1. Khả năng RealityKit đã xác minh
+- Apple RealityKit: `Entity.availableAnimations` trả về danh sách animation mà RealityKit hỗ trợ khi import entity từ file; từng `AnimationResource` có tên (`name`) và có thể phát riêng.
+- `Entity.playAnimation(_:transitionDuration:...)` hỗ trợ chuyển tiếp/cross-fade; `AnimationResource.repeat(count:)` hoặc `repeat(duration:)` cho phép quyết định loop có giới hạn hoặc vô hạn. Vì vậy Wave có thể phát một lần, còn Idle/Talk mới loop.
+- RealityKit hỗ trợ tối đa hai animation chạy đồng thời trên một entity; `blendLayerOffset` chỉ nhận 0 hoặc 1. Không nên thiết kế một hệ thống nhiều lớp tùy ý.
+- Nguồn Apple: https://developer.apple.com/documentation/realitykit/entity, https://developer.apple.com/documentation/realitykit/animationresource, https://developer.apple.com/documentation/realitykit/entity/playanimation%28_%3Atransitionduration%3Ablendlayeroffset%3Aseparateanimatedvalue%3Astartspaused%3Aclock%3A%29
+- Đây mới là căn cứ API. Chưa có thử nghiệm xác nhận USDZ do `robotson/usdz-forge` tạo từ GLB nhiều animation sẽ giữ đủ tên/count animation trong RealityKit. Phải kiểm tra trên app test trước.
+
+### 2. Phát hiện sâu ở pipeline GLB
+- `scripts/compact-glb-primitives.mjs` không chủ động loại bỏ animation: script giữ lại accessor input/output của tất cả animation sampler và remap index. Nút thắt làm giảm từ 70 xuống 3 là `split-glb-animations.mjs`, không phải bước compact.
+- `src/export/glb.ts` của upstream tạo một glTF animation cho mỗi clip. Hiện exporter ghi rotation channel cho mọi bone trong rig cho mỗi clip (69 joints), cộng root translation; vì thế ngay cả clip chỉ định nghĩa tay/đầu cũng được bake thành animation toàn skeleton.
+- Hệ quả: không được giả định có thể chạy Talk và Wave/Laugh đồng thời như hai lớp độc lập. Hai clip hiện có đều chứa track cho toàn rig; khi blend có thể ghi đè pose của nhau.
+
+### 3. Transcript và giới hạn đồng bộ
+- Trong `LiveVoice.swift`, output audio (`inlineData`) bật `aiSpeaking` và enqueue PCM; output transcription là luồng riêng, gọi `append(.assistant, text)`.
+- `append` nối các đoạn transcript vào cùng `lines[index].text`; không tạo một Line mới cho mỗi đoạn. Vì vậy chỉ quan sát `lines.count` không thể theo dõi nội dung từng phần.
+- Có thể theo dõi thay đổi assistant transcript, gom thành câu theo dấu câu/turnComplete rồi phân loại cử chỉ. Nhưng transcript và audio là hai luồng sự kiện riêng, code hiện không có timecode/word alignment; cử chỉ theo nội dung chỉ có thể đồng bộ gần đúng theo câu/đoạn, không thể cam kết khớp chính xác từng âm tiết.
+- Không sửa API, model, audio buffering, phát PCM hoặc voice session để triển khai gesture; chỉ đọc transcript hiện có.
+
+### 4. Kế hoạch đề xuất để user duyệt — chưa sửa code
+1. **Khóa thử nghiệm ở Ara-Avatar-Test trước:** xử lý/hiểu lỗi runtime đã được user báo (app thoát khi hiện “Đang tải nhân vật…”); không đoán nguyên nhân. Chỉ khi app test nạp model ổn định mới tiếp tục đánh giá animation.
+2. **Thử một USDZ chứa nhiều animation:** ở repo test, tạo một GLB giữ các clip chọn lọc `Idle`, `Wave`, `Talk` trong cùng file (không tách thành ba model/Entity); convert thành một USDZ. Không đưa cả 70 clip vào app ở bước đầu. Kiểm tra USDZ có đúng một skeleton và đủ ba SkelAnimation; sau đó log `availableAnimations.map(\.name)` trong app test, phát từng animation trên cùng một Entity và kiểm tra cross-fade. Nếu converter/RealityKit không giữ đủ animation thì dừng, không đưa thay đổi vào ChatAI.
+3. **Thiết kế chuyển động phiên bản đầu:** Idle khi nghe/chờ; Talk loop khi audio đang phát; Wave one-shot lúc bắt đầu phiên rồi tự về Idle; không loop Wave trong 3 giây như cách hiện tại. Không dùng Cheer. Laugh chỉ để giai đoạn sau nếu cần phản ứng cười.
+4. **Tạo một clip hội thoại mới thay vì chồng hai clip toàn thân:** do exporter hiện ghi track cho mọi bone và RealityKit chỉ blend tối đa hai animation, không mặc định chạy Talk + Wave/Laugh đồng thời. Nếu cần cử chỉ giải thích, tạo một clip full-body mới kiểu `TalkExplain`: giữ chuyển động đầu/cổ nhẹ của Talk, thêm một cử chỉ mở bàn tay phải/trái nhỏ, vai và thân trên chuyển động rất ít; phát clip này thay Talk trong một đoạn ngắn rồi trở lại Talk. Chỉ tạo sau khi test rig/pose trong repo Ara-Avatar-Test.
+5. **Giảm gật đầu nếu cần:** đánh giá trực quan clip Talk hiện tại; chỉ giảm biên độ/nhịp đầu-cổ trong source khi test xác nhận vẫn quá lặp. Không tự chỉnh hàng loạt 70 clip.
+6. **Nối cử chỉ với nội dung lời nói:** theo dõi text assistant đang được nối thêm, gom theo câu; chỉ nhận một số dấu hiệu ngữ nghĩa đơn giản (ví dụ “để em giải thích”, “đầu tiên”, “ví dụ”, “tóm lại”) để kích hoạt TalkExplain. Giới hạn tần suất, tránh mỗi chunk/từ lại phát cử chỉ. Không thêm AI API/NLP dependency.
+7. **Chuyển sang ChatAI sau khi test đạt:** giữ một Entity/model xuyên suốt; chọn AnimationResource theo tên; chỉ sửa các phần liên quan Ara (`AraAvatarView`, `CompanionChatView`, script/workflow tạo asset và kiểm tra resource nếu cần). Giữ nguyên voice/audio/API/history, Text Chat, Chibi Chat và các phần khác.
+8. **Nghiệm thu:** app test phải nạp một USDZ; log thấy đủ animation names; chuyển Idle → Wave → Idle → Talk → TalkExplain → Talk không mất/nháy nhân vật; âm thanh không bị gián đoạn; kiểm tra trên iPhone thực tế trước khi gọi là ổn định. Chỉ sau đó mới đưa asset/pipeline vào ChatAI.
+- Không chạy GitHub Actions, không build và không sửa code trong giai đoạn nghiên cứu/duyệt kế hoạch. Khi user duyệt kế hoạch, vẫn xác nhận riêng trước lần chạy Action cần thiết để tạo artifact.
+
+## Việc cần làm khi tiếp tục chat mới — cập nhật
+- Đọc file này trước; đây là nguồn bối cảnh chuẩn để tiếp tục, không yêu cầu user kể lại hai repo và pipeline.
+- Chờ user duyệt kế hoạch trước khi sửa code.
+- Nếu được duyệt, bắt đầu từ repo Ara-Avatar-Test và lỗi runtime nạp USDZ đã được user báo; không sửa ChatAI trước khi test riêng đạt.
+- Không chạy workflow/Action hoặc build nếu chưa được user cho phép theo bước.
