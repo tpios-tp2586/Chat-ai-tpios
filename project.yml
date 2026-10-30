@@ -10,6 +10,8 @@ targets:
       - path: ChatAI
         excludes:
           - Resources/**
+      - path: ChatAI/Resources
+        buildPhase: resources
     info:
       path: ChatAI-Info.plist
       properties:
