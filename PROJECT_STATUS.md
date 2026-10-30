@@ -134,3 +134,17 @@
 5. Không sửa voice pipeline, Text Chat, Chibi Chat hoặc asset animation khi chưa xác định clip/rig cần dùng. Ưu tiên sửa tối thiểu và kiểm tra bằng log trên iPhone.
 
 - Bổ sung sau khi rà thứ tự cập nhật SwiftUI: có trường hợp `onChange(of: clip)` không nhận được trạng thái trung gian `.talk`. Trong cùng callback `aiSpeaking = true`, code gán `.talk` rồi gọi `handleLatestTranscript()`; nếu transcript đã có cue, hàm này gán ngay `.talkExplain`. SwiftUI có thể render giá trị cuối cùng `.talkExplain` và bỏ qua trạng thái `.talk`, vì vậy logic reset góc nhìn đang gắn riêng với `newClip == .talk` không bảo đảm chạy ở mọi lượt nói. Nên chuyển reset về tín hiệu bắt đầu nói độc lập với lựa chọn clip (ví dụ token/reset event), nhưng chưa sửa trong lượt audit này.
+
+## Cập nhật sửa điều phối animation Ara — 2026-10-31
+- Đã kiểm tra lại PROJECT_STATUS.md, CompanionChatView.swift, AraAvatarView.swift và luồng LiveVoiceManager trên main trước khi sửa.
+- Commit 71522c0b1294e2560964056d6c4d34212bf9cba5 — sửa điều phối cử chỉ trong CompanionChatView.swift:
+  - Thay callback DispatchQueue.main.asyncAfter của TalkExplain bằng Task có thể cancel và generation UUID. Callback cũ không thể kết thúc nhầm cử chỉ mới.
+  - Hủy timer khi AI dừng nói, khi bắt đầu lượt nói mới và khi rời màn hình.
+  - Ghi nhận ID assistant gần nhất trước lượt người dùng; bỏ qua transcript assistant cũ để không phát lại cue của lượt trước.
+  - Chỉ kích hoạt TalkExplain khi dòng assistant hiện tại khác dòng assistant trước lượt người dùng.
+- Commit 25e4e01b9800b2f8685140e436a1c1d7a8a84af2 — sửa reset hướng nhìn trong AraAvatarView.swift:
+  - Thêm resetToFrontToken, được tăng độc lập khi aiSpeaking chuyển sang true.
+  - Reset góc nhìn không còn phụ thuộc vào việc SwiftUI có render trạng thái trung gian .talk hay không; vẫn hoạt động khi clip được chọn ngay là .talkExplain.
+- Không thay đổi LiveVoice.swift, giao tiếp Gemini, xử lý audio, chatbot, Text Chat, Chibi Chat, asset hoặc pipeline chuyển đổi USDZ.
+- Các trạng thái nghe/suy nghĩ/mood vẫn chưa có clip 3D tương ứng trong asset hiện tại (chỉ có Idle/Wave/Talk/TalkExplain); không giả lập bằng cách gán sai clip.
+- Trạng thái kiểm chứng: thay đổi đã được ghi lên main; cần build IPA bằng Codemagic và test trên iPhone để xác nhận compile/runtime. Chưa chạy GitHub Actions và chưa xác nhận build IPA.
