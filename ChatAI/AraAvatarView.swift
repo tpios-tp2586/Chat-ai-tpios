@@ -102,9 +102,11 @@ private final class AraAvatarLoader: ObservableObject {
                 self.entity = model
                 self.animations.removeAll()
                 for animation in model.availableAnimations {
-                    self.animations[animation.name.lowercased()] = animation
+                    if let name = animation.name {
+                        self.animations[name.lowercased()] = animation
+                    }
                 }
-                let names = model.availableAnimations.map(\.name).joined(separator: ", ")
+                let names = model.availableAnimations.compactMap(\.name).joined(separator: ", ")
                 self.onLog?("[ARA] Imported animations (\(model.availableAnimations.count)): \(names)")
                 guard let clip = self.requestedClip else { return }
                 self.play(clip, on: model)
