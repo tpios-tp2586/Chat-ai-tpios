@@ -28,7 +28,7 @@
   3. `scripts/verify-glb.mjs` kiểm tra GLB, skin, joints và animation.
   4. Upload artifact `ara-avatar-glb`.
   5. Checkout `robotson/usdz-forge`, setup OpenUSD converter.
-  6. `scripts/split-glb-animations.mjs` tách riêng Idle/Wave/Talk; chuyển từng clip sang USDZ; inspect và probe xác nhận USDZ có animation.
+  6. `scripts/split-glb-animations.mjs` ghép Idle/Wave/Talk/TalkExplain thành một animation tuần tự trên timeline chung; xuất `animation-timeline.json`; convert một USDZ.
   7. Upload artifact `ara-avatar-usdz`; workflow cũ còn build app thử nghiệm iOS Simulator và upload `ara-avatar-ios-simulator`.
 - App thử nghiệm: `ios-test/Sources/AraAvatarTestApp.swift`, project config `ios-test/project.yml`; nạp USDZ từ app bundle, có picker Idle/Wave/Talk. Build simulator thành công chỉ chứng minh compile/package; không chứng minh chuyển động đẹp hoặc chạy đúng trên iPhone thật.
 - Workflow `.github/workflows/build-ios-test.yml` là workflow build-only, tải USDZ artifact đã có rồi build app simulator; không tạo lại model/USDZ.
@@ -53,7 +53,8 @@
 ### 3. Kiến trúc animation và giới hạn đã xác minh
 - Pipeline ban đầu chỉ lấy `Idle`, `Wave`, `Talk` từ 70 animation; không phải upstream chỉ có 3 chuyển động.
 - `AraAvatarView.swift` đã được chuyển sang dùng một resource `Ara-Avatar.usdz` và tra animation bằng `availableAnimations`, thay vì duy trì 3 USDZ entity riêng.
-- RealityKit hỗ trợ lấy animation qua `Entity.availableAnimations` và phát bằng `playAnimation`; pipeline hiện chuyển clip trên cùng Entity với transition ngắn.
+- RealityKit có thể nhập USDZ nhiều SkelAnimation thành một resource tên `global scene animation`; không thể giả định giữ tên clip gốc. Apple hỗ trợ cắt một timeline bằng `AnimationView` (`trimStart`/`trimEnd`) rồi tạo các `AnimationResource` riêng.
+- Dùng một animation timeline nối tiếp giúp tránh đóng gói 4 bản model đầy đủ; app tạo 4 clip Idle/Wave/Talk/TalkExplain từ resource toàn cảnh và phát trên cùng Entity.
 - RealityKit có giới hạn về việc chạy đồng thời nhiều animation trên một Entity; các clip exporter của upstream chứa full-rig tracks, vì vậy không giả định có thể layer Talk + Wave/Explain một cách an toàn.
 - `CompanionChatView.swift` theo dõi transcript live và trạng thái `aiSpeaking`; khi đang nói có thể chọn cue theo cụm từ để kích hoạt gesture. Transcript/Audio không có word-level timestamps nên không đồng bộ gesture đến từng âm tiết.
 
@@ -69,9 +70,17 @@
 - Commit workflow: `e50bc2174bdf1b8638b6e93f22de98830fdf8982`.
 - GitHub Actions run mới nhất: `41072830971`, workflow `Generate Ara USDZ avatar assets`, `workflow_dispatch`, branch `main`, kết luận `success`.
 - Run `41072830971` xác nhận cách áp dụng `TalkExplain` mới đã chạy thành công trên GitHub runner; không còn lỗi `git apply` ở bước gesture.
+- Artifact run `41072830971` đã được tải và kiểm tra trực tiếp: GLB đầu vào có 71 animations (gồm 4 clip cần dùng), 1 skin, 69 joints; thời lượng clip: Idle 3.2s, Wave 1.6s, Talk 6.4s, TalkExplain 2.8s.
+- USDZ của run `41072830971` báo `skelAnimations: 4`, `endTimeCode: 192`, nhưng iPhone thực tế chỉ nhập `(1): global scene animation`; mọi lệnh tìm Idle/Wave/Talk đều Missing. Đây là bằng chứng pipeline cũ không giữ các clip thành tài nguyên có tên riêng khi RealityKit import.
+- Apple WWDC21 và API docs xác nhận hướng phù hợp: ghép clip nối tiếp trên một timeline, sau đó dùng `AnimationView` để cắt clip theo timecode. Tổng thời lượng mới dự kiến 14.0s (420 timecodes ở 30fps).
 - `TalkExplain`: clip one-shot khoảng 2.8 giây, cử chỉ tay phải mở nhẹ và phối hợp với chuyển động Talk; có mapping facial speech tương ứng. Đây là gesture hội thoại nhẹ, không phải cử chỉ phóng đại.
 - Codemagic chưa được coi là đã xác minh cho artifact mới chỉ dựa trên GitHub Actions. Cần build IPA và kiểm tra trên iPhone thật trước khi kết luận Ara hoạt động hoàn chỉnh.
-- `codemagic.yaml` lấy artifact `ara-avatar-usdz` mới nhất từ Actions của repo ChatAI bằng `GITHUB_TOKEN` trong nhóm `ara_secrets`, giải nén vào `ChatAI/Resources`, kiểm tra resource rồi XcodeGen/build. ZIP nếu có chỉ là file tạm nội bộ, không phải build artifact cần giữ.
+- Đã cập nhật pipeline trên `main` để tạo một animation tuần tự 14s, xuất manifest `animation-timeline.json`, yêu cầu USDZ có đúng `skelAnimations: 1` và `endTimeCode: 420`; upload/release kèm manifest.
+- `AraAvatarView.swift` đã chuyển sang đọc manifest và tạo các `AnimationResource` bằng `AnimationView` từ resource `global scene animation`; có kiểm tra thời lượng USDZ trước khi tạo clip.
+- `codemagic.yaml` đã kiểm tra và bundle cả `Ara-Avatar.usdz` lẫn `animation-timeline.json`; ZIP chỉ là file tạm nội bộ, artifact build vẫn chỉ là IPA.
+- Các commit sửa mới trên `main`: script `172c87f4c7ebc51902cdda8c6e851dfb5e153f6e`; workflow `971b16f1ab5486c182c01d9eb56bbed59b7a9cfa`; Swift `b0f084852d6009f8f66824524eda9e1c5f82aa39`; Codemagic `f2d7abfe68602b32f74733d47d8ad48f9d776872`.
+- Đã test script ghép timeline trực tiếp trên GLB artifact thật: tạo một animation `AraConversation`, 71 channels, tổng 14.0s; manifest có đúng các khoảng Idle 0–3.2s, Wave 3.2001–4.8s, Talk 4.8001–11.2s, TalkExplain 11.2001–14.0s. Kiểm tra header GLB và cấu trúc channel thành công.
+- Chưa chạy lại GitHub Actions vì connector hiện không có thao tác dispatch workflow; thay đổi conversion chưa được xác minh trên macOS/usdzconvert. Chưa build Codemagic hoặc test IPA mới.
 
 ## Hướng triển khai Ara hiện tại
 1. Giữ `Idle` làm chuyển động nền; `Talk` làm chuyển động nền khi phát audio.
@@ -89,6 +98,7 @@
 
 ## Việc cần làm khi tiếp tục chat mới
 - Đọc file này trước; đây là nguồn bối cảnh chuẩn để tiếp tục, không yêu cầu user kể lại hai repo và pipeline.
-- Bước tiếp theo là lấy artifact `ara-avatar-usdz` từ run thành công và đưa qua Codemagic để build IPA.
-- Sau khi có IPA, kiểm tra trên iPhone thật: avatar load, `Idle`, `Talk`, `Wave`, `TalkExplain`, transition, texture và không crash.
+- Bước tiếp theo: chạy thủ công workflow `.github/workflows/generate-ara-usdz.yml` trên `main`; kiểm tra log conversion phải có `skelAnimations: 1`, `endTimeCode: 420`, probe=`1`, artifact phải gồm `Ara-Avatar.usdz` và `animation-timeline.json`.
+- Nếu Actions thành công, chạy Codemagic để build IPA. Kiểm tra iPhone: log phải báo tạo 4 `AnimationViews` từ global scene animation, duration khoảng 14s, sau đó phát Idle/Talk/Wave/TalkExplain không còn Missing.
+- Nếu Actions báo USDZ duration không đúng 14s hoặc không tạo được đúng 1 SkelAnimation, dừng và sửa converter trước khi build app.
 - Chỉ sau khi kiểm tra thiết bị mới đánh giá tiếp chất lượng gesture và quyết định có cần chỉnh code hay asset.
