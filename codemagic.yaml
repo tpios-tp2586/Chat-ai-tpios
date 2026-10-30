@@ -41,7 +41,8 @@ workflows:
           rm ara-avatar-usdz.zip
 
           test -s "ChatAI/Resources/Ara-Avatar.usdz"
-          echo "Single Ara USDZ with named animation clips is ready to be bundled."
+          test -s "ChatAI/Resources/animation-timeline.json"
+          echo "Ara USDZ and its animation timeline manifest are ready to be bundled."
 
       - name: Install XcodeGen
         script: brew install xcodegen
