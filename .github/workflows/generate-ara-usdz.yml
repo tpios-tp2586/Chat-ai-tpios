@@ -44,7 +44,7 @@ jobs:
           path: ara
 
       - name: Apply ChatAI conversational gesture
-        run: git -C ara apply "$GITHUB_WORKSPACE/patches/ara-3d-gen/talk-explain.patch"
+        run: node scripts/apply-ara-talk-explain.mjs ara
 
       - name: Install Ara dependencies
         working-directory: ara
