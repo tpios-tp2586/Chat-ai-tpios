@@ -17,13 +17,14 @@
 - Chạy thủ công qua GitHub Actions trên `main`; workflow tạo GLB, xác minh rig/animation, tách Idle/Wave/Talk, tối ưu, chuyển USDZ và kiểm tra animation.
 - Workflow lưu artifact trung gian 14 ngày và phát hành 3 USDZ cùng SHA/report vào Release tag `ara-avatar-v1` của repo ChatAI.
 - Workflow dùng `GITHUB_TOKEN` tự cấp với quyền `contents: write`; không cần PAT riêng.
-- App tải từng clip theo nhu cầu, kiểm tra SHA-256 và lưu cache trong Application Support. **Lưu ý:** repo ChatAI Private nên URL Release không thể tải ẩn danh trực tiếp từ iPhone; cần xử lý cơ chế phân phối có xác thực trước khi coi tính năng tải model hoàn tất. Không nhúng token GitHub vào app và không đóng gói USDZ vào IPA.
+- Codemagic lấy artifact `ara-avatar-usdz` bằng `GITHUB_TOKEN` từ nhóm `ara_secrets`, giải nén ba USDZ vào `ChatAI/Resources` trước khi chạy XcodeGen/build. XcodeGen đưa thư mục này vào app bundle; `AraAvatarView` nạp bằng `Bundle.main`, không tải Release/URLSession và không cần đăng nhập GitHub trong app.
+- Chat Voice chuyển clip sang Talk khi `liveManager.aiSpeaking == true`, trở về Idle khi kết thúc lời nói.
 
 ## Việc cần kiểm tra tiếp
 1. Chạy workflow `Generate Ara USDZ avatar assets` thủ công và xác nhận đủ ba USDZ được phát hành.
-2. Giải quyết quyền tải model từ repo Private cho app iPhone mà không nhúng token.
-3. Chạy Codemagic build IPA và sửa lỗi compile nếu có.
-4. Cài trên iPhone: xác nhận tải Idle, chuyển Talk/Wave, cache hoạt động khi mở lại và khi offline.
+2. Chạy Codemagic build IPA; xác nhận `ara_secrets` có `GITHUB_TOKEN` đọc được Actions artifacts của repo ChatAI.
+3. Kiểm tra IPA chứa đủ `Ara-Idle.usdz`, `Ara-Wave.usdz`, `Ara-Talk.usdz` trong app bundle.
+4. Cài trên iPhone: kiểm tra Idle/Talk/Wave và log Bundle lookup; không cần mạng để nạp clip sau khi cài.
 5. Chỉ sau khi Ara chạy ổn mới dọn ảnh tham khảo trong `Reference/FaceExpressions` nếu không còn cần giữ.
 
 ## Đã loại bỏ
