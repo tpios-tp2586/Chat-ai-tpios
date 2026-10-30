@@ -118,8 +118,47 @@
 8. **Nghiệm thu:** app test phải nạp một USDZ; log thấy đủ animation names; chuyển Idle → Wave → Idle → Talk → TalkExplain → Talk không mất/nháy nhân vật; âm thanh không bị gián đoạn; kiểm tra trên iPhone thực tế trước khi gọi là ổn định. Chỉ sau đó mới đưa asset/pipeline vào ChatAI.
 - Không chạy GitHub Actions, không build và không sửa code trong giai đoạn nghiên cứu/duyệt kế hoạch. Khi user duyệt kế hoạch, vẫn xác nhận riêng trước lần chạy Action cần thiết để tạo artifact.
 
-## Việc cần làm khi tiếp tục chat mới — cập nhật
-- Đọc file này trước; đây là nguồn bối cảnh chuẩn để tiếp tục, không yêu cầu user kể lại hai repo và pipeline.
-- Chờ user duyệt kế hoạch trước khi sửa code.
-- Nếu được duyệt, bắt đầu từ repo Ara-Avatar-Test và lỗi runtime nạp USDZ đã được user báo; không sửa ChatAI trước khi test riêng đạt.
-- Không chạy workflow/Action hoặc build nếu chưa được user cho phép theo bước.
+## Việc cần làm khi tiếp tục chat mới — trạng thái mới nhất
+- Đọc file này trước; đây là nguồn bối cảnh chuẩn.
+- Tiếp tục trực tiếp trên `main` của ChatAI; không tạo/chuyển branch.
+- Không quay lại Ara-Avatar-Test trừ khi user đổi quyết định.
+- Trước khi yêu cầu Codemagic build IPA, cần tạo artifact mới `ara-avatar-usdz` bằng workflow `Generate Ara USDZ avatar assets` vì Codemagic hiện đã chuyển sang yêu cầu `ChatAI/Resources/Ara-Avatar.usdz`.
+- User chưa yêu cầu chạy workflow hoặc Codemagic trong lượt triển khai này; hiện chưa có build/device verification.
+
+## Ara — triển khai trực tiếp trên ChatAI (2026-10-30)
+
+### Nguồn nghiên cứu được đưa vào project
+- Nguồn gốc: https://github.com/olatunde85/3d-gen
+- Commit upstream được pin trong workflow: `e26cdef1464a0babf23bb0235b5f05930301ee25` (để tránh thay đổi ngoài ý muốn khi upstream cập nhật).
+- Tài liệu đã đối chiếu trực tiếp:
+  - `docs/animations.md`: 70 clips, phân nhóm; Wave/Cheer/Laugh/Talk là Emotes; Talk là loop và chỉ có đầu/cổ/brow, không có gesture tay giải thích.
+  - `src/core/anim/clips/emotes.ts`: code gốc Wave/Cheer/Laugh/Talk; Wave vẫy tay, Talk lấy Idle làm nền và thêm chuyển động đầu/cổ.
+  - `src/core/anim/clips/faces.ts` + `docs/faces.md`: facial blend shapes và speech visemes.
+  - `src/export/glb.ts`: exporter ghi một glTF animation cho mỗi clip, gồm rotation channel cho toàn bộ bone của rig, root translation và morph weights nếu có.
+  - `docs/exporting.md`: upstream hỗ trợ xuất một file chứa nhiều animation; vì vậy ChatAI không cần giữ ba model USDZ riêng.
+  - `docs/rigging.md` và `docs/architecture.md`: rig game, hand IK và evaluator dùng chung cho preview/export.
+- License: source MIT; MakeHuman character data CC0 1.0; motion capture CMU có điều kiện không bán lại riêng dữ liệu mocap đã chuyển đổi và yêu cầu giữ acknowledgement theo upstream.
+
+### Thiết kế hiện tại
+- Một file `Ara-Avatar.usdz`, một skeleton/mesh/Entity, chứa bốn animation có tên: `Idle`, `Wave`, `Talk`, `TalkExplain`.
+- `TalkExplain` là clip custom do ChatAI patch vào upstream source: giữ nền Talk, thêm cử chỉ mở bàn tay phải nhỏ, nhịp đưa tay ra rồi thu về trong 2.8 giây; one-shot, không loop.
+- Workflow checkout upstream tại commit đã pin, áp dụng `patches/ara-3d-gen/talk-explain.patch`, export GLB, giữ bốn animation trong một GLB, compact, convert thành một USDZ và kiểm tra USDZ có đúng bốn `skelAnimations`.
+- Release mới dự kiến là `ara-avatar-v2`; release `ara-avatar-v1` chứa ba USDZ cũ vẫn được giữ nguyên.
+- Codemagic đã đổi sang lấy artifact `ara-avatar-usdz` mới nhất và bundle duy nhất `Ara-Avatar.usdz`; IPA artifact vẫn giữ nguyên, không thêm ZIP build artifact.
+
+### Code ChatAI đã cập nhật
+- `ChatAI/AraAvatarView.swift`: bỏ cache ba Entity riêng; nạp một USDZ duy nhất, log danh sách `availableAnimations`, phát animation theo tên trên cùng Entity và cross-fade 0.25 giây. Idle/Talk loop; Wave/TalkExplain chạy một lần.
+- `ChatAI/CompanionChatView.swift`: theo dõi cả số dòng và `lines.last?.text` để bắt nội dung transcript được nối thêm; nhận diện một số cụm tiếng Việt/Anh như “để em giải thích”, “đầu tiên”, “ví dụ”, “tóm lại” để phát TalkExplain một lần trong lượt nói, sau 2.8 giây trở về Talk. Wave lúc vào live rút từ 3 giây xuống 1.6 giây.
+- Không sửa `LiveVoice.swift`, API, PCM/audio playback, voice session, chat history, Text Chat hoặc Chibi Chat.
+- Giữ log chẩn đoán hiện có; bổ sung log animation names và animation đang phát.
+
+### Giới hạn kỹ thuật cần nhớ
+- RealityKit `Entity.availableAnimations` cung cấp các AnimationResource được import và hỗ trợ; `playAnimation(_:transitionDuration:...)` hỗ trợ cross-fade. Apple docs: https://developer.apple.com/documentation/realitykit/entity/availableanimations và https://developer.apple.com/documentation/realitykit/entity/playanimation%28_%3Atransitionduration%3Ablendlayeroffset%3Aseparateanimatedvalue%3Astartspaused%3Aclock%3A%29
+- RealityKit chỉ hỗ trợ tối đa hai animation đồng thời trên một entity; do exporter tạo full-rig tracks, không chồng Talk và TalkExplain như hai layer độc lập. Thiết kế hiện tại chuyển tiếp giữa các clip trên cùng entity.
+- Talk upstream tạo viseme giả lập để preview, không đồng bộ thật với PCM của Gemini Live. Cử chỉ TalkExplain chỉ đồng bộ gần đúng theo transcript/cụm từ, không theo timestamp từng âm tiết. Không được mô tả đây là lip-sync thật.
+- Không đưa cả 70 clips vào app; chỉ đóng gói bốn clip hội thoại cần thiết.
+
+### Trạng thái xác minh
+- Đã cập nhật code và workflow trên `main`; chưa chạy GitHub Actions, chưa tạo artifact `ara-avatar-v2`, chưa chạy Codemagic và chưa kiểm tra trên iPhone.
+- Vì vậy không tuyên bố tính năng đã build hoặc chạy ổn định. Codemagic hiện cần artifact mới trước lần build tiếp theo; nếu chạy trước khi có artifact mới, file `Ara-Avatar.usdz` sẽ không tồn tại trong artifact cũ.
+- User đã chọn không dùng repo test riêng; bước xác minh tiếp theo sẽ là workflow tạo USDZ rồi Codemagic build IPA, sau đó user kiểm tra trực tiếp trên iPhone.
