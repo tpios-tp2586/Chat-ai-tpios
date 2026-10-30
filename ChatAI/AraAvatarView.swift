@@ -3,7 +3,15 @@ import RealityKit
 import SwiftUI
 
 struct AraAvatarView: View {
-    enum Clip: String { case idle = "Ara-Idle", wave = "Ara-Wave", talk = "Ara-Talk" }
+    enum Clip: String {
+        case idle = "Idle"
+        case wave = "Wave"
+        case talk = "Talk"
+        case talkExplain = "TalkExplain"
+
+        var loops: Bool { self == .idle || self == .talk }
+    }
+
     let clip: Clip
     let onLog: (String) -> Void
     @StateObject private var loader = AraAvatarLoader()
@@ -53,33 +61,29 @@ private final class AraAvatarLoader: ObservableObject {
     @Published var entity: Entity?
     @Published var status = "Đang nạp avatar Ara…"
     var onLog: ((String) -> Void)?
+
+    private var requestedClip: AraAvatarView.Clip?
     private var activeClip: AraAvatarView.Clip?
-    private var loadID = 0
+    private var animations: [String: AnimationResource] = [:]
     private var loadSubscription: AnyCancellable?
-    private var cache: [AraAvatarView.Clip: Entity] = [:]
+    private var playback: AnimationPlaybackController?
 
     func show(_ clip: AraAvatarView.Clip) {
-        guard activeClip != clip || entity == nil else { return }
-        activeClip = clip
-        loadID += 1
-        let requestID = loadID
-        loadSubscription?.cancel()
-
-        if let cachedModel = cache[clip] {
-            play(cachedModel)
-            entity = cachedModel
-            status = "Đã chuyển sang \(clip.rawValue) (cache)"
-            onLog?("[ARA] Reused cached clip: \(clip.rawValue)")
+        requestedClip = clip
+        guard let entity else {
+            guard loadSubscription == nil else { return }
+            load()
             return
         }
+        guard activeClip != clip else { return }
+        play(clip, on: entity)
+    }
 
-        status = entity == nil
-            ? "Đang nạp \(clip.rawValue) từ app bundle…"
-            : "Đang chuẩn bị \(clip.rawValue); giữ Ara hiện tại…"
-
-        guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
-            status = "Không tìm thấy \(clip.rawValue).usdz trong app bundle"
-            onLog?("[ARA] Bundle lookup failed: \(clip.rawValue).usdz")
+    private func load() {
+        status = "Đang nạp Ara-Avatar.usdz từ app bundle…"
+        guard let url = Bundle.main.url(forResource: "Ara-Avatar", withExtension: "usdz") else {
+            status = "Không tìm thấy Ara-Avatar.usdz trong app bundle"
+            onLog?("[ARA] Bundle lookup failed: Ara-Avatar.usdz")
             return
         }
         onLog?("[ARA] Found bundled asset: \(url.lastPathComponent)")
@@ -87,27 +91,40 @@ private final class AraAvatarLoader: ObservableObject {
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
-                if case .failure = completion {
-                    self?.status = "Lỗi nạp \(clip.rawValue)"
-                    self?.onLog?("[ARA] Load failed: \(clip.rawValue)")
+                guard let self else { return }
+                self.loadSubscription = nil
+                if case .failure(let error) = completion {
+                    self.status = "Lỗi nạp Ara-Avatar.usdz: \(error.localizedDescription)"
+                    self.onLog?("[ARA] USDZ load failed: \(error.localizedDescription)")
                 }
             }, receiveValue: { [weak self] model in
-                guard let self, requestID == self.loadID else { return }
-                guard model.availableAnimations.first != nil else {
-                    self.status = "Đã nạp model nhưng không có animation"
-                    return
-                }
-                self.cache[clip] = model
-                self.play(model)
+                guard let self else { return }
                 self.entity = model
-                self.status = "Đã nạp \(clip.rawValue) từ app bundle"
-                self.onLog?("[ARA] Clip ready and cached: \(clip.rawValue)")
+                self.animations.removeAll()
+                for animation in model.availableAnimations {
+                    self.animations[animation.name.lowercased()] = animation
+                }
+                let names = model.availableAnimations.map(\.name).joined(separator: ", ")
+                self.onLog?("[ARA] Imported animations (\(model.availableAnimations.count)): \(names)")
+                guard let clip = self.requestedClip else { return }
+                self.play(clip, on: model)
             })
     }
 
-    private func play(_ model: Entity) {
-        guard let animation = model.availableAnimations.first else { return }
-        model.playAnimation(animation.repeat())
+    private func play(_ clip: AraAvatarView.Clip, on model: Entity) {
+        guard let animation = animations[clip.rawValue.lowercased()] else {
+            status = "Không tìm thấy animation \(clip.rawValue) trong Ara-Avatar.usdz"
+            onLog?("[ARA] Missing animation: \(clip.rawValue); available: \(animations.keys.sorted().joined(separator: ", "))")
+            return
+        }
+
+        playback = model.playAnimation(
+            clip.loops ? animation.repeat() : animation,
+            transitionDuration: 0.25
+        )
+        activeClip = clip
+        status = "Đang phát animation \(clip.rawValue)"
+        onLog?("[ARA] Playing \(clip.rawValue) on the same Entity")
     }
 }
 
