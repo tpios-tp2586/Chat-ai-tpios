@@ -1,5 +1,4 @@
 import Combine
-import CryptoKit
 import RealityKit
 import SwiftUI
 
@@ -24,34 +23,18 @@ struct AraAvatarView: View {
         }
         .task { loader.onLog = onLog; loader.show(clip) }
         .onChange(of: clip) { loader.show($0) }
-        .onReceive(loader.$status.dropFirst()) { onLog("[ARA] \($0)") }
+        .onReceive(loader.$status.dropFirst()) { onLog("[ARA] \\($0)") }
     }
 }
 
 @MainActor
 private final class AraAvatarLoader: ObservableObject {
     @Published var entity: Entity?
-    @Published var status = "Đang tải avatar Ara…"
+    @Published var status = "Đang nạp avatar Ara…"
     var onLog: ((String) -> Void)?
-
     private var activeClip: AraAvatarView.Clip?
     private var loadID = 0
     private var loadSubscription: AnyCancellable?
-
-    private let assets: [AraAvatarView.Clip: (url: String, sha256: String)] = [
-        .idle: (
-            "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v1/Ara-Idle.usdz",
-            "cafb0757cf9ae7067722d0f782422abec57d58da24e638c55a1a446984186201"
-        ),
-        .talk: (
-            "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v1/Ara-Talk.usdz",
-            "f1885941f9cdc4d71e67c19ca3e93b0c4edaaa9c1af20b3636ee12f8acc251dd"
-        ),
-        .wave: (
-            "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v1/Ara-Wave.usdz",
-            "657db823be57368b0f5b1cfa4f6fa73c2ba112107e5adaca74cc008ded82ffc2"
-        )
-    ]
 
     func show(_ clip: AraAvatarView.Clip) {
         guard activeClip != clip || entity == nil else { return }
@@ -59,63 +42,32 @@ private final class AraAvatarLoader: ObservableObject {
         loadID += 1
         let requestID = loadID
         loadSubscription?.cancel()
-        status = "Đang chuẩn bị \(clip.rawValue)…"
+        entity = nil
+        status = "Đang nạp \\(clip.rawValue) từ app bundle…"
 
-        Task {
-            do {
-                let url = try await localURL(for: clip)
-                guard requestID == loadID else { return }
-                loadSubscription = Entity.loadAsync(contentsOf: url)
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { [weak self] completion in
-                        if case .failure(let error) = completion {
-                            self?.status = "Lỗi tải model: \(error.localizedDescription)"
-                        }
-                    }, receiveValue: { [weak self] model in
-                        guard let self, requestID == self.loadID else { return }
-                        if let animation = model.availableAnimations.first {
-                            model.playAnimation(animation.repeat())
-                        }
-                        self.entity = model
-                        self.status = "Đã tải \(clip.rawValue)"
-                    })
-            } catch {
-                guard requestID == loadID else { return }
-                status = "Không tải được \(clip.rawValue): \(error.localizedDescription)"
-            }
+        guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
+            status = "Không tìm thấy \\(clip.rawValue).usdz trong app bundle"
+            onLog?("[ARA] Bundle lookup failed: \\(clip.rawValue).usdz")
+            return
         }
-    }
+        onLog?("[ARA] Found bundled asset: \\(url.lastPathComponent)")
 
-    private func localURL(for clip: AraAvatarView.Clip) async throws -> URL {
-        guard let asset = assets[clip] else { throw URLError(.badURL) }
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("AraAvatar/ara-avatar-v1", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent("\(clip.rawValue).usdz")
-
-        if FileManager.default.fileExists(atPath: destination.path),
-           try sha256(of: destination) == asset.sha256 {
-            return destination
-        }
-
-        status = "Đang tải \(clip.rawValue) (khoảng 34 MB)…"
-        let (temporaryURL, response) = try await URLSession.shared.download(from: URL(string: asset.url)!)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw URLError(.badServerResponse)
-        }
-        let digest = try sha256(of: temporaryURL)
-        guard digest == asset.sha256 else {
-            try? FileManager.default.removeItem(at: temporaryURL)
-            throw URLError(.cannotDecodeContentData)
-        }
-        try? FileManager.default.removeItem(at: destination)
-        try FileManager.default.moveItem(at: temporaryURL, to: destination)
-        return destination
-    }
-
-    private func sha256(of url: URL) throws -> String {
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        loadSubscription = Entity.loadAsync(contentsOf: url)
+            .receive(on: DispatchQueue.main)
+            .sink(receiveCompletion: { [weak self] completion in
+                if case .failure(let error) = completion {
+                    self?.status = "Lỗi nạp model: \\(error.localizedDescription)"
+                }
+            }, receiveValue: { [weak self] model in
+                guard let self, requestID == self.loadID else { return }
+                guard let animation = model.availableAnimations.first else {
+                    self.status = "Đã nạp model nhưng không có animation"
+                    return
+                }
+                model.playAnimation(animation.repeat())
+                self.entity = model
+                self.status = "Đã nạp \\(clip.rawValue) từ app bundle"
+            })
     }
 }
 
@@ -126,6 +78,7 @@ private struct AraRealityView: UIViewRepresentable {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
         attach(entity, to: view)
+        context.coordinator.currentEntity = entity
         return view
     }
 
