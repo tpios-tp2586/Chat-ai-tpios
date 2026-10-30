@@ -18,16 +18,22 @@ workflows:
       - name: Download and verify Ara USDZ release assets
         script: |
           set -euo pipefail
+          : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
           : "${CM_COMMIT:?Missing Codemagic source commit SHA}"
           : "${BUILD_NUMBER:?Missing Codemagic build number}"
 
-          RELEASE_URL="https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v2"
           mkdir -p ChatAI/Resources
           curl --fail --location --silent --show-error --retry 2 \
-            "$RELEASE_URL/Ara-Avatar.usdz" \
+            --header "Accept: application/octet-stream" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/692475053" \
             --output ChatAI/Resources/Ara-Avatar.usdz
           curl --fail --location --silent --show-error --retry 2 \
-            "$RELEASE_URL/animation-timeline.json" \
+            --header "Accept: application/octet-stream" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/692475023" \
             --output ChatAI/Resources/animation-timeline.json
 
           printf '%s  %s\n' \
