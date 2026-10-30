@@ -7,7 +7,7 @@ struct AraAvatarView: View {
     let clip: Clip
     let onLog: (String) -> Void
     @StateObject private var loader = AraAvatarLoader()
-    @AppStorage("ara_avatar_zoom_scale") private var savedZoomScale = 1.0
+    @AppStorage("ara_avatar_zoom_scale_v2") private var savedZoomScale = 1.8
     @State private var pinchStartScale = 1.0
 
     private var zoomGesture: some Gesture {
@@ -35,7 +35,7 @@ struct AraAvatarView: View {
             }
         }
         .contentShape(Rectangle())
-        .gesture(zoomGesture)
+        .simultaneousGesture(zoomGesture)
         .task {
             pinchStartScale = savedZoomScale
             loader.onLog = onLog
