@@ -26,6 +26,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
@@ -101,6 +102,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: robotson/usdz-forge
+          ref: d474129ce1f026fa6904c9ac95dd74212a501a9d
           path: usdz-forge
 
       - name: Prepare USDZ texture packaging
@@ -111,17 +113,17 @@ jobs:
           converter = Path("usdz-forge/engine/native/usdzconvert")
           source = converter.read_text()
           old = """    if dstIsUsdz:
-                  # construct .usdz archive from the .usdc file
-                  UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
+        # construct .usdz archive from the .usdc file
+        UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
           """
           new = """    if dstIsUsdz:
-                  # The GLB reader writes embedded images under textures/.
-                  # The ARKit packager resolves localized assets under 0/.
-                  textures = os.path.join(tmpFolder, 'textures')
-                  if os.path.isdir(textures):
-                      copytree(textures, os.path.join(tmpFolder, '0'), dirs_exist_ok=True)
-                  # construct .usdz archive from the .usdc file
-                  UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
+        # The GLB reader writes embedded images under textures/.
+        # Stage them at the ARKit package's localized 0/ path.
+        textures = os.path.join(tmpFolder, 'textures')
+        if os.path.isdir(textures):
+            copytree(textures, os.path.join(tmpFolder, '0'), dirs_exist_ok=True)
+        # construct .usdz archive from the .usdc file
+        UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
           """
           if source.count(old) != 1:
               raise SystemExit("Could not safely locate the USDZ packaging block")
