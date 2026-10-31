@@ -8,8 +8,14 @@ struct AraAvatarView: View {
         case wave = "Wave"
         case talk = "Talk"
         case talkExplain = "TalkExplain"
+        case listening = "AraListening"
+        case thinking = "AraThinking"
+        case empathy = "AraEmpathy"
+        case laugh = "AraLaugh"
 
-        var loops: Bool { self == .idle || self == .talk }
+        var loops: Bool {
+            self == .idle || self == .talk || self == .listening || self == .thinking || self == .empathy
+        }
     }
 
     let clip: Clip
@@ -193,7 +199,7 @@ private final class AraAvatarLoader: ObservableObject {
                     return
                 }
 
-                let requiredNames = ["idle", "wave", "talk", "talkexplain"]
+                let requiredNames = ["idle", "wave", "talk", "talkexplain", "aralistening", "arathinking", "araempathy", "aralaugh"]
                 let missing = requiredNames.filter { clips[$0] == nil }
                 guard missing.isEmpty else {
                     self.status = "Thiếu clip animation: \(missing.joined(separator: ", "))"
