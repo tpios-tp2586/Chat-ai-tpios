@@ -23,6 +23,8 @@ struct CompanionChatView: View {
     @State private var previousAssistantLineIDForTurn: UUID?
     @State private var explainGestureGeneration = UUID()
     @State private var explainGestureTask: Task<Void, Never>?
+    @State private var emotionGestureTask: Task<Void, Never>?
+    @State private var emotionGestureGeneration = UUID()
     @State private var speechStartToken = 0
     @State private var message: String?
     @State private var nightMode = false
@@ -94,6 +96,9 @@ struct CompanionChatView: View {
         .onChange(of: liveManager.lines.last?.text) { _ in
             handleLatestTranscript()
         }
+        .onChange(of: liveManager.faceExpression) { expression in
+            applyAraEmotion(expression)
+        }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
@@ -104,7 +109,8 @@ struct CompanionChatView: View {
                 handleLatestTranscript()
             } else {
                 cancelExplainGesture()
-                avatarClip = .idle
+                cancelEmotionGesture()
+                avatarClip = liveManager.state == .live ? .listening : .idle
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
@@ -125,16 +131,18 @@ struct CompanionChatView: View {
                 emotion = .idle
             case .connecting:
                 emotion = .thinking
+                avatarClip = .thinking
             case .live:
                 emotion = .listening
                 avatarClip = .wave
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-                    if liveManager.state == .live && !liveManager.aiSpeaking { avatarClip = .idle }
+                    if liveManager.state == .live && !liveManager.aiSpeaking { avatarClip = .listening }
                 }
             }
         }
         .onDisappear {
             cancelExplainGesture()
+            cancelEmotionGesture()
             liveManager.end()
         }
     }
@@ -222,6 +230,48 @@ struct CompanionChatView: View {
                     Button("Đóng") { showDiagnosticLog = false }
                 } }
         }
+    }
+
+    private func applyAraEmotion(_ expression: RobotFaceExpression) {
+        guard avatarClip != .wave && avatarClip != .talkExplain else { return }
+        switch expression {
+        case .listening:
+            avatarClip = .listening
+        case .thinking, .confused:
+            avatarClip = .thinking
+        case .speaking:
+            avatarClip = .talk
+        case .happy:
+            playAraLaugh()
+        case .sad:
+            avatarClip = .empathy
+        case .idle, .surprised, .angry, .sleepy:
+            break
+        }
+    }
+
+    private func playAraLaugh() {
+        emotionGestureTask?.cancel()
+        let generation = UUID()
+        emotionGestureGeneration = generation
+        avatarClip = .laugh
+        addDiagnostic("[ARA] AraLaugh triggered by happy mood")
+        emotionGestureTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 2_400_000_000)
+            } catch {
+                return
+            }
+            guard emotionGestureGeneration == generation, avatarClip == .laugh else { return }
+            avatarClip = liveManager.aiSpeaking ? .talk : (liveManager.state == .live ? .listening : .idle)
+            emotionGestureTask = nil
+        }
+    }
+
+    private func cancelEmotionGesture() {
+        emotionGestureGeneration = UUID()
+        emotionGestureTask?.cancel()
+        emotionGestureTask = nil
     }
 
     private func handleLatestTranscript() {
