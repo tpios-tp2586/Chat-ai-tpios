@@ -202,3 +202,18 @@
 2. Trong log Codemagic, xác nhận bước tải artifact hoàn tất và hai file được tìm thấy trong `ChatAI/Resources`; sau đó xác nhận Xcode build và đóng gói IPA thành công.
 3. Cài IPA lên iPhone và mở Chat Voice. Dùng nút log để kiểm tra: USDZ được tìm thấy, source animation được import, manifest có 8 clip/26 giây, tạo đủ 8 AnimationView và phát clip đầu tiên không lỗi.
 4. Kiểm tra lần lượt Listening, Thinking, Empathy (loop) và Laugh (one-shot); không chỉnh chatbot, Text Chat hoặc Chibi Chat trong lượt kiểm tra này.
+
+
+## TalkExplain — sửa điều kiện kích hoạt — 2026-10-31
+- Kiểm tra log iPhone gần nhất: app tải USDZ/manifest, tạo đủ 8 AnimationView; nhưng không có log `TalkExplain triggered`, nên chưa có bằng chứng clip này từng được yêu cầu phát trong hội thoại.
+- Nguyên nhân ở runtime: `CompanionChatView.handleLatestTranscript()` chỉ kích hoạt khi transcript assistant đang nói chứa một số cụm từ cố định; cách diễn đạt khác không kích hoạt. Cờ `didTriggerExplainGesture` trước đây còn bị reset khi bất kỳ dòng transcript mới nào được thêm.
+- Đã sửa trên `main`:
+  - Chỉ reset cờ gesture khi có dòng thoại mới từ user.
+  - Nhận diện cue tiếng Việt không dấu/có dấu (sau chuẩn hóa) và tiếng Anh; thêm các tín hiệu giải thích, ví dụ, trình tự, nguyên nhân, hướng dẫn, so sánh, tổng kết.
+  - Nhận diện danh sách có từ hai mục trở lên.
+  - Ghi log khi TalkExplain bị bỏ qua vì không có cue, khi được kích hoạt và khi kết thúc trở về Talk.
+  - Không thêm dependency; không thay đổi LiveVoiceManager, audio, API, Text Chat hoặc Chibi Chat.
+- Commits:
+  - `23ac5dde4ab5c8f92024f9d6b9efc2f62ebd6527` — sửa luồng reset và nhận diện cue.
+  - `19c79088c73035fb1c4eaa93de60dcffd8343101` — chuẩn hóa chữ `đ` và regex danh sách.
+- Chưa chạy Xcode/Codemagic build và chưa kiểm chứng cử chỉ tay trên iPhone. Build tiếp theo cần quan sát cả hai log: `[ARA] TalkExplain triggered: ...` và `[ARA] Playing TalkExplain from the global timeline`. Nếu có log phát mà tay vẫn không chuyển động, cần kiểm tra dữ liệu joint animation của clip trong GLB/USDZ; không tiếp tục chỉnh điều kiện transcript.
