@@ -93,6 +93,32 @@ jobs:
           repository: robotson/usdz-forge
           path: usdz-forge
 
+      - name: Prepare USDZ texture packaging
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          converter = Path("usdz-forge/engine/native/usdzconvert")
+          source = converter.read_text()
+          old = """    if dstIsUsdz:
+                  # construct .usdz archive from the .usdc file
+                  UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
+          """
+          new = """    if dstIsUsdz:
+                  # The GLB reader writes embedded images under textures/.
+                  # The ARKit packager resolves localized assets under 0/.
+                  textures = os.path.join(tmpFolder, 'textures')
+                  if os.path.isdir(textures):
+                      copytree(textures, os.path.join(tmpFolder, '0'), dirs_exist_ok=True)
+                  # construct .usdz archive from the .usdc file
+                  UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
+          """
+          if source.count(old) != 1:
+              raise SystemExit("Could not safely locate the USDZ packaging block")
+          converter.write_text(source.replace(old, new, 1))
+          print("Prepared embedded GLB textures for ARKit USDZ packaging.")
+          PY
+
       - name: Set up USDZ conversion engine
         working-directory: usdz-forge
         run: ./engine/setup-engine.sh
@@ -121,7 +147,22 @@ jobs:
           grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*780" output-usdz/usdz-report.txt
           grep -q "timeCodesPerSecond: 30.0" output-usdz/usdz-report.txt
           grep -q "GLB animations=75" output-usdz/animation-diagnostics.txt
-          grep -q "TalkExplain/RightForeArm" output-usdz/usdz-animation-diagnostics.txt
+          "$PY" - <<'PY'
+          import re
+          from pathlib import Path
+          report = Path("output-usdz/usdz-animation-diagnostics.txt").read_text()
+          for joint in ("RightArm", "RightForeArm", "RightHand"):
+              match = re.search(rf"^{joint}: maxAngleDeltaVsTalk=([0-9.]+)deg;", report, re.M)
+              if not match or float(match.group(1)) < 10:
+                  raise SystemExit(f"{joint} TalkExplain motion is missing or below 10 degrees")
+              print(f"{joint} TalkExplain delta: {match.group(1)} degrees")
+          PY
+          "$PY" usdz-forge/engine/check_texture.py "$DEST" | tee output-usdz/texture-diagnostics.txt
+          if grep -q "RESOLVES      : NO" output-usdz/texture-diagnostics.txt; then
+            echo "USDZ contains unresolved texture references"
+            exit 1
+          fi
+          grep -q "RESOLVES      : YES" output-usdz/texture-diagnostics.txt
           test -s output-usdz/ara-research-data.json.gz
           ANIMATED="$("$PY" usdz-forge/engine/native/probe_usdz.py "$DEST")"
           test "$ANIMATED" = "1"
@@ -151,6 +192,7 @@ jobs:
             output-usdz/animation-timeline.json
             output-usdz/animation-diagnostics.txt
             output-usdz/usdz-animation-diagnostics.txt
+            output-usdz/texture-diagnostics.txt
             output-usdz/verification-report.txt
             output-usdz/conversion-log.txt
             output-usdz/SHA256SUMS.txt
