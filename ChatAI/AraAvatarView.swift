@@ -117,6 +117,8 @@ private final class AraAvatarLoader: ObservableObject {
     private var animations: [String: AnimationResource] = [:]
     private var loadSubscription: AnyCancellable?
     private var playback: AnimationPlaybackController?
+    private var hipSwayAnimation: AnimationResource?
+    private var hipSwayPlayback: AnimationPlaybackController?
 
     func show(_ clip: AraAvatarView.Clip) {
         requestedClip = clip
@@ -208,6 +210,53 @@ private final class AraAvatarLoader: ObservableObject {
                 }
 
                 self.animations = clips
+
+                do {
+                    let angles: [Float] = [
+                        0,
+                        0.3535534,
+                        0.5,
+                        0.3535534,
+                        0,
+                        -0.3535534,
+                        -0.5,
+                        -0.3535534,
+                        0
+                    ]
+                    let frames = angles.map { degrees -> JointTransforms in
+                        let rotation = simd_quatf(
+                            angle: degrees * Float.pi / 180,
+                            axis: SIMD3<Float>(0, 1, 0)
+                        )
+                        return JointTransforms([
+                            Transform(
+                                scale: SIMD3<Float>(repeating: 1),
+                                rotation: rotation,
+                                translation: SIMD3<Float>(repeating: 0)
+                            )
+                        ])
+                    }
+                    let definition = SampledAnimation<JointTransforms>(
+                        jointNames: ["Hips"],
+                        frames: frames,
+                        name: "AraHipSway",
+                        tweenMode: .linear,
+                        frameInterval: 0.15625,
+                        isAdditive: true,
+                        isScaleAnimated: false,
+                        isRotationAnimated: true,
+                        isTranslationAnimated: false,
+                        bindTarget: .transform,
+                        blendLayer: 100,
+                        repeatMode: .repeat
+                    )
+                    self.hipSwayAnimation = try AnimationResource.generate(with: definition)
+                    self.onLog?("[ARA] Hip sway ready: Hips ±0.5°, 0.8Hz, additive")
+                } catch {
+                    self.hipSwayAnimation = nil
+                    self.onLog?("[ARA] Hip sway generation failed: \(error.localizedDescription)")
+                }
+
                 self.entity = model
                 let clipSummary = timeline.clips.map {
                     "\($0.name)(\(String(format: "%.2f", $0.start))-\(String(format: "%.2f", $0.end))s)"
@@ -217,6 +266,22 @@ private final class AraAvatarLoader: ObservableObject {
                 guard let clip = self.requestedClip else { return }
                 self.play(clip, on: model)
             })
+    }
+
+    private func stopHipSway() {
+        guard let sway = hipSwayPlayback else { return }
+        if sway.isValid {
+            sway.stop()
+        }
+        hipSwayPlayback = nil
+    }
+
+    private func startHipSway(on model: Entity) {
+        stopHipSway()
+        guard let hipSwayAnimation else { return }
+        let sway = model.playAnimation(hipSwayAnimation, transitionDuration: 0)
+        hipSwayPlayback = sway
+        onLog?("[ARA] Hip sway started")
     }
 
     private func play(_ clip: AraAvatarView.Clip, on model: Entity) {
@@ -234,6 +299,12 @@ private final class AraAvatarLoader: ObservableObject {
             } else {
                 onLog?("[ARA] Previous playback already inactive: clip=\(activeClip?.rawValue ?? "unknown")")
             }
+        }
+
+        if clip == .talk || clip == .listening {
+            startHipSway(on: model)
+        } else {
+            stopHipSway()
         }
 
         let nextPlayback = model.playAnimation(
