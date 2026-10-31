@@ -83,3 +83,11 @@
 - Artifact GitHub Actions được Codemagic tải phải chứa `Ara-Avatar.usdz` và `animation-timeline.json` đồng bộ cùng run.
 - Sau khi có asset run mới, build IPA trên `main`, cài iPhone thật và đối chiếu log TalkExplain với `animation-diagnostics.txt`.
 - ZIP chỉ là file tạm nội bộ của workflow; artifact cuối mong muốn vẫn chỉ IPA.
+
+## USDZ post-conversion joint diagnostics — 2026-10-31
+- Latest successful run 41192273828 confirmed GLB `TalkExplain` differs strongly from `Talk` in arm joints: RightArm 49.729°, RightForeArm 103.471°, RightHand 37.736° (sampled quaternion delta); Head 0.822°, Neck 0.345°.
+- The same run converted USDZ successfully, retaining 1 UsdSkel animation, 780 timecodes at 30 fps, and 34 morph targets. Converter emitted `Skeletal animation contains node animation` plus unresolved generated texture references; neither warning alone proves arm animation loss.
+- Added `scripts/inspect-ara-usdz-animation.py` to read actual `UsdSkel.Animation` joint rotation arrays from the converted USDZ and sample Talk/TalkExplain at matching normalized times. It reports max angular difference and within-clip sampled rotation steps for torso/head/right-arm joints.
+- Updated `.github/workflows/generate-ara-usdz.yml` to run this diagnostic after conversion and include `usdz-animation-diagnostics.txt` in the USDZ artifact and release.
+- Next: run the workflow on `main` and compare the new USDZ report against `animation-diagnostics.txt`. Do not build Codemagic IPA until post-conversion results are reviewed.
+\n
