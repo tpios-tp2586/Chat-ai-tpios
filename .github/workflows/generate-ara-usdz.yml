@@ -113,17 +113,17 @@ jobs:
           converter = Path("usdz-forge/engine/native/usdzconvert")
           source = converter.read_text()
           old = """    if dstIsUsdz:
-        # construct .usdz archive from the .usdc file
-        UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
+                  # construct .usdz archive from the .usdc file
+                  UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
           """
           new = """    if dstIsUsdz:
-        # The GLB reader writes embedded images under textures/.
-        # Stage them at the ARKit package's localized 0/ path.
-        textures = os.path.join(tmpFolder, 'textures')
-        if os.path.isdir(textures):
-            copytree(textures, os.path.join(tmpFolder, '0'), dirs_exist_ok=True)
-        # construct .usdz archive from the .usdc file
-        UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
+                  # The GLB reader writes embedded images under textures/.
+                  # Stage them at the ARKit package's localized 0/ path.
+                  textures = os.path.join(tmpFolder, 'textures')
+                  if os.path.isdir(textures):
+                      copytree(textures, os.path.join(tmpFolder, '0'), dirs_exist_ok=True)
+                  # construct .usdz archive from the .usdc file
+                  UsdUtils.CreateNewARKitUsdzPackage(tmpPath, dstPath)
           """
           if source.count(old) != 1:
               raise SystemExit("Could not safely locate the USDZ packaging block")
