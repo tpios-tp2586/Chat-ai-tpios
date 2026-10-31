@@ -124,3 +124,5 @@
 - Converter log showed unresolved generated texture paths 0/texgen_0..11. The USDZ Forge GLB converter writes embedded images to its temporary textures/ folder, while the ARKit package localization warnings refer to the 0/ package path. Workflow now stages those texture files at the resolver's expected 0/ path before packaging, then runs the bundled engine/check_texture.py against the finished USDZ. Any unresolved texture reference now fails with a direct diagnostic.
 - Replaced the incorrect arm-track grep with numeric checks that require at least 10° TalkExplain-vs-Talk delta for RightArm, RightForeArm, and RightHand. Texture diagnostics are included in both the artifact and release.
 - This is a workflow-only correction; no app Swift code, chatbot/API, history, Text Chat, Chibi Chat, or voice pipeline changed. No new Action or Codemagic build has been started.
+
+- Added optional workflow input source_run_id: when supplied, the generate job is skipped and convert downloads ara-avatar-glb from that earlier run. For the next retry, use source_run_id=41197339845 so the already-generated GLB is reused and the expensive model generation is not repeated.
