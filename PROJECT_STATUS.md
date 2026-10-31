@@ -90,7 +90,6 @@
 - Added `scripts/inspect-ara-usdz-animation.py` to read actual `UsdSkel.Animation` joint rotation arrays from the converted USDZ and sample Talk/TalkExplain at matching normalized times. It reports max angular difference and maximum angular range from each clip's starting pose for torso/head/right-arm joints.
 - Updated `.github/workflows/generate-ara-usdz.yml` to run this diagnostic after conversion and include `usdz-animation-diagnostics.txt` in the USDZ artifact and release.
 - Next: run the workflow on `main` and compare the new USDZ report against `animation-diagnostics.txt`. Do not build Codemagic IPA until post-conversion results are reviewed.
-\n
 
 ## Ara playback handoff — 2026-10-31
 - Code review found AraAvatarLoader.play() replaced its stored AnimationPlaybackController without explicitly stopping the previous controller. This left the runtime handoff insufficiently observable and potentially allowed overlapping full-rig playback.
@@ -106,16 +105,14 @@
 - This change affects the GLB generation source only. It does not alter an already-generated Ara-Avatar.usdz embedded in an IPA. Required verification order: run `.github/workflows/generate-ara-usdz.yml` on `main`; inspect the new GLB and USDZ diagnostics for right shoulder/arm/forearm/hand tracks and pose range; only if those checks pass, build IPA with Codemagic and test on iPhone.
 - No Codemagic build was started. No other branches created. Text Chat, Chibi Chat, chatbot/API, chat history, and voice pipeline were not modified.
 
-
 ## Ara — one-run research bundle (2026-10-31)
 - User yêu cầu gom đủ dữ liệu chẩn đoán trong một lần chạy để giảm quota GitHub Actions; không chạy Action lặp lại cho từng giả thuyết.
 - Đã tải và kiểm tra artifact thực tế của run 41193640083. Run này dùng commit `35503a754e3473c0060a26eb521a5d5e723382a0`, tức trước patch TalkExplain `11455dc5f5609c9abf9d0508d191f5b1e11b6ff0`; vì vậy đây chỉ là baseline, không xác minh cử chỉ ngực mới.
-- Baseline GLB: 75 animations, 69 joints, 34 morph targets; mỗi clip hội thoại có 71 channels (69 rotation + 1 translation + 1 weights). Talk có 193 morph-weight keyframes, TalkExplain có 85. USDZ baseline: 69 joints, 788 rotation time samples, timeline 26s/30fps. Báo cáo cũ chỉ lấy mẫu góc xoay 10 joints, chưa lưu toàn bộ keyframes.
+- Baseline GLB: 75 animations, 69 joints, 34 morph targets; mỗi clip hội thoại có 71 tracks (69 rotation + 1 translation + 1 weights). Talk có 193 morph-weight keyframes, TalkExplain có 85. USDZ baseline: 69 joints, 788 rotation time samples, timeline 26s/30fps. Báo cáo cũ chỉ lấy mẫu góc xoay 10 joints, chưa lưu toàn bộ keyframes.
 - Bổ sung `scripts/ara-research-data.py`: đọc toàn bộ animation channels/keyframes của GLB (mọi animation, gồm rotation/translation/scale/weights nếu có), rig/joint/morph metadata; đọc USDZ UsdSkel joint translations/rotations/scales và blend-shape weights theo time samples; đóng gói thành `ara-research-data.json.gz`, có hash và provenance (run, commit, preset, detail, upstream pin).
 - Cập nhật `.github/workflows/generate-ara-usdz.yml`: giữ nguyên một workflow generate/convert hiện tại; capture conversion log; artifact retention 90 ngày; tạo một research bundle; publish GLB gốc, USDZ, JSON nghiên cứu nén và diagnostics lên Release tag mới `ara-avatar-v3` (giữ nguyên Release v2). Không thêm workflow hoặc dependency.
 - Đã kiểm tra script Python compile và đọc thành công GLB baseline: 75 animations, 69 joints, 34 morph targets; Talk/TalkExplain mỗi clip 71 tracks, weight width 34. Chưa thể kiểm thử phần USDZ parser cục bộ vì môi trường hiện tại không có `pxr`; phần này sẽ được chạy trong Python 3.14 environment của USDZ Forge ở Action tổng hợp.
 - Chưa chạy GitHub Actions hoặc Codemagic. Trước lần chạy duy nhất cần review thay đổi trên `main`; sau đó kiểm tra JSON.gz và so sánh GLB/USDZ để quyết định có build IPA hay không.
-
 
 ## Ara conversion failure — run #9 and correction (2026-10-31)
 - Run #9 (41197339845) completed GLB generation and successfully created the USDZ and compressed research dataset before failing at the final shell checks. Confirmed output: 69 joints, 34 morph targets, 788 USDZ rotation samples, 30 fps, and a 26-second timeline.
@@ -127,9 +124,18 @@
 
 - Added optional workflow input source_run_id: when supplied, the generate job is skipped and convert downloads ara-avatar-glb from that earlier run. For the next retry, use source_run_id=41197339845 so the already-generated GLB is reused and the expensive model generation is not repeated.
 
-
 ## Ara convert-only retry failure — run #10 (2026-10-31)
 - Run #10 `41198462973` failed at step `Download GLB intermediate artifact`; USDZ conversion did not start. Exact log: `Unable to download artifact(s): Resource not accessible by integration`.
 - The workflow token permissions showed only `Contents: write` and `Metadata: read`; cross-run artifact download needs `Actions: read`. Confirmed source artifact `ara-avatar-glb` from run #9 still exists, is not expired, ID `13040824701`, size 8,145,807 bytes.
 - Updated `.github/workflows/generate-ara-usdz.yml` on `main` (commit `2704b88621cb1b97d24bafd4b4be86339da0cfec`): added `actions: read`, pinned USDZ Forge to `d474129ce1f026fa6904c9ac95dd74212a501a9d`, and corrected the texture-patch source block indentation that previously would not match the converter.
 - No new Action or Codemagic build was started after this correction. Next retry should reuse `source_run_id=41197339845`; first confirm the updated workflow permissions and artifact download step succeed before evaluating texture diagnostics.
+
+## Ara — ưu tiên nghiên cứu mới theo xác nhận của user (2026-10-31)
+- User xác nhận lại thứ tự ưu tiên: **biểu cảm nhân vật và ngữ cảnh lời nói trước; chuyển động/cử chỉ cơ thể phối hợp với nội dung lời nói tiếp theo; khẩu hình miệng để nghiên cứu sau**.
+- Mục tiêu trước mắt là làm Ara thể hiện được cảm xúc và phản ứng phù hợp ngữ cảnh hội thoại, đồng thời dùng chuyển động đầu, mắt, vai, thân trên và tay để giao tiếp tự nhiên (ví dụ: vui, buồn, ngạc nhiên, suy nghĩ, đồng cảm, lắng nghe, giải thích, chào).
+- Biểu cảm và gesture phải được chọn theo ý nghĩa/ngữ cảnh của câu nói, không chỉ dựa vào trạng thái kỹ thuật `aiSpeaking` hoặc phát một clip cố định cho mọi câu.
+- **Tạm hoãn nghiên cứu và chỉnh sửa mở miệng/viseme/lip-sync.** Giữ nguyên phần hiện tại; không thay đổi blend-shape khẩu hình hoặc cố đồng bộ miệng với audio trong giai đoạn này.
+- Thứ tự nghiên cứu: (1) kiểm kê 34 blend shapes và xác định nhóm biểu cảm khuôn mặt; (2) xác minh cách RealityKit áp dụng blend shapes/biểu cảm trên USDZ; (3) lập mapping ngữ cảnh hội thoại → biểu cảm; (4) đánh giá và thiết kế gesture cơ thể phù hợp; (5) kiểm thử trên iPhone bằng video thực tế.
+- Video test iPhone gần nhất cho thấy mô hình tải thành công, 8 clip được tạo, Wave và TalkExplain có cử chỉ nhìn thấy được; Talk được kích hoạt nhưng chuyển động cơ thể khi nói chưa rõ. Đây là quan sát thực tế, chưa phải kết luận nguyên nhân kỹ thuật.
+- Log runtime xác nhận TalkExplain được trigger và kết thúc rồi quay về Talk; các dòng `TalkExplain skipped: no explanation cue` là log bỏ qua do chưa có cue, không tự thân là lỗi.
+- Giữ nguyên chatbot/API, voice transport, lịch sử chat, Text Chat và Chibi Chat. Chưa sửa code hoặc chạy workflow/build chỉ để thực hiện việc ghi nhận định hướng này.
