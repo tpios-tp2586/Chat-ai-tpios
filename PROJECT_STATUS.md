@@ -91,3 +91,10 @@
 - Updated `.github/workflows/generate-ara-usdz.yml` to run this diagnostic after conversion and include `usdz-animation-diagnostics.txt` in the USDZ artifact and release.
 - Next: run the workflow on `main` and compare the new USDZ report against `animation-diagnostics.txt`. Do not build Codemagic IPA until post-conversion results are reviewed.
 \n
+
+## Ara playback handoff — 2026-10-31
+- Code review found AraAvatarLoader.play() replaced its stored AnimationPlaybackController without explicitly stopping the previous controller. This left the runtime handoff insufficiently observable and potentially allowed overlapping full-rig playback.
+- Updated ChatAI/AraAvatarView.swift on main (commit e72ae2231d094de48b108750e3e89d6b3f718a85): before starting a new clip, inspect the previous controller and stop it if still valid; then log the new controller's isPlaying, isValid, and duration. This keeps one intended clip active at a time; it does not change the USDZ, timeline, clip ranges, trigger cues, or voice pipeline.
+- Apple RealityKit documents controller stop/stop-with-blend-out and notes that up to two animations can blend on an entity. The app targets iOS 16, so the implementation uses the broadly available controller stop() API and retains the existing 0.25s transition for the next clip.
+- Runtime verification is still required on a real iPhone. Expected diagnostic sequence when switching Talk → TalkExplain → Talk: previous controller status, previous playback stopped, then new clip started with playing=true and valid=true. If the logs show this but the arm gesture remains visually weak, the remaining issue is the gesture's authored motion amplitude/pose rather than clip selection or overlapping playback.
+- Do not modify Text Chat, Chibi Chat, or voice transport. Do not build/dispatch Codemagic until user requests the next test.
