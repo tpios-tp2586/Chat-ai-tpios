@@ -71,7 +71,7 @@ jobs:
             output/verification-report.txt
             output/animation-diagnostics.txt
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
   convert:
     needs: generate
@@ -97,7 +97,7 @@ jobs:
         working-directory: usdz-forge
         run: ./engine/setup-engine.sh
 
-      - name: Convert one sequential-animation avatar USDZ
+      - name: Convert, inspect and archive Ara research data
         run: |
           set -euo pipefail
           GLB="$(find input -maxdepth 1 -type f -name '*.glb' -print -quit)"
@@ -110,39 +110,49 @@ jobs:
           PY="$GITHUB_WORKSPACE/usdz-forge/engine/python/bin/python3.14"
           cp clips/animation-timeline.json output-usdz/animation-timeline.json
           cp input/animation-diagnostics.txt output-usdz/animation-diagnostics.txt
+          cp input/verification-report.txt output-usdz/verification-report.txt
           node scripts/compact-glb-primitives.mjs "$SOURCE" "$COMPACT"
-          "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST"
+          "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST" 2>&1 | tee output-usdz/conversion-log.txt
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
           "$PY" scripts/inspect-ara-usdz-animation.py "$DEST" output-usdz/animation-timeline.json | tee output-usdz/usdz-animation-diagnostics.txt
+          ARA_PRESET="${{ inputs.preset }}" ARA_DETAIL="${{ inputs.detail }}" \
+            "$PY" scripts/ara-research-data.py "$GLB" "$DEST" output-usdz/animation-timeline.json
           grep -q "skelAnimations: 1" output-usdz/usdz-report.txt
           grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*780" output-usdz/usdz-report.txt
           grep -q "timeCodesPerSecond: 30.0" output-usdz/usdz-report.txt
+          grep -q "GLB animations=75" output-usdz/animation-diagnostics.txt
+          grep -q "TalkExplain/RightForeArm" output-usdz/usdz-animation-diagnostics.txt
+          test -s output-usdz/ara-research-data.json.gz
           ANIMATED="$("$PY" usdz-forge/engine/native/probe_usdz.py "$DEST")"
           test "$ANIMATED" = "1"
-          shasum -a 256 "$DEST" | tee output-usdz/SHA256SUMS.txt
+          shasum -a 256 "$DEST" "$GLB" output-usdz/ara-research-data.json.gz | tee output-usdz/SHA256SUMS.txt
 
-      - name: Upload USDZ intermediate artifact
+      - name: Upload USDZ and research artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ara-avatar-usdz
-          path: output-usdz/*
+          name: ara-avatar-research-bundle
+          path: output-usdz/**
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
-      - name: Publish USDZ files to ChatAI Release
+      - name: Publish versioned Ara research assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ara-avatar-v2
-          name: Ara Avatar USDZ Assets v2
+          tag_name: ara-avatar-v3
+          name: Ara Avatar and Research Data v3
           body: |
-            Generated from the pinned Ara 3D Gen source with the ChatAI TalkExplain gesture patch.
-            The eight clips are concatenated on one 26-second timeline and sliced into named RealityKit AnimationResources at runtime.
-            animation-diagnostics.txt reports GLB joint tracks; usdz-animation-diagnostics.txt measures converted USDZ joint rotations over Talk and TalkExplain.
+            Generated from pinned Ara 3D Gen source e26cdef1464a0babf23bb0235b5f05930301ee25 with the ChatAI TalkExplain chest-level gesture patch.
+            Includes the generated source GLB, converted RealityKit USDZ, full keyframe-level GLB/USDZ research dataset, conversion log, diagnostics, and eight-clip 26-second timeline.
+            The compressed research JSON preserves all source GLB animation channels and converted USDZ skeletal/morph samples for offline analysis without rerunning Actions.
           files: |
+            input/*.glb
             output-usdz/Ara-Avatar.usdz
+            output-usdz/ara-research-data.json.gz
             output-usdz/animation-timeline.json
             output-usdz/animation-diagnostics.txt
             output-usdz/usdz-animation-diagnostics.txt
+            output-usdz/verification-report.txt
+            output-usdz/conversion-log.txt
             output-usdz/SHA256SUMS.txt
             output-usdz/usdz-report.txt
           fail_on_unmatched_files: true
