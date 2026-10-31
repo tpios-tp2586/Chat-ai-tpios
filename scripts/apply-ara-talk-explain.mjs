@@ -30,7 +30,7 @@ index = replaceOnce(
   "import { araEmpathy, araLaugh, araListening, araThinking, cheer, laugh, talk, talkExplain, wave } from './emotes';",
   "emotes import",
 );
-index = replaceOnce(index, "    talk,\n    mocap('cry'", "    talk,\n    talkExplain,\n    mocap('cry'", "clip registration");
+index = replaceOnce(index, "    talk,\n    mocap('cry'", "    talk,\n    talkExplain,\n    araListening,\n    araThinking,\n    araEmpathy,\n    araLaugh,\n    mocap('cry'", "clip registration");
 
 let emotes = fs.readFileSync(files.emotes, "utf8");
 emotes += `
