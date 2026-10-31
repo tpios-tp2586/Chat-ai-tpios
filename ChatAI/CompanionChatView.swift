@@ -319,7 +319,7 @@ struct CompanionChatView: View {
     }
 
     private func explainCueReason(_ text: String) -> String? {
-        let value = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+        let value = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN")).replacingOccurrences(of: "đ", with: "d")
         let cues = [
             "de em giai thich", "giai thich", "noi ro", "cu the", "vi du", "chang han",
             "dau tien", "thu nhat", "thu hai", "tiep theo", "tom lai", "ket luan",
@@ -336,7 +336,7 @@ struct CompanionChatView: View {
         let listItems = text.split(separator: "\n").filter { line in
             let item = line.trimmingCharacters(in: .whitespaces)
             return ["- ", "• ", "* "].contains(where: item.hasPrefix)
-                || item.range(of: #"^\\d+[.)]\\s"#, options: .regularExpression) != nil
+                || item.range(of: #"^\d+[.)]\s"#, options: .regularExpression) != nil
         }
         return listItems.count >= 2 ? "structured list (\(listItems.count) items)" : nil
     }
