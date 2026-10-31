@@ -111,7 +111,7 @@ jobs:
           "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST"
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
           grep -q "skelAnimations: 1" output-usdz/usdz-report.txt
-          grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*420" output-usdz/usdz-report.txt
+          grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*780" output-usdz/usdz-report.txt
           grep -q "timeCodesPerSecond: 30.0" output-usdz/usdz-report.txt
           ANIMATED="$("$PY" usdz-forge/engine/native/probe_usdz.py "$DEST")"
           test "$ANIMATED" = "1"
@@ -132,7 +132,7 @@ jobs:
           name: Ara Avatar USDZ Assets v2
           body: |
             Generated from the pinned Ara 3D Gen source with the ChatAI TalkExplain gesture patch.
-            The four clips are concatenated on one 14-second timeline and sliced into named RealityKit AnimationResources at runtime.
+            The four clips are concatenated on one 26-second timeline and sliced into named RealityKit AnimationResources at runtime.
           files: |
             output-usdz/Ara-Avatar.usdz
             output-usdz/animation-timeline.json
