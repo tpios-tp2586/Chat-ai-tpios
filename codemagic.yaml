@@ -24,11 +24,11 @@ workflows:
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $GITHUB_TOKEN" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
-            --data-urlencode "name=ara-avatar-usdz" \
+            --data-urlencode "name=ara-avatar-research-bundle" \
             --data-urlencode "per_page=100" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts")"
-          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-usdz" and not x.get("expired")]; print(max(a,key=lambda x:x["created_at"])["id"] if a else "")')"
-          test -n "$ARTIFACT_ID"
+          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-research-bundle" and not x.get("expired") and x.get("workflow_run",{}).get("head_branch")=="main"]; print(max(a,key=lambda x:x["created_at"])["id"] if a else "")')"
+          test -n "$ARTIFACT_ID" || { echo "No successful Ara research bundle artifact found on main."; exit 1; }
 
           mkdir -p ChatAI/Resources
           curl --fail --location --silent --show-error \
@@ -36,14 +36,14 @@ workflows:
             --header "Authorization: Bearer $GITHUB_TOKEN" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts/$ARTIFACT_ID/zip" \
-            --output ara-avatar-usdz.zip
-          unzip -oq ara-avatar-usdz.zip -d ChatAI/Resources
-          rm ara-avatar-usdz.zip
+            --output ara-avatar-research-bundle.zip
+          unzip -oq ara-avatar-research-bundle.zip -d ChatAI/Resources
+          rm ara-avatar-research-bundle.zip
 
           test -s "ChatAI/Resources/Ara-Avatar.usdz"
           test -s "ChatAI/Resources/animation-timeline.json"
           echo "Ara USDZ and its animation timeline manifest are ready to be bundled."
-
+ 
       - name: Install XcodeGen
         script: brew install xcodegen
 
