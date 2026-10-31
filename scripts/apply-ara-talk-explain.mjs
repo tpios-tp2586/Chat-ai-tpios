@@ -40,18 +40,24 @@ export const talkExplain: Clip = {
   id: 'talk_explain', name: 'TalkExplain', category: 'Emotes', duration: 2.8, loop: false,
   sample: (t) => {
     const progress = Math.max(0, Math.min(1, t / 2.8));
-    const reach = Math.sin(progress * Math.PI);
+    // Lift, briefly present the open hand at chest height, then lower it smoothly.
+    const lift = progress < 0.28
+      ? 1 - Math.pow(1 - progress / 0.28, 3)
+      : progress > 0.68
+        ? Math.pow(1 - (progress - 0.68) / 0.32, 3)
+        : 1;
     const base = talk.sample((t / 2.8) * TALK_LEN);
     const bones = { ...base.bones };
-    fingers(bones, 3);
+    fingers(bones, 2);
     return {
       ...base,
       bones,
       ik: {
         Right: {
-          pos: v(-0.30 - 0.08 * reach, -0.18 + 0.08 * reach, 0.18 + 0.04 * reach),
-          pole: v(-0.7, -1, -0.2),
-          dir: v(-0.1, 0.2, 1),
+          // Chest-space target: move the right hand from the upper abdomen to chest level.
+          pos: v(-0.31 - 0.07 * lift, -0.14 + 0.16 * lift, 0.12 + 0.12 * lift),
+          pole: v(-0.75, -0.35, -0.15),
+          dir: v(-0.12, 0.08, 1),
           palm: v(0, 0, 1),
         },
       },
