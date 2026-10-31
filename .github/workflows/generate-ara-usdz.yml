@@ -19,12 +19,18 @@ on:
         options:
           - medium
           - high
+      source_run_id:
+        description: Optional prior run ID containing ara-avatar-glb; skips GLB generation
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   generate:
+    if: ${{ inputs.source_run_id == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -75,6 +81,7 @@ jobs:
 
   convert:
     needs: generate
+    if: ${{ always() && (needs.generate.result == 'success' || inputs.source_run_id != '') }}
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -86,6 +93,9 @@ jobs:
         with:
           name: ara-avatar-glb
           path: input
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id || github.run_id }}
 
       - name: Check out USDZ Forge
         uses: actions/checkout@v4
