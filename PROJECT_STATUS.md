@@ -2,8 +2,8 @@
 
 ## Project
 - Repo: https://github.com/tpios-tp2586/Chat-ai-tpios
-- Branch chính: `main` בלבד. Không tự tạo/chuyển branch.
-- Build iOS: Codemagic; artifact mong muốn: IPA בלבד, không thêm ZIP artifact.
+- Branch chính: `main`. Không tự tạo/chuyển branch.
+- Build iOS: Codemagic; artifact mong muốn: IPA, không thêm ZIP artifact.
 - PROJECT_STATUS.md là snapshot trạng thái hiện tại, không phải nhật ký phát triển. Git commit/diff lưu lịch sử thay đổi.
 
 ## Quy tắc làm việc
