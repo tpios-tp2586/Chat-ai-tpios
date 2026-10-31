@@ -148,3 +148,14 @@
 - Không thay đổi LiveVoice.swift, giao tiếp Gemini, xử lý audio, chatbot, Text Chat, Chibi Chat, asset hoặc pipeline chuyển đổi USDZ.
 - Các trạng thái nghe/suy nghĩ/mood vẫn chưa có clip 3D tương ứng trong asset hiện tại (chỉ có Idle/Wave/Talk/TalkExplain); không giả lập bằng cách gán sai clip.
 - Trạng thái kiểm chứng: thay đổi đã được ghi lên main; cần build IPA bằng Codemagic và test trên iPhone để xác nhận compile/runtime. Chưa chạy GitHub Actions và chưa xác nhận build IPA.
+
+
+## Cập nhật nghiên cứu và bổ sung hoạt ảnh cảm xúc Ara — 2026-10-31
+- Đã mở rộng generator upstream tại commit `e26cdef1464a0babf23bb0235b5f05930301ee25` bằng bốn clip procedural mới dựa trên pose Idle: `AraListening`, `AraThinking`, `AraEmpathy`, `AraLaugh`.
+- Các clip mới giữ cùng bộ xương/track nền bằng cách bắt đầu từ `idle.sample`; không thêm dependency, không thay rig/model.
+- `scripts/split-glb-animations.mjs` hiện ghép 8 clip: Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh. Tổng timeline dự kiến 26 giây (780 timecodes ở 30 fps).
+- Workflow USDZ đã cập nhật assertion duration từ 420 lên 780 timecodes.
+- Runtime Ara đã khai báo 4 clip mới; Listening/Thinking/Empathy là loop, Laugh là one-shot 2,4 giây.
+- CompanionChatView nối `LiveVoiceManager.faceExpression` sang Ara: listening, thinking/confused, happy (Laugh), sad (Empathy), speaking (Talk). Wave và TalkExplain được ưu tiên, không bị mood hook ghi đè.
+- Chưa chạy GitHub Actions generate USDZ, chưa xác minh converter trên macOS, chưa build Codemagic IPA và chưa test chuyển động trên iPhone. Cần chạy workflow generate trước; nếu exporter báo khác track hoặc USDZ duration không đạt 780 timecodes thì dừng, không build IPA.
+- Các mood surprised/angry/sleepy hiện chưa có clip body riêng; không giả định đã được biểu đạt bằng hoạt ảnh 3D. Khẩu hình và blendshape vẫn nằm ngoài phạm vi thay đổi.
