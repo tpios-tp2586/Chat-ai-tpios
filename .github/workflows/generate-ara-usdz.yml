@@ -113,6 +113,7 @@ jobs:
           node scripts/compact-glb-primitives.mjs "$SOURCE" "$COMPACT"
           "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST"
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
+          "$PY" scripts/inspect-ara-usdz-animation.py "$DEST" output-usdz/animation-timeline.json | tee output-usdz/usdz-animation-diagnostics.txt
           grep -q "skelAnimations: 1" output-usdz/usdz-report.txt
           grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*780" output-usdz/usdz-report.txt
           grep -q "timeCodesPerSecond: 30.0" output-usdz/usdz-report.txt
@@ -136,11 +137,12 @@ jobs:
           body: |
             Generated from the pinned Ara 3D Gen source with the ChatAI TalkExplain gesture patch.
             The eight clips are concatenated on one 26-second timeline and sliced into named RealityKit AnimationResources at runtime.
-            animation-diagnostics.txt reports the actual GLB joint tracks and TalkExplain-vs-Talk rotation deltas.
+            animation-diagnostics.txt reports GLB joint tracks; usdz-animation-diagnostics.txt measures converted USDZ joint rotations over Talk and TalkExplain.
           files: |
             output-usdz/Ara-Avatar.usdz
             output-usdz/animation-timeline.json
             output-usdz/animation-diagnostics.txt
+            output-usdz/usdz-animation-diagnostics.txt
             output-usdz/SHA256SUMS.txt
             output-usdz/usdz-report.txt
           fail_on_unmatched_files: true
