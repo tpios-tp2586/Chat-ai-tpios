@@ -214,13 +214,13 @@ private final class AraAvatarLoader: ObservableObject {
                 do {
                     let angles: [Float] = [
                         0,
-                        0.3535534,
-                        0.5,
-                        0.3535534,
+                        3.535534,
+                        5,
+                        3.535534,
                         0,
-                        -0.3535534,
-                        -0.5,
-                        -0.3535534,
+                        -3.535534,
+                        -5,
+                        -3.535534,
                         0
                     ]
                     let frames = angles.map { degrees -> JointTransforms in
@@ -251,7 +251,7 @@ private final class AraAvatarLoader: ObservableObject {
                         repeatMode: .repeat
                     )
                     self.hipSwayAnimation = try AnimationResource.generate(with: definition)
-                    self.onLog?("[ARA] Hip sway ready: Hips ±0.5°, 0.8Hz, additive")
+                    self.onLog?("[ARA] Hip sway ready: Hips ±5°, 0.8Hz, additive")
                 } catch {
                     self.hipSwayAnimation = nil
                     self.onLog?("[ARA] Hip sway generation failed: \(error.localizedDescription)")
