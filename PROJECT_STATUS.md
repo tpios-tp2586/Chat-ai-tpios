@@ -157,7 +157,7 @@
 - Workflow USDZ đã cập nhật assertion duration từ 420 lên 780 timecodes.
 - Runtime Ara đã khai báo 4 clip mới; Listening/Thinking/Empathy là loop, Laugh là one-shot 2,4 giây.
 - CompanionChatView nối `LiveVoiceManager.faceExpression` sang Ara: listening, thinking/confused, happy (Laugh), sad (Empathy), speaking (Talk). Wave và TalkExplain được ưu tiên, không bị mood hook ghi đè.
-- Chưa chạy GitHub Actions generate USDZ, chưa xác minh converter trên macOS, chưa build Codemagic IPA và chưa test chuyển động trên iPhone. Cần chạy workflow generate trước; nếu exporter báo khác track hoặc USDZ duration không đạt 780 timecodes thì dừng, không build IPA.
+- GitHub Actions generate USDZ đã chạy thành công ở run `41148983095`; converter macOS xác nhận một SkelAnimation, duration 780 timecodes/30 fps và probe animation hợp lệ. Chi tiết nằm trong mục “Xác minh quy trình tạo Ara USDZ”. Chưa build Codemagic IPA và chưa test chuyển động trên iPhone.
 - Các mood surprised/angry/sleepy hiện chưa có clip body riêng; không giả định đã được biểu đạt bằng hoạt ảnh 3D. Khẩu hình và blendshape vẫn nằm ngoài phạm vi thay đổi.
 
 
