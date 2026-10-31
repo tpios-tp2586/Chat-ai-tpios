@@ -115,3 +115,12 @@
 - Cập nhật `.github/workflows/generate-ara-usdz.yml`: giữ nguyên một workflow generate/convert hiện tại; capture conversion log; artifact retention 90 ngày; tạo một research bundle; publish GLB gốc, USDZ, JSON nghiên cứu nén và diagnostics lên Release tag mới `ara-avatar-v3` (giữ nguyên Release v2). Không thêm workflow hoặc dependency.
 - Đã kiểm tra script Python compile và đọc thành công GLB baseline: 75 animations, 69 joints, 34 morph targets; Talk/TalkExplain mỗi clip 71 tracks, weight width 34. Chưa thể kiểm thử phần USDZ parser cục bộ vì môi trường hiện tại không có `pxr`; phần này sẽ được chạy trong Python 3.14 environment của USDZ Forge ở Action tổng hợp.
 - Chưa chạy GitHub Actions hoặc Codemagic. Trước lần chạy duy nhất cần review thay đổi trên `main`; sau đó kiểm tra JSON.gz và so sánh GLB/USDZ để quyết định có build IPA hay không.
+
+
+## Ara conversion failure — run #9 and correction (2026-10-31)
+- Run #9 (41197339845) completed GLB generation and successfully created the USDZ and compressed research dataset before failing at the final shell checks. Confirmed output: 69 joints, 34 morph targets, 788 USDZ rotation samples, 30 fps, and a 26-second timeline.
+- The failure was a false-negative check: workflow searched for TalkExplain/RightForeArm, but the actual USDZ report prints RightForeArm: maxAngleDeltaVsTalk=... . The report measured RightArm 75.452°, RightForeArm 116.609°, and RightHand 62.497° delta versus Talk.
+- Downloaded run #9's GLB artifact and inspected its JSON/BIN: it contains 12 embedded images with valid JPEG/PNG signatures in bufferViews. The compaction script explicitly retains image bufferViews and remaps their indices.
+- Converter log showed unresolved generated texture paths 0/texgen_0..11. The USDZ Forge GLB converter writes embedded images to its temporary textures/ folder, while the ARKit package localization warnings refer to the 0/ package path. Workflow now stages those texture files at the resolver's expected 0/ path before packaging, then runs the bundled engine/check_texture.py against the finished USDZ. Any unresolved texture reference now fails with a direct diagnostic.
+- Replaced the incorrect arm-track grep with numeric checks that require at least 10° TalkExplain-vs-Talk delta for RightArm, RightForeArm, and RightHand. Texture diagnostics are included in both the artifact and release.
+- This is a workflow-only correction; no app Swift code, chatbot/API, history, Text Chat, Chibi Chat, or voice pipeline changed. No new Action or Codemagic build has been started.
