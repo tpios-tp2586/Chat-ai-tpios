@@ -187,3 +187,18 @@
 - [x] Đã publish USDZ cùng manifest và báo cáo vào release `ara-avatar-v2`.
 - [ ] Chưa xác minh 8 AnimationView được tạo và phát đúng trong RealityKit trên iPhone.
 - [ ] Chưa build Codemagic IPA chứa asset mới và chưa test các trạng thái Listening/Thinking/Empathy/Laugh trên thiết bị.
+
+
+## Kiểm tra đường đóng gói Ara vào IPA — 2026-10-31
+- Đã đọc trực tiếp `codemagic.yaml` và `project.yml`; hiện không cần chép USDZ thủ công vào Git.
+- Codemagic workflow `ios-unsigned` đã có bước tải artifact GitHub Actions mới nhất tên `ara-avatar-usdz` (bỏ artifact expired), giải nén vào `ChatAI/Resources`, rồi kiểm tra hai file `Ara-Avatar.usdz` và `animation-timeline.json`.
+- `project.yml` loại `Resources/**` khỏi nhóm source Swift và khai báo riêng `ChatAI/Resources` là build-phase resources. Do đó XcodeGen sẽ đóng gói USDZ và manifest vào app bundle.
+- Artifact hiện hành đã xác minh: ID `13022416559`, thuộc Actions run `41148983095`, branch `main`, source commit `1a1e0ad46ce8ec1727e80d720ce30aed9453c071`, chưa expired; SHA-256 archive `ad3af79da6073e3bfbeb845d4c96218113153b0e8245499b44ce76b574ccfd36`. USDZ bên trong có SHA-256 `d87b5eff576fe226cb14e702761447e761d6183e10fff92ff6d7b989ba613f9b`.
+- Kết luận: đường lấy asset → giải nén → thêm vào app bundle đã được kiểm tra bằng cấu hình hiện có; chưa cần sửa `codemagic.yaml` hoặc source Swift ở bước này.
+- Giới hạn: artifact Actions giữ 14 ngày (hiện hết hạn 2026-11-14); cần build IPA trước hạn hoặc chạy lại workflow tạo asset nếu artifact đã hết hạn.
+
+### Việc cần làm tiếp
+1. Chạy workflow `ios-unsigned` trong Codemagic trên branch `main` để tạo IPA. Assistant chưa có kết nối Codemagic để tự khởi chạy build.
+2. Trong log Codemagic, xác nhận bước tải artifact hoàn tất và hai file được tìm thấy trong `ChatAI/Resources`; sau đó xác nhận Xcode build và đóng gói IPA thành công.
+3. Cài IPA lên iPhone và mở Chat Voice. Dùng nút log để kiểm tra: USDZ được tìm thấy, source animation được import, manifest có 8 clip/26 giây, tạo đủ 8 AnimationView và phát clip đầu tiên không lỗi.
+4. Kiểm tra lần lượt Listening, Thinking, Empathy (loop) và Laugh (one-shot); không chỉnh chatbot, Text Chat hoặc Chibi Chat trong lượt kiểm tra này.
