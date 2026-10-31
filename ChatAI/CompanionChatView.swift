@@ -84,9 +84,9 @@ struct CompanionChatView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
         .onChange(of: liveManager.lines.count) { _ in
-            didTriggerExplainGesture = false
             if let line = liveManager.lines.last {
                 if line.role == .user {
+                    didTriggerExplainGesture = false
                     previousAssistantLineIDForTurn = liveManager.lines.dropLast().last(where: { $0.role == .assistant })?.id
                 }
                 addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
@@ -103,7 +103,6 @@ struct CompanionChatView: View {
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
                 cancelExplainGesture()
-                didTriggerExplainGesture = false
                 speechStartToken &+= 1
                 avatarClip = .talk
                 handleLatestTranscript()
@@ -284,15 +283,20 @@ struct CompanionChatView: View {
         guard line.role == .assistant,
               line.id != previousAssistantLineIDForTurn,
               liveManager.aiSpeaking,
-              !didTriggerExplainGesture,
-              hasExplainCue(line.text) else { return }
+              !didTriggerExplainGesture else { return }
+
+        let wordCount = line.text.split(whereSeparator: { $0.isWhitespace }).count
+        guard let reason = explainCueReason(line.text) else {
+            addDiagnostic("[ARA] TalkExplain skipped: no explanation cue; chars=\(line.text.count), words=\(wordCount)")
+            return
+        }
 
         didTriggerExplainGesture = true
         cancelExplainGesture()
         let generation = UUID()
         explainGestureGeneration = generation
         avatarClip = .talkExplain
-        addDiagnostic("[ARA] TalkExplain triggered for current assistant line")
+        addDiagnostic("[ARA] TalkExplain triggered: \(reason); chars=\(line.text.count), words=\(wordCount)")
         explainGestureTask = Task { @MainActor in
             do {
                 try await Task.sleep(nanoseconds: 2_800_000_000)
@@ -303,6 +307,7 @@ struct CompanionChatView: View {
                   liveManager.aiSpeaking,
                   avatarClip == .talkExplain else { return }
             avatarClip = .talk
+            addDiagnostic("[ARA] TalkExplain finished; returned to Talk")
             explainGestureTask = nil
         }
     }
@@ -313,14 +318,27 @@ struct CompanionChatView: View {
         explainGestureTask = nil
     }
 
-    private func hasExplainCue(_ text: String) -> Bool {
-        let value = text.lowercased()
+    private func explainCueReason(_ text: String) -> String? {
+        let value = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
         let cues = [
-            "để em giải thích", "để em nói rõ", "đầu tiên", "ví dụ",
-            "cụ thể là", "tóm lại", "quan trọng là",
-            "let me explain", "for example", "in summary"
+            "de em giai thich", "giai thich", "noi ro", "cu the", "vi du", "chang han",
+            "dau tien", "thu nhat", "thu hai", "tiep theo", "tom lai", "ket luan",
+            "quan trong la", "nguyen nhan", "ly do", "bao gom", "nghia la", "phan tich",
+            "huong dan", "cac buoc", "buoc 1", "so sanh", "vi vay", "do do", "boi vi",
+            "can lam nhu sau", "minh cung xem", "co the hieu", "dieu nay co nghia",
+            "let me explain", "for example", "for instance", "first", "next", "in summary",
+            "the reason", "because", "this means", "to compare", "step 1", "here is how"
         ]
-        return cues.contains(where: value.contains)
+        if let cue = cues.first(where: { value.contains($0) }) {
+            return "cue=\(cue)"
+        }
+
+        let listItems = text.split(separator: "\n").filter { line in
+            let item = line.trimmingCharacters(in: .whitespaces)
+            return ["- ", "• ", "* "].contains(where: item.hasPrefix)
+                || item.range(of: #"^\\d+[.)]\\s"#, options: .regularExpression) != nil
+        }
+        return listItems.count >= 2 ? "structured list (\(listItems.count) items)" : nil
     }
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
