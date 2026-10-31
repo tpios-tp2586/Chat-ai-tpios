@@ -226,13 +226,24 @@ private final class AraAvatarLoader: ObservableObject {
             return
         }
 
-        playback = model.playAnimation(
+        if let previousPlayback = playback {
+            if previousPlayback.isValid {
+                onLog?("[ARA] Replacing playback: clip=\(activeClip?.rawValue ?? "unknown"), playing=\(previousPlayback.isPlaying), time=\(String(format: "%.2f", previousPlayback.time))/\(String(format: "%.2f", previousPlayback.duration))s")
+                previousPlayback.stop()
+                onLog?("[ARA] Previous playback stopped: stopped=\(previousPlayback.isStopped), playing=\(previousPlayback.isPlaying)")
+            } else {
+                onLog?("[ARA] Previous playback already inactive: clip=\(activeClip?.rawValue ?? "unknown")")
+            }
+        }
+
+        let nextPlayback = model.playAnimation(
             clip.loops ? animation.repeat() : animation,
             transitionDuration: 0.25
         )
+        playback = nextPlayback
         activeClip = clip
         status = "Đang phát animation \(clip.rawValue)"
-        onLog?("[ARA] Playing \(clip.rawValue) from the global timeline")
+        onLog?("[ARA] Playback started: clip=\(clip.rawValue), playing=\(nextPlayback.isPlaying), valid=\(nextPlayback.isValid), duration=\(String(format: "%.2f", nextPlayback.duration))s")
     }
 }
 
