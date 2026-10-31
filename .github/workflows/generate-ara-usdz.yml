@@ -60,6 +60,7 @@ jobs:
           GLB="$(find output -maxdepth 1 -type f -name '*.glb' -print -quit)"
           test -n "$GLB"
           node scripts/verify-glb.mjs "$GLB"
+          node scripts/inspect-ara-animation.mjs "$GLB"
 
       - name: Upload GLB intermediate artifact
         uses: actions/upload-artifact@v4
@@ -68,6 +69,7 @@ jobs:
           path: |
             output/*.glb
             output/verification-report.txt
+            output/animation-diagnostics.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -107,6 +109,7 @@ jobs:
           DEST="output-usdz/Ara-Avatar.usdz"
           PY="$GITHUB_WORKSPACE/usdz-forge/engine/python/bin/python3.14"
           cp clips/animation-timeline.json output-usdz/animation-timeline.json
+          cp input/animation-diagnostics.txt output-usdz/animation-diagnostics.txt
           node scripts/compact-glb-primitives.mjs "$SOURCE" "$COMPACT"
           "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST"
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
@@ -132,10 +135,12 @@ jobs:
           name: Ara Avatar USDZ Assets v2
           body: |
             Generated from the pinned Ara 3D Gen source with the ChatAI TalkExplain gesture patch.
-            The four clips are concatenated on one 26-second timeline and sliced into named RealityKit AnimationResources at runtime.
+            The eight clips are concatenated on one 26-second timeline and sliced into named RealityKit AnimationResources at runtime.
+            animation-diagnostics.txt reports the actual GLB joint tracks and TalkExplain-vs-Talk rotation deltas.
           files: |
             output-usdz/Ara-Avatar.usdz
             output-usdz/animation-timeline.json
+            output-usdz/animation-diagnostics.txt
             output-usdz/SHA256SUMS.txt
             output-usdz/usdz-report.txt
           fail_on_unmatched_files: true
