@@ -20,6 +20,7 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var avatarClip: AraAvatarView.Clip = .idle
     @State private var didTriggerExplainGesture = false
+    @State private var didTriggerContextGestureForTurn = false
     @State private var previousAssistantLineIDForTurn: UUID?
     @State private var explainGestureGeneration = UUID()
     @State private var explainGestureTask: Task<Void, Never>?
@@ -87,6 +88,7 @@ struct CompanionChatView: View {
             if let line = liveManager.lines.last {
                 if line.role == .user {
                     didTriggerExplainGesture = false
+                    didTriggerContextGestureForTurn = false
                     previousAssistantLineIDForTurn = liveManager.lines.dropLast().last(where: { $0.role == .assistant })?.id
                 }
                 addDiagnostic("[VOICE] Có dòng thoại mới, vai trò: \(line.role)")
@@ -249,12 +251,12 @@ struct CompanionChatView: View {
         }
     }
 
-    private func playAraLaugh() {
+    private func playAraLaugh(reason: String = "happy mood") {
         emotionGestureTask?.cancel()
         let generation = UUID()
         emotionGestureGeneration = generation
         avatarClip = .laugh
-        addDiagnostic("[ARA] AraLaugh triggered by happy mood")
+        addDiagnostic("[ARA] AraLaugh triggered: \(reason)")
         emotionGestureTask = Task { @MainActor in
             do {
                 try await Task.sleep(nanoseconds: 2_400_000_000)
@@ -262,6 +264,24 @@ struct CompanionChatView: View {
                 return
             }
             guard emotionGestureGeneration == generation, avatarClip == .laugh else { return }
+            avatarClip = liveManager.aiSpeaking ? .talk : (liveManager.state == .live ? .listening : .idle)
+            emotionGestureTask = nil
+        }
+    }
+
+    private func playAraEmpathy(reason: String) {
+        emotionGestureTask?.cancel()
+        let generation = UUID()
+        emotionGestureGeneration = generation
+        avatarClip = .empathy
+        addDiagnostic("[ARA] AraEmpathy triggered: \(reason)")
+        emotionGestureTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 2_400_000_000)
+            } catch {
+                return
+            }
+            guard emotionGestureGeneration == generation, avatarClip == .empathy else { return }
             avatarClip = liveManager.aiSpeaking ? .talk : (liveManager.state == .live ? .listening : .idle)
             emotionGestureTask = nil
         }
@@ -288,6 +308,14 @@ struct CompanionChatView: View {
         let wordCount = line.text.split(whereSeparator: { $0.isWhitespace }).count
         guard let reason = explainCueReason(line.text) else {
             addDiagnostic("[ARA] TalkExplain skipped: no explanation cue; chars=\(line.text.count), words=\(wordCount)")
+            guard !didTriggerContextGestureForTurn,
+                  let cue = contextGestureCue(line.text) else { return }
+            didTriggerContextGestureForTurn = true
+            if cue.clip == .empathy {
+                playAraEmpathy(reason: cue.reason)
+            } else {
+                playAraLaugh(reason: cue.reason)
+            }
             return
         }
 
@@ -318,13 +346,19 @@ struct CompanionChatView: View {
         explainGestureTask = nil
     }
 
+    private func normalizedAraCueText(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+    }
+
     private func explainCueReason(_ text: String) -> String? {
-        let value = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN")).replacingOccurrences(of: "đ", with: "d")
+        let value = normalizedAraCueText(text)
         let cues = [
             "de em giai thich", "giai thich", "noi ro", "cu the", "vi du", "chang han",
-            "dau tien", "thu nhat", "thu hai", "tiep theo", "tom lai", "ket luan",
-            "quan trong la", "nguyen nhan", "ly do", "bao gom", "nghia la", "phan tich",
+            "dau tien", "thu nhat", "thu hai", "thu ba", "tiep theo", "tom lai", "ket luan",
+            "quan trong", "nguyen nhan", "ly do", "bao gom", "nghia la", "phan tich",
             "huong dan", "cac buoc", "buoc 1", "so sanh", "vi vay", "do do", "boi vi",
+            "theo", "that ra", "chinh la",
             "can lam nhu sau", "minh cung xem", "co the hieu", "dieu nay co nghia",
             "let me explain", "for example", "for instance", "first", "next", "in summary",
             "the reason", "because", "this means", "to compare", "step 1", "here is how"
@@ -339,6 +373,19 @@ struct CompanionChatView: View {
                 || item.range(of: #"^\d+[.)]\s"#, options: .regularExpression) != nil
         }
         return listItems.count >= 2 ? "structured list (\(listItems.count) items)" : nil
+    }
+
+    private func contextGestureCue(_ text: String) -> (clip: AraAvatarView.Clip, reason: String)? {
+        let value = normalizedAraCueText(text)
+        let empathyCues = ["hieu roi", "cam thong", "kho qua", "buon", "lo lang", "thong cam", "dung lo"]
+        if let cue = empathyCues.first(where: { value.contains($0) }) {
+            return (.empathy, "cue=\(cue)")
+        }
+        let laughCues = ["ha ha", "hi hi", "vui", "buon cuoi", "hai", "thi ra"]
+        if let cue = laughCues.first(where: { value.contains($0) }) {
+            return (.laugh, "cue=\(cue)")
+        }
+        return nil
     }
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
