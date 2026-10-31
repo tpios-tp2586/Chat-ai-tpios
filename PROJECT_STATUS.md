@@ -126,3 +126,10 @@
 - This is a workflow-only correction; no app Swift code, chatbot/API, history, Text Chat, Chibi Chat, or voice pipeline changed. No new Action or Codemagic build has been started.
 
 - Added optional workflow input source_run_id: when supplied, the generate job is skipped and convert downloads ara-avatar-glb from that earlier run. For the next retry, use source_run_id=41197339845 so the already-generated GLB is reused and the expensive model generation is not repeated.
+
+
+## Ara convert-only retry failure — run #10 (2026-10-31)
+- Run #10 `41198462973` failed at step `Download GLB intermediate artifact`; USDZ conversion did not start. Exact log: `Unable to download artifact(s): Resource not accessible by integration`.
+- The workflow token permissions showed only `Contents: write` and `Metadata: read`; cross-run artifact download needs `Actions: read`. Confirmed source artifact `ara-avatar-glb` from run #9 still exists, is not expired, ID `13040824701`, size 8,145,807 bytes.
+- Updated `.github/workflows/generate-ara-usdz.yml` on `main` (commit `2704b88621cb1b97d24bafd4b4be86339da0cfec`): added `actions: read`, pinned USDZ Forge to `d474129ce1f026fa6904c9ac95dd74212a501a9d`, and corrected the texture-patch source block indentation that previously would not match the converter.
+- No new Action or Codemagic build was started after this correction. Next retry should reuse `source_run_id=41197339845`; first confirm the updated workflow permissions and artifact download step succeed before evaluating texture diagnostics.
