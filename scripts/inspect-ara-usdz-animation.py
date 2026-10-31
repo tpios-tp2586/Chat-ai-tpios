@@ -70,7 +70,7 @@ def main():
 
     def clip_delta(joint_index, clip_a, clip_b=None):
         maximum = 0.0
-        previous = None
+        reference = None
         for sample in range(41):
             fraction = sample / 40.0
             time_a = clip_a["start"] + (clip_a["end"] - clip_a["start"]) * fraction
@@ -78,9 +78,10 @@ def main():
             if qa is None:
                 continue
             if clip_b is None:
-                if previous is not None:
-                    maximum = max(maximum, angle_degrees(previous, qa))
-                previous = qa
+                if reference is None:
+                    reference = qa
+                else:
+                    maximum = max(maximum, angle_degrees(reference, qa))
             else:
                 time_b = clip_b["start"] + (clip_b["end"] - clip_b["start"]) * fraction
                 qb = rotation_at(joint_index, time_b)
@@ -108,7 +109,7 @@ def main():
         delta = clip_delta(index, clips["TalkExplain"], clips["Talk"])
         motion = clip_delta(index, clips["TalkExplain"])
         report.append(
-            "%s: maxAngleDeltaVsTalk=%.3fdeg; maxStepWithinTalkExplain=%.3fdeg" %
+            "%s: maxAngleDeltaVsTalk=%.3fdeg; maxAngleFromStartWithinTalkExplain=%.3fdeg" %
             (name, delta, motion)
         )
 
