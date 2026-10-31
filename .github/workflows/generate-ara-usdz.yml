@@ -135,7 +135,7 @@ jobs:
         working-directory: usdz-forge
         run: ./engine/setup-engine.sh
 
-      - name: Convert, inspect and archive Ara research data
+      - name: Convert, bake Hips motion, inspect and archive Ara research data
         run: |
           set -euo pipefail
           GLB="$(find input -maxdepth 1 -type f -name '*.glb' -print -quit)"
@@ -144,13 +144,15 @@ jobs:
           node scripts/split-glb-animations.mjs "$GLB" clips
           SOURCE="clips/Ara-Avatar.glb"
           COMPACT="clips/Ara-Avatar.compact.glb"
+          CONVERTED="output-usdz/Ara-Avatar.converted.usdz"
           DEST="output-usdz/Ara-Avatar.usdz"
           PY="$GITHUB_WORKSPACE/usdz-forge/engine/python/bin/python3.14"
           cp clips/animation-timeline.json output-usdz/animation-timeline.json
           cp input/animation-diagnostics.txt output-usdz/animation-diagnostics.txt
           cp input/verification-report.txt output-usdz/verification-report.txt
           node scripts/compact-glb-primitives.mjs "$SOURCE" "$COMPACT"
-          "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$DEST" 2>&1 | tee output-usdz/conversion-log.txt
+          "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$CONVERTED" 2>&1 | tee output-usdz/conversion-log.txt
+          "$PY" scripts/apply-ara-hip-sway.py "$CONVERTED" "$DEST" | tee output-usdz/hip-sway-diagnostics.txt
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
           "$PY" scripts/inspect-ara-usdz-animation.py "$DEST" output-usdz/animation-timeline.json | tee output-usdz/usdz-animation-diagnostics.txt
           ARA_PRESET="${{ inputs.preset }}" ARA_DETAIL="${{ inputs.detail }}" \
@@ -194,7 +196,7 @@ jobs:
           tag_name: ara-avatar-v3
           name: Ara Avatar and Research Data v3
           body: |
-            Generated from pinned Ara 3D Gen source e26cdef1464a0babf23bb0235b5f05930301ee25 with the ChatAI TalkExplain chest-level gesture patch.
+            Generated from pinned Ara 3D Gen source e26cdef1464a0babf23bb0235b5f05930301ee25 with the ChatAI TalkExplain chest-level gesture patch and baked Hips sway.
             Includes the generated source GLB, converted RealityKit USDZ, full keyframe-level GLB/USDZ research dataset, conversion log, diagnostics, and eight-clip 26-second timeline.
             The compressed research JSON preserves all source GLB animation channels and converted USDZ skeletal/morph samples for offline analysis without rerunning Actions.
           files: |
@@ -204,6 +206,7 @@ jobs:
             output-usdz/animation-timeline.json
             output-usdz/animation-diagnostics.txt
             output-usdz/usdz-animation-diagnostics.txt
+            output-usdz/hip-sway-diagnostics.txt
             output-usdz/texture-diagnostics.txt
             output-usdz/verification-report.txt
             output-usdz/conversion-log.txt
