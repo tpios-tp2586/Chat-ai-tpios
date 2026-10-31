@@ -98,10 +98,10 @@
 
 ## Việc cần làm khi tiếp tục chat mới
 - Đọc file này trước; đây là nguồn bối cảnh chuẩn để tiếp tục, không yêu cầu user kể lại hai repo và pipeline.
-- Bước tiếp theo: chạy thủ công workflow `.github/workflows/generate-ara-usdz.yml` trên `main`; kiểm tra log conversion phải có `skelAnimations: 1`, `endTimeCode: 420`, probe=`1`, artifact phải gồm `Ara-Avatar.usdz` và `animation-timeline.json`.
-- Nếu Actions thành công, chạy Codemagic để build IPA. Kiểm tra iPhone: log phải báo tạo 4 `AnimationViews` từ global scene animation, duration khoảng 14s, sau đó phát Idle/Talk/Wave/TalkExplain không còn Missing.
-- Nếu Actions báo USDZ duration không đúng 14s hoặc không tạo được đúng 1 SkelAnimation, dừng và sửa converter trước khi build app.
-- Chỉ sau khi kiểm tra thiết bị mới đánh giá tiếp chất lượng gesture và quyết định có cần chỉnh code hay asset.
+- Workflow generate USDZ đã chạy thành công ở run `41148983095`; chi tiết log, report, 8 clip và quy trình tái tạo được ghi trong mục “Xác minh quy trình tạo Ara USDZ”.
+- Bước tiếp theo: cập nhật đồng bộ `Ara-Avatar.usdz` và `animation-timeline.json` từ release `ara-avatar-v2` vào app bundle; kiểm tra code/runtime trước khi build để bảo đảm loader đọc đủ 8 clip và timeline 26s/780 timecodes.
+- Sau đó chạy Codemagic tạo IPA và kiểm tra trên iPhone thật: RealityKit phải import được global scene animation, tạo đủ 8 AnimationView, không có clip Missing; kiểm tra riêng Listening/Thinking/Empathy loop và Laugh one-shot.
+- Chỉ sau khi test thiết bị mới đánh giá chất lượng chuyển động và quyết định có cần chỉnh code hoặc asset.
 
 ## Cập nhật sau build và kiểm tra hành động Ara — 2026-10-31
 ### Đã xác nhận trên iPhone
@@ -159,3 +159,31 @@
 - CompanionChatView nối `LiveVoiceManager.faceExpression` sang Ara: listening, thinking/confused, happy (Laugh), sad (Empathy), speaking (Talk). Wave và TalkExplain được ưu tiên, không bị mood hook ghi đè.
 - Chưa chạy GitHub Actions generate USDZ, chưa xác minh converter trên macOS, chưa build Codemagic IPA và chưa test chuyển động trên iPhone. Cần chạy workflow generate trước; nếu exporter báo khác track hoặc USDZ duration không đạt 780 timecodes thì dừng, không build IPA.
 - Các mood surprised/angry/sleepy hiện chưa có clip body riêng; không giả định đã được biểu đạt bằng hoạt ảnh 3D. Khẩu hình và blendshape vẫn nằm ngoài phạm vi thay đổi.
+
+
+## Xác minh quy trình tạo Ara USDZ — 2026-10-31
+### Kết quả workflow thực tế
+- GitHub Actions run: [41148983095](https://github.com/tpios-tp2586/Chat-ai-tpios/actions/runs/41148983095) — workflow `Generate Ara USDZ avatar assets`, event `workflow_dispatch`, branch `main`, commit `1a1e0ad46ce8ec1727e80d720ce30aed9453c071`; cả hai job `generate` và `convert` đều SUCCESS.
+- Job generate xác nhận GLB có 1 skin, 69 joints, 75 animations; trong đó có đủ 8 clip ChatAI cần dùng: `Idle`, `Wave`, `Talk`, `TalkExplain`, `AraListening`, `AraThinking`, `AraEmpathy`, `AraLaugh`.
+- Script ghép thành một timeline tuần tự 26.0 giây, ghép 71 rig tracks từ 8 clip. Các đoạn: Idle 0.0000–3.2000s; Wave 3.2001–4.8000s; Talk 4.8001–11.2000s; TalkExplain 11.2001–14.0000s; AraListening 14.0001–17.2000s; AraThinking 17.2001–20.4000s; AraEmpathy 20.4001–23.6000s; AraLaugh 23.6001–26.0000s.
+- USDZ converter chạy trên macOS 15 arm64 thành công. Báo cáo thực tế: `startTimeCode: 0.0`, `endTimeCode: 780.0`, `timeCodesPerSecond: 30.0`, `skeletons: 1`, `skelAnimations: 1`. Lệnh probe trả về `1`; các assertion trong workflow đều qua.
+- USDZ SHA-256: `d87b5eff576fe226cb14e702761447e761d6183e10fff92ff6d7b989ba613f9b`.
+- Workflow upload thành công artifact `ara-avatar-glb` (8,145,771 bytes) và `ara-avatar-usdz` (10,050,996 bytes). Release [Ara Avatar USDZ Assets v2](https://github.com/tpios-tp2586/Chat-ai-tpios/releases/tag/ara-avatar-v2) đã được cập nhật với `Ara-Avatar.usdz`, `animation-timeline.json`, `usdz-report.txt` và `SHA256SUMS.txt`.
+- Kết luận: đã xác minh thành công bước tạo GLB, ghép 8 clip, chuyển USDZ, kiểm tra cấu trúc animation và publish asset trên GitHub. Đây chưa phải xác minh RealityKit runtime hoặc chuyển động trên iPhone.
+
+### Quy trình tái tạo USDZ
+1. Mở GitHub repo ChatAI → Actions → `Generate Ara USDZ avatar assets` → Run workflow trên branch `main`.
+2. Chọn preset `Athletic woman`, detail `high`; không tạo branch mới.
+3. Workflow checkout upstream `olatunde85/3d-gen` tại commit cố định `e26cdef1464a0babf23bb0235b5f05930301ee25`, áp dụng `scripts/apply-ara-talk-explain.mjs` (script này hiện đăng ký cả TalkExplain và 4 clip Ara procedural), cài dependencies, tạo GLB và verify rig/clip.
+4. Upload GLB trung gian; job convert tải GLB, checkout `robotson/usdz-forge`, cài converter trên macOS, chạy `scripts/split-glb-animations.mjs` để ghép 8 clip thành một timeline 26 giây, rồi chạy `scripts/compact-glb-primitives.mjs` để giảm số vertex instances.
+5. Chuyển `Ara-Avatar.usdz`; chạy `inspect_usdz.py` và `probe_usdz.py`. Chỉ chấp nhận kết quả khi `skelAnimations: 1`, `endTimeCode: 780`, `timeCodesPerSecond: 30.0`, probe = `1`.
+6. Upload artifact và cập nhật release tag `ara-avatar-v2`. Lấy cả `Ara-Avatar.usdz` và `animation-timeline.json` cùng một run/release; hai file phải đồng bộ phiên bản.
+7. Sau khi thay asset trong app, kiểm tra runtime bằng Codemagic IPA và iPhone thật. Actions SUCCESS chỉ xác nhận pipeline/conversion; không thay thế kiểm tra RealityKit import, tên clip, playback, hiệu năng và chất lượng cử chỉ trên thiết bị.
+
+### Trạng thái tiếp theo
+- [x] Workflow tạo GLB và USDZ thành công.
+- [x] Đã kiểm tra GLB có 8 clip mục tiêu, 1 skin và 69 joints.
+- [x] Đã kiểm tra USDZ có một SkelAnimation, timeline 780 timecodes ở 30 fps và probe nhận diện animation.
+- [x] Đã publish USDZ cùng manifest và báo cáo vào release `ara-avatar-v2`.
+- [ ] Chưa xác minh 8 AnimationView được tạo và phát đúng trong RealityKit trên iPhone.
+- [ ] Chưa build Codemagic IPA chứa asset mới và chưa test các trạng thái Listening/Thinking/Empathy/Laugh trên thiết bị.
