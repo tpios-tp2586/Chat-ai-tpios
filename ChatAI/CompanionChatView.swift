@@ -94,11 +94,11 @@ struct CompanionChatView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .overlay(alignment: .top) {
+        .overlay(alignment: .bottom) {
             if showAraTestMenu {
                 araTestMenu
-                    .padding(.top, 58)
                     .padding(.horizontal, 12)
+                    .padding(.bottom, 94)
                     .zIndex(2)
             }
         }
@@ -349,7 +349,7 @@ struct CompanionChatView: View {
                                 }
                                 .foregroundStyle(.primary)
                                 .padding(.horizontal, 11)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 5)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(activeTheme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 9))
                             }
@@ -357,10 +357,10 @@ struct CompanionChatView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 172)
+                .frame(maxHeight: 116)
             }
         }
-        .padding(9)
+        .padding(8)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
