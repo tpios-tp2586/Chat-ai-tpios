@@ -37,7 +37,7 @@ struct CompanionChatView: View {
     @AppStorage("ara_test_panel_x") private var testPanelX = 0.0
     @AppStorage("ara_test_panel_y") private var testPanelY = 0.0
     @AppStorage("ara_test_panel_collapsed") private var testPanelCollapsed = false
-    @State private var testPanelDragStart = CGSize.zero
+    @GestureState private var testPanelDragOffset = CGSize.zero
     @State private var testPanelResizeStart = 1.0
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
@@ -132,7 +132,7 @@ struct CompanionChatView: View {
                                 .frame(width: width, height: height)
                         }
                     }
-                    .position(x: x, y: y)
+                    .position(x: x + testPanelDragOffset.width, y: y + testPanelDragOffset.height)
                 }
                 .zIndex(2)
             }
@@ -359,14 +359,12 @@ struct CompanionChatView: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 2)
-                    .onChanged { value in
-                        testPanelX = testPanelDragStart.width + Double(value.translation.width)
-                        testPanelY = testPanelDragStart.height + Double(value.translation.height)
+                    .updating($testPanelDragOffset) { value, state, _ in
+                        state = value.translation
                     }
                     .onEnded { value in
-                        testPanelX = testPanelDragStart.width + Double(value.translation.width)
-                        testPanelY = testPanelDragStart.height + Double(value.translation.height)
-                        testPanelDragStart = CGSize(width: testPanelX, height: testPanelY)
+                        testPanelX += Double(value.translation.width)
+                        testPanelY += Double(value.translation.height)
                     }
             )
 
@@ -459,7 +457,6 @@ struct CompanionChatView: View {
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
         .onAppear {
-            testPanelDragStart = CGSize(width: testPanelX, height: testPanelY)
             testPanelResizeStart = testPanelScale
         }
     }
