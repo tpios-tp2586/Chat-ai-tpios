@@ -9,7 +9,7 @@ import zipfile
 
 from pxr import Gf, Usd, UsdSkel, UsdUtils
 
-AMPLITUDE_DEGREES = 3.0
+AMPLITUDE_DEGREES = 5.0
 FREQUENCY_HZ = 0.8
 TARGET_FPS = 30.0
 TARGET_CLIPS = {"Talk", "AraListening"}
