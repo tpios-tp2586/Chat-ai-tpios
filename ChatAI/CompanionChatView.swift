@@ -56,6 +56,7 @@ struct CompanionChatView: View {
                             ) { log in
                                 addDiagnostic(log)
                             }
+
                         }
                         .frame(
                             width: min(proxy.size.width - 12, 410),
@@ -128,6 +129,7 @@ struct CompanionChatView: View {
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
+                    // Speech is a mouth animation, not a facial emotion.
                     if emotion == .idle || emotion == .listening || emotion == .thinking {
                         emotion = .speaking
                     }
@@ -200,12 +202,8 @@ struct CompanionChatView: View {
             .accessibilityLabel("Xem và sao chép log")
 
             Button {
-                if isGestureTestMode {
-                    toggleGestureTestMode()
-                } else {
-                    toggleGestureTestMode()
-                    showExpressionTests = true
-                }
+                if isGestureTestMode { toggleGestureTestMode() }
+                else { toggleGestureTestMode(); showExpressionTests = true }
             } label: {
                 Image(systemName: isGestureTestMode ? "xmark" : "figure.stand")
                     .font(.system(size: 15, weight: .semibold))
@@ -220,21 +218,10 @@ struct CompanionChatView: View {
             .accessibilityLabel(isGestureTestMode ? "Đóng chế độ test Ara" : "Thử cử chỉ Ara")
 
             if isGestureTestMode {
-                Button { showExpressionTests = true } label: {
-                    Image(systemName: "face.smiling")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(activeTheme.accent)
-                        .frame(width: 42, height: 42)
-                }
-                .accessibilityLabel("Biểu cảm & lời nói")
-
-                Button { showActionTests = true } label: {
-                    Image(systemName: "figure.run")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(activeTheme.accent)
-                        .frame(width: 42, height: 42)
-                }
-                .accessibilityLabel("Theo yêu cầu")
+                Button { showExpressionTests = true } label: { Image(systemName: "face.smiling") }
+                    .accessibilityLabel("Biểu cảm & lời nói")
+                Button { showActionTests = true } label: { Image(systemName: "figure.run") }
+                    .accessibilityLabel("Theo yêu cầu")
             }
 
             Button { nightMode.toggle() } label: {
@@ -305,13 +292,11 @@ struct CompanionChatView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    ForEach(groups.indices, id: \.self) { groupIndex in
-                        let group = groups[groupIndex]
+                    ForEach(groups, id: \.0) { group in
                         VStack(alignment: .leading, spacing: 9) {
                             Text(group.0).font(.subheadline.weight(.semibold))
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                                ForEach(group.1.indices, id: \.self) { itemIndex in
-                                    let item = group.1[itemIndex]
+                                ForEach(group.1, id: \.0) { item in
                                     Button {
                                         if item.1 == .jumpStart {
                                             testJumpSequence()
@@ -340,13 +325,35 @@ struct CompanionChatView: View {
         .presentationDetents([.medium, .large])
     }
 
+    private func gestureTestChip(_ title: String, clip: AraAvatarView.Clip) -> some View {
+        Button {
+            testAraGesture(clip)
+        } label: {
+            HStack(spacing: 4) {
+                if avatarClip == clip {
+                    Image(systemName: "checkmark.circle.fill")
+                }
+                Text(title)
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+            .frame(width: 82)
+            .background(
+                avatarClip == clip ? activeTheme.accent : activeTheme.surface.opacity(0.96),
+                in: Capsule()
+            )
+            .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Test Ara: \(title)")
+    }
+
     private func toggleGestureTestMode() {
         if isGestureTestMode {
             gestureTestTask?.cancel()
             gestureTestTask = nil
             isGestureTestMode = false
-            showExpressionTests = false
-            showActionTests = false
             avatarClip = .idle
             addDiagnostic("[ARA TEST] Test mode closed")
             return
@@ -468,81 +475,55 @@ struct CompanionChatView: View {
         }
     }
 
-    private var statusText: String {
-        if isGestureTestMode { return "Đang test Ara" }
-        if liveManager.aiSpeaking { return "Ara đang nói" }
-        switch liveManager.state {
-        case .idle: return "Sẵn sàng"
-        case .connecting: return "Đang kết nối"
-        case .live: return "Đang nghe"
-        }
-    }
-
-    private var statusIcon: String {
-        if isGestureTestMode { return "hand.tap" }
-        if liveManager.aiSpeaking { return "waveform" }
-        switch liveManager.state {
-        case .idle: return "checkmark.circle"
-        case .connecting: return "arrow.triangle.2.circlepath"
-        case .live: return "ear"
-        }
-    }
-
-    private var controls: some View {
-        HStack(spacing: 14) {
-            Button { liveManager.toggle() } label: {
-                Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 58, height: 58)
-                    .background(activeTheme.accent, in: Circle())
-            }
-            .disabled(isGestureTestMode)
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(activeTheme.accent)
-                    .frame(width: 48, height: 48)
-                    .background(activeTheme.surface, in: Circle())
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-    }
-
-    private func addDiagnostic(_ line: String) {
-        diagnosticLogs.append(line)
-        if diagnosticLogs.count > 300 {
-            diagnosticLogs.removeFirst(diagnosticLogs.count - 300)
-        }
+    private func cancelEmotionGesture() {
+        emotionGestureGeneration = UUID()
+        emotionGestureTask?.cancel()
+        emotionGestureTask = nil
     }
 
     private func handleLatestTranscript() {
-        guard !isGestureTestMode else { return }
-        guard let line = liveManager.lines.last, line.role == .assistant else { return }
-        let text = line.text.lowercased()
-        if text.contains("giải thích") || text.contains("explain") {
-            guard !didTriggerExplainGesture else { return }
-            didTriggerExplainGesture = true
-            playExplainGesture()
-        } else if text.contains("cảm ơn") || text.contains("thank") {
-            guard !didTriggerContextGestureForTurn else { return }
-            didTriggerContextGestureForTurn = true
-            playAraEmpathy(reason: "assistant context")
+        guard !isGestureTestMode, let line = liveManager.lines.last else { return }
+        message = line.text
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
+            emotion = line.role == .user ? .listening : emotionForAssistantText(line.text)
         }
-    }
 
-    private func playExplainGesture() {
-        explainGestureTask?.cancel()
+        guard line.role == .assistant,
+              line.id != previousAssistantLineIDForTurn,
+              liveManager.aiSpeaking,
+              !didTriggerExplainGesture else { return }
+
+        let wordCount = line.text.split(whereSeparator: { $0.isWhitespace }).count
+        guard let reason = explainCueReason(line.text) else {
+            addDiagnostic("[ARA] TalkExplain skipped: no explanation cue; chars=\(line.text.count), words=\(wordCount)")
+            guard !didTriggerContextGestureForTurn,
+                  let cue = contextGestureCue(line.text) else { return }
+            didTriggerContextGestureForTurn = true
+            if cue.clip == .empathy {
+                playAraEmpathy(reason: cue.reason)
+            } else {
+                playAraLaugh(reason: cue.reason)
+            }
+            return
+        }
+
+        didTriggerExplainGesture = true
+        cancelExplainGesture()
         let generation = UUID()
         explainGestureGeneration = generation
         avatarClip = .talkExplain
-        addDiagnostic("[ARA] TalkExplain triggered")
+        addDiagnostic("[ARA] TalkExplain triggered: \(reason); chars=\(line.text.count), words=\(wordCount)")
         explainGestureTask = Task { @MainActor in
-            do { try await Task.sleep(nanoseconds: 3_000_000_000) } catch { return }
-            guard explainGestureGeneration == generation, avatarClip == .talkExplain else { return }
-            avatarClip = liveManager.aiSpeaking ? .talk : (liveManager.state == .live ? .listening : .idle)
+            do {
+                try await Task.sleep(nanoseconds: 2_800_000_000)
+            } catch {
+                return
+            }
+            guard explainGestureGeneration == generation,
+                  liveManager.aiSpeaking,
+                  avatarClip == .talkExplain else { return }
+            avatarClip = .talk
+            addDiagnostic("[ARA] TalkExplain finished; returned to Talk")
             explainGestureTask = nil
         }
     }
@@ -553,9 +534,173 @@ struct CompanionChatView: View {
         explainGestureTask = nil
     }
 
-    private func cancelEmotionGesture() {
-        emotionGestureGeneration = UUID()
-        emotionGestureTask?.cancel()
-        emotionGestureTask = nil
+    private func normalizedAraCueText(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+    }
+
+    private func explainCueReason(_ text: String) -> String? {
+        let value = normalizedAraCueText(text)
+        let cues = [
+            "de em giai thich", "giai thich", "noi ro", "cu the", "vi du", "chang han",
+            "dau tien", "thu nhat", "thu hai", "thu ba", "tiep theo", "tom lai", "ket luan",
+            "quan trong", "nguyen nhan", "ly do", "bao gom", "nghia la", "phan tich",
+            "huong dan", "cac buoc", "buoc 1", "so sanh", "vi vay", "do do", "boi vi",
+            "theo", "that ra", "chinh la",
+            "can lam nhu sau", "minh cung xem", "co the hieu", "dieu nay co nghia",
+            "let me explain", "for example", "for instance", "first", "next", "in summary",
+            "the reason", "because", "this means", "to compare", "step 1", "here is how"
+        ]
+        if let cue = cues.first(where: { value.contains($0) }) {
+            return "cue=\(cue)"
+        }
+
+        let listItems = text.split(separator: "\n").filter { line in
+            let item = line.trimmingCharacters(in: .whitespaces)
+            return ["- ", "• ", "* "].contains(where: item.hasPrefix)
+                || item.range(of: #"^\d+[.)]\s"#, options: .regularExpression) != nil
+        }
+        return listItems.count >= 2 ? "structured list (\(listItems.count) items)" : nil
+    }
+
+    private func contextGestureCue(_ text: String) -> (clip: AraAvatarView.Clip, reason: String)? {
+        let value = normalizedAraCueText(text)
+        let empathyCues = ["hieu roi", "cam thong", "kho qua", "buon", "lo lang", "thong cam", "dung lo"]
+        if let cue = empathyCues.first(where: { value.contains($0) }) {
+            return (.empathy, "cue=\(cue)")
+        }
+        let laughCues = ["ha ha", "hi hi", "vui", "buon cuoi", "hai", "thi ra"]
+        if let cue = laughCues.first(where: { value.contains($0) }) {
+            return (.laugh, "cue=\(cue)")
+        }
+        return nil
+    }
+
+    private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
+        let value = text.lowercased()
+        let happySignals = ["haha", "😂", "🤣", "😄", "😊", "vui quá", "tuyệt vời", "chúc mừng", "hay quá"]
+        let surprisedSignals = ["😮", "😲", "bất ngờ", "không ngờ", "thật sao", "wow"]
+        let winkSignals = ["😉", "😜", "đùa thôi", "trêu anh"]
+        if winkSignals.contains(where: value.contains) { return .happy }
+        if surprisedSignals.contains(where: value.contains) { return .surprised }
+        if happySignals.contains(where: value.contains) { return .happy }
+        return liveManager.aiSpeaking ? .speaking : .idle
+    }
+
+    private func addDiagnostic(_ line: String) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        diagnosticLogs.append("[\(timestamp)] \(line)")
+        if diagnosticLogs.count > 150 { diagnosticLogs.removeFirst(diagnosticLogs.count - 150) }
+    }
+
+    private var controls: some View {
+        HStack(spacing: 12) {
+            Button {
+                if liveManager.state == .idle {
+                    startLive()
+                } else {
+                    liveManager.end()
+                }
+            } label: {
+                Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
+                    .frame(width: 52, height: 52)
+                    .background(activeTheme.surface, in: Circle())
+                    .overlay(Circle().stroke(activeTheme.accent.opacity(0.24), lineWidth: 1))
+            }
+
+            Button {
+                if liveManager.state == .idle {
+                    startLive()
+                }
+            } label: {
+                Label(
+                    liveManager.state == .live
+                        ? (liveManager.aiSpeaking ? "AI đang nói..." : "Đang nghe anh")
+                        : (liveManager.state == .connecting ? "Đang kết nối..." : "Tiếp tục chat"),
+                    systemImage: "waveform"
+                )
+                .font(.subheadline.weight(.bold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .foregroundStyle(.white)
+                .background(
+                    LinearGradient(
+                        colors: [activeTheme.accent, activeTheme.accent.opacity(0.78)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: Capsule()
+                )
+            }
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .frame(width: 52, height: 52)
+                    .background(Color.red.opacity(0.85), in: Circle())
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(16)
+        .background(activeTheme.background.opacity(0.96))
+    }
+
+    private func startLive() {
+        previousAssistantLineIDForTurn = liveManager.lines.last(where: { $0.role == .assistant })?.id
+        liveManager.start(
+            model: liveModel,
+            voice: liveVoice,
+            persona: livePersona,
+            bargeIn: liveBargeIn
+        )
+    }
+
+    private var statusText: String {
+        switch emotion {
+        case .idle: "Đang ở đây với anh"
+        case .listening: "Em đang nghe anh"
+        case .thinking: "Đang suy nghĩ"
+        case .speaking: "Em đang nói"
+        case .happy: "Em đang vui"
+        case .surprised: "Bất ngờ quá!"
+        case .confused: "Để em nghĩ lại..."
+        case .sad: "Em hơi buồn..."
+        case .angry: "Em đang giận đó nha"
+        case .sleepy: "Em hơi buồn ngủ..."
+        }
+    }
+
+    private var statusIcon: String {
+        switch emotion {
+        case .idle: "sparkles"
+        case .listening: "ear"
+        case .thinking: "ellipsis.bubble"
+        case .speaking: "waveform"
+        case .happy: "face.smiling"
+        case .surprised: "exclamationmark.bubble"
+        case .confused: "questionmark.bubble"
+        case .sad: "cloud.rain"
+        case .angry: "flame"
+        case .sleepy: "moon.zzz"
+        }
     }
 }
+
+private enum CompanionEmotion: CaseIterable {
+    case idle, listening, thinking, speaking, happy, surprised, confused, sad, angry, sleepy
+
+    var label: String {
+        switch self {
+        case .idle: "Bình thường"
+        case .listening: "Đang nghe"
+        case .thinking: "Đang suy nghĩ"
+        case .speaking: "Đang nói"
+        case .happy: "Vui"
+        case .surprised: "Ngạc nhiên"
+        case .confused: "Bối rối"
+        case .sad: "Buồn"
+        case .angry: "Tức giận"
+        case .sleepy: "Buồn ngủ"
+        }
+    }
+}
+
