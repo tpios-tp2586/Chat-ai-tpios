@@ -11,6 +11,7 @@
 - Ưu tiên thay đổi tối thiểu; không thêm dependency nếu không cần.
 - Bảo vệ chatbot/API, chat history, voice transport/pipeline, Text Chat và Chibi Chat. Không sửa Text Chat/Chibi Chat khi làm Ara.
 - Không chạy GitHub Actions hoặc Codemagic nếu chưa được user yêu cầu hoặc chưa cần để xác minh thay đổi cụ thể.
+- Không tự chạy/dispatch GitHub Actions (kể cả workflow generate/convert) khi chưa thật sự cần. Mỗi lần chạy có thể tiêu tốn GitHub Actions minutes/quota; trước khi chạy phải giải thích lý do và xin user xác nhận. Ưu tiên kiểm tra code, diff và cú pháp trước; chỉ chạy khi cần xác minh kết quả mà kiểm tra tĩnh không thể xác nhận.
 - Không sửa file backup/backup workflow; user tự quản lý backup.
 - User thao tác chủ yếu trên iPhone; báo kết quả ngắn gọn, rõ ràng.
 - Session Checkpoint: đọc status một lần ở đầu phiên/khôi phục; trong phiên chỉ đọc file liên quan; checkpoint sau mỗi công đoạn quan trọng hoặc trước khi chuyển phiên. Khi cập nhật status, thay thế nội dung cũ bằng snapshot mới, không nối nhật ký.
