@@ -15,11 +15,12 @@ workflows:
           test -s IMG_0290.png
           echo "Required project and icon files are present."
 
-      - name: Download Ara USDZ Actions artifact into app resources
+      - name: Download and bake Ara USDZ with OpenUSD
         script: |
           set -euo pipefail
           : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
 
+          USD_TMP="$(mktemp -d)"
           ARTIFACTS_JSON="$(curl --fail --silent --show-error --get \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $GITHUB_TOKEN" \
@@ -28,22 +29,42 @@ workflows:
             --data-urlencode "per_page=100" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts")"
           ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-research-bundle" and not x.get("expired") and x.get("workflow_run",{}).get("head_branch")=="main"]; print(max(a,key=lambda x:x["created_at"])["id"] if a else "")')"
-          test -n "$ARTIFACT_ID" || { echo "No successful Ara research bundle artifact found on main."; exit 1; }
+          test -n "$ARTIFACT_ID" || { echo "No Ara research bundle artifact found on main."; exit 1; }
 
-          mkdir -p ChatAI/Resources
           curl --fail --location --silent --show-error \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $GITHUB_TOKEN" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts/$ARTIFACT_ID/zip" \
-            --output ara-avatar-research-bundle.zip
-          unzip -oq ara-avatar-research-bundle.zip -d ChatAI/Resources
-          rm ara-avatar-research-bundle.zip
+            --output "$USD_TMP/ara-avatar-research-bundle.zip"
+          mkdir -p "$USD_TMP/artifact"
+          unzip -oq "$USD_TMP/ara-avatar-research-bundle.zip" -d "$USD_TMP/artifact"
 
-          test -s "ChatAI/Resources/Ara-Avatar.usdz"
-          test -s "ChatAI/Resources/animation-timeline.json"
-          echo "Ara USDZ and its animation timeline manifest are ready to be bundled."
- 
+          SOURCE_USDZ="$(find "$USD_TMP/artifact" -type f -name 'Ara-Avatar.usdz' -print -quit)"
+          TIMELINE="$(find "$USD_TMP/artifact" -type f -name 'animation-timeline.json' -print -quit)"
+          test -s "$SOURCE_USDZ" || { echo "Unbaked Ara-Avatar.usdz is missing from the artifact."; exit 1; }
+          test -s "$TIMELINE" || { echo "animation-timeline.json is missing from the artifact."; exit 1; }
+
+          python3 -c 'import sys; assert (3, 9) <= sys.version_info[:2] < (3, 15), f"Unsupported Python: {sys.version}"'
+          python3 -m venv "$USD_TMP/venv"
+          USD_PY="$USD_TMP/venv/bin/python"
+          "$USD_PY" -m pip install --disable-pip-version-check --only-binary=:all: usd-core==26.5
+          "$USD_PY" -c 'from pxr import Usd, UsdSkel, UsdUtils; print("OpenUSD 26.5 ready:", Usd.GetVersion())'
+
+          mkdir -p ChatAI/Resources
+          cp "$TIMELINE" ChatAI/Resources/animation-timeline.json
+          "$USD_PY" scripts/apply-ara-hip-sway.py "$SOURCE_USDZ" ChatAI/Resources/Ara-Avatar.usdz "$TIMELINE" | tee "$USD_TMP/hip-sway-diagnostics.txt"
+          grep -q '^Talk:' "$USD_TMP/hip-sway-diagnostics.txt"
+          grep -q '^AraListening:' "$USD_TMP/hip-sway-diagnostics.txt"
+          unzip -tq ChatAI/Resources/Ara-Avatar.usdz
+
+          mkdir -p output-usdz
+          "$USD_PY" scripts/inspect-ara-usdz-animation.py ChatAI/Resources/Ara-Avatar.usdz "$TIMELINE" | tee "$USD_TMP/usdz-animation-diagnostics.txt"
+          grep -q 'Talk vs TalkExplain' "$USD_TMP/usdz-animation-diagnostics.txt"
+          test -s ChatAI/Resources/Ara-Avatar.usdz
+
+          echo "Ara USDZ baked and validated with OpenUSD before the Xcode build."
+
       - name: Install XcodeGen
         script: brew install xcodegen
 
