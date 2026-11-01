@@ -26,7 +26,7 @@ while (offset < bytes.length) {
 if (!json || !binary || json.buffers?.length !== 1) throw new Error("GLB is missing its JSON or embedded binary buffer");
 
 const requiredNames = ["Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh"];
-const optionalNames = ["Cheer", "Laugh"];
+const optionalNames = ["Cheer", "Laugh", "Cry"];
 const findAnimation = name => (json.animations ?? []).find(item => item.name?.toLowerCase() === name.toLowerCase());
 const selected = [
   ...requiredNames.map(name => {
