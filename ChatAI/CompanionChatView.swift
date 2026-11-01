@@ -31,8 +31,8 @@ struct CompanionChatView: View {
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
     @State private var isGestureTestMode = false
-    @State private var showExpressionTests = false
-    @State private var showActionTests = false
+    @State private var showAraTestMenu = false
+    @State private var selectedTestGroup = "Biểu cảm"
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -94,9 +94,15 @@ struct CompanionChatView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .overlay(alignment: .top) {
+            if showAraTestMenu {
+                araTestMenu
+                    .padding(.top, 58)
+                    .padding(.horizontal, 12)
+                    .zIndex(2)
+            }
+        }
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
-        .sheet(isPresented: $showExpressionTests) { expressionTestSheet }
-        .sheet(isPresented: $showActionTests) { actionTestSheet }
         .onChange(of: liveManager.lines.count) { _ in
             if let line = liveManager.lines.last {
                 if line.role == .user {
@@ -202,10 +208,15 @@ struct CompanionChatView: View {
             .accessibilityLabel("Xem và sao chép log")
 
             Button {
-                if isGestureTestMode { toggleGestureTestMode() }
-                else { toggleGestureTestMode(); showExpressionTests = true }
+                if showAraTestMenu {
+                    showAraTestMenu = false
+                    toggleGestureTestMode()
+                } else {
+                    if !isGestureTestMode { toggleGestureTestMode() }
+                    showAraTestMenu = true
+                }
             } label: {
-                Image(systemName: isGestureTestMode ? "xmark" : "figure.stand")
+                Image(systemName: showAraTestMenu ? "xmark" : "testtube.2")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
@@ -215,14 +226,7 @@ struct CompanionChatView: View {
                             .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
                     }
             }
-            .accessibilityLabel(isGestureTestMode ? "Đóng chế độ test Ara" : "Thử cử chỉ Ara")
-
-            if isGestureTestMode {
-                Button { showExpressionTests = true } label: { Image(systemName: "face.smiling") }
-                    .accessibilityLabel("Biểu cảm & lời nói")
-                Button { showActionTests = true } label: { Image(systemName: "figure.run") }
-                    .accessibilityLabel("Theo yêu cầu")
-            }
+            .accessibilityLabel(showAraTestMenu ? "Đóng menu test Ara" : "Mở menu test Ara")
 
             Button { nightMode.toggle() } label: {
                 Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
@@ -271,82 +275,95 @@ struct CompanionChatView: View {
         }
     }
 
-    private var expressionTestSheet: some View {
-        testSheet(title: "Biểu cảm & lời nói", groups: [
-            ("Nói chuyện", [("Idle", AraAvatarView.Clip.idle), ("Talk", .talk), ("TalkExplain", .talkExplain)]),
-            ("Biểu cảm", [("Wave", .wave), ("Laugh", .naturalLaugh)])
-        ])
+    private var araTestGroups: [(String, String, [(String, AraAvatarView.Clip)])] {
+        [
+            ("Biểu cảm", "face.smiling", [
+                ("Idle", .idle), ("Talk", .talk), ("TalkExplain", .talkExplain),
+                ("Wave", .wave), ("Laugh", .naturalLaugh)
+            ]),
+            ("Di chuyển", "figure.walk", [
+                ("Walk", .walk), ("Run", .run), ("Walk backwards", .walkBackwards),
+                ("Strafe left", .strafeLeft), ("Strafe right", .strafeRight)
+            ]),
+            ("Xoay", "arrow.trianglehead.2.clockwise.rotate.90", [
+                ("Turn left 45°", .turnLeft45), ("Turn left 90°", .turnLeft90),
+                ("Turn right 45°", .turnRight45), ("Turn right 90°", .turnRight90),
+                ("Full turn 360°", .fullTurn)
+            ]),
+            ("Tư thế", "figure.stand", [
+                ("Idle / nghỉ", .idle), ("Sit down (chair)", .sitDown),
+                ("Sit idle (chair)", .sitIdle), ("Stand up (chair)", .standUp),
+                ("Lie down", .lieDown), ("Sleep", .sleep)
+            ]),
+            ("Nhảy", "figure.jumprope", [("Jump sequence", .jumpStart)]),
+            ("Khác", "ellipsis", [("Ride horse (trot)", .rideHorse)])
+        ]
     }
 
-    private var actionTestSheet: some View {
-        testSheet(title: "Theo yêu cầu", groups: [
-            ("Di chuyển", [("Walk", .walk), ("Run", .run), ("Walk backwards", .walkBackwards), ("Strafe left", .strafeLeft), ("Strafe right", .strafeRight)]),
-            ("Xoay", [("Turn left 45°", .turnLeft45), ("Turn left 90°", .turnLeft90), ("Turn right 45°", .turnRight45), ("Turn right 90°", .turnRight90), ("Full turn 360°", .fullTurn)]),
-            ("Tư thế", [("Idle / nghỉ", .idle), ("Sit down (chair)", .sitDown), ("Sit idle (chair)", .sitIdle), ("Stand up (chair)", .standUp), ("Lie down", .lieDown), ("Sleep", .sleep)]),
-            ("Nhảy", [("Jump sequence", .jumpStart)]),
-            ("Cử chỉ & phương tiện", [("Wave", .wave), ("Laugh", .naturalLaugh), ("Ride horse (trot)", .rideHorse)])
-        ])
-    }
-
-    private func testSheet(title: String, groups: [(String, [(String, AraAvatarView.Clip)])]) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ForEach(groups, id: \.0) { group in
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text(group.0).font(.subheadline.weight(.semibold))
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                                ForEach(group.1, id: \.0) { item in
-                                    Button {
-                                        if item.1 == .jumpStart {
-                                            testJumpSequence()
-                                        } else {
-                                            testAraGesture(item.1)
-                                        }
-                                    } label: {
-                                        Text(item.0).frame(maxWidth: .infinity).padding(.vertical, 11)
-                                            .background(avatarClip == item.1 ? activeTheme.accent : activeTheme.surface,
-                                                        in: RoundedRectangle(cornerRadius: 12))
-                                    }.buttonStyle(.plain)
-                                }
+    private var araTestMenu: some View {
+        VStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(araTestGroups, id: \.0) { group in
+                        Button {
+                            selectedTestGroup = group.0
+                        } label: {
+                            VStack(spacing: 3) {
+                                Image(systemName: group.1).font(.system(size: 15, weight: .semibold))
+                                Text(group.0).font(.system(size: 10, weight: .medium))
                             }
+                            .foregroundStyle(selectedTestGroup == group.0 ? .white : .primary)
+                            .frame(minWidth: 55)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 8)
+                            .background(
+                                selectedTestGroup == group.0 ? activeTheme.accent : activeTheme.surface,
+                                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if let group = araTestGroups.first(where: { $0.0 == selectedTestGroup }) {
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(spacing: 5) {
+                        ForEach(group.2, id: \.0) { item in
+                            Button {
+                                if item.1 == .jumpStart {
+                                    testJumpSequence()
+                                } else {
+                                    testAraGesture(item.1)
+                                }
+                            } label: {
+                                HStack(spacing: 9) {
+                                    Image(systemName: avatarClip == item.1 ? "checkmark.circle.fill" : "play.circle")
+                                        .foregroundStyle(avatarClip == item.1 ? activeTheme.accent : .secondary)
+                                    Text(item.0).font(.system(size: 13, weight: .medium))
+                                    Spacer()
+                                    if avatarClip == item.1 {
+                                        Text("Đang test").font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(activeTheme.accent)
+                                    }
+                                }
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(activeTheme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 9))
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                }.padding()
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Đóng") { showExpressionTests = false; showActionTests = false }
                 }
+                .frame(maxHeight: 172)
             }
         }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func gestureTestChip(_ title: String, clip: AraAvatarView.Clip) -> some View {
-        Button {
-            testAraGesture(clip)
-        } label: {
-            HStack(spacing: 4) {
-                if avatarClip == clip {
-                    Image(systemName: "checkmark.circle.fill")
-                }
-                Text(title)
-            }
-            .font(.system(size: 10, weight: .semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 8)
-            .frame(width: 82)
-            .background(
-                avatarClip == clip ? activeTheme.accent : activeTheme.surface.opacity(0.96),
-                in: Capsule()
-            )
-            .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Test Ara: \(title)")
+        .padding(9)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
+        .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
     }
 
     private func toggleGestureTestMode() {
@@ -354,6 +371,7 @@ struct CompanionChatView: View {
             gestureTestTask?.cancel()
             gestureTestTask = nil
             isGestureTestMode = false
+            showAraTestMenu = false
             avatarClip = .idle
             addDiagnostic("[ARA TEST] Test mode closed")
             return
