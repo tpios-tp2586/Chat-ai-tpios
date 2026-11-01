@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Bake a small Hips Y-axis sway into Talk and AraListening in an Ara USDZ."""
+"""Bake a subtle Hips Y-axis sway into selected Ara USDZ timeline clips."""
+import json
 import math
 import os
-import shutil
 import sys
 import tempfile
 import zipfile
@@ -11,11 +11,7 @@ from pxr import Gf, Usd, UsdSkel
 
 AMPLITUDE_DEGREES = 3.0
 FREQUENCY_HZ = 0.8
-FPS = 30.0
-TARGET_CLIPS = {
-    "Talk": (4.80, 11.20),
-    "AraListening": (14.00, 17.20),
-}
+TARGET_CLIPS = {"Talk", "AraListening"}
 
 
 def quat_mul(a, b):
@@ -23,12 +19,13 @@ def quat_mul(a, b):
     av = a.GetImaginary()
     bw = float(b.GetReal())
     bv = b.GetImaginary()
+    cross = Gf.Cross(av, bv)
     return Gf.Quatf(
         aw * bw - float(Gf.Dot(av, bv)),
         Gf.Vec3f(
-            aw * bv[0] + bw * av[0] + float(Gf.Cross(av, bv)[0]),
-            aw * bv[1] + bw * av[1] + float(Gf.Cross(av, bv)[1]),
-            aw * bv[2] + bw * av[2] + float(Gf.Cross(av, bv)[2]),
+            aw * bv[0] + bw * av[0] + float(cross[0]),
+            aw * bv[1] + bw * av[1] + float(cross[1]),
+            aw * bv[2] + bw * av[2] + float(cross[2]),
         ),
     )
 
@@ -36,6 +33,31 @@ def quat_mul(a, b):
 def yaw_quaternion(degrees):
     half = math.radians(degrees) * 0.5
     return Gf.Quatf(math.cos(half), Gf.Vec3f(0.0, math.sin(half), 0.0))
+
+
+def load_target_clips(timeline_path):
+    with open(timeline_path, encoding="utf-8") as source:
+        timeline = json.load(source)
+
+    fps = float(timeline["fps"])
+    if fps <= 0:
+        raise RuntimeError(f"Invalid timeline fps: {fps}")
+
+    clips = {}
+    for clip in timeline["clips"]:
+        name = str(clip["name"])
+        if name not in TARGET_CLIPS:
+            continue
+        start = float(clip["start"])
+        end = float(clip["end"])
+        if not math.isfinite(start) or not math.isfinite(end) or end <= start:
+            raise RuntimeError(f"Invalid time range for {name}: {start}-{end}")
+        clips[name] = (start, end)
+
+    missing = TARGET_CLIPS - clips.keys()
+    if missing:
+        raise RuntimeError("Timeline is missing target clips: " + ", ".join(sorted(missing)))
+    return fps, clips
 
 
 def find_animation(stage):
@@ -52,14 +74,9 @@ def find_joint(joints, wanted):
     raise RuntimeError(f"Joint {wanted!r} not found in USDZ animation")
 
 
-def clip_for_time(seconds):
-    for name, (start, end) in TARGET_CLIPS.items():
-        if start <= seconds <= end:
-            return name, start, end
-    return None
+def patch_usd_file(source_usdz, destination_usdz, timeline_path):
+    timeline_fps, clips = load_target_clips(timeline_path)
 
-
-def patch_usd_file(source_usdz, destination_usdz):
     with tempfile.TemporaryDirectory() as temp:
         unpacked = os.path.join(temp, "package")
         os.makedirs(unpacked)
@@ -75,10 +92,18 @@ def patch_usd_file(source_usdz, destination_usdz):
         if len(usd_files) != 1:
             raise RuntimeError(f"Expected one USD payload in USDZ, found {len(usd_files)}")
 
-        usd_path = usd_files[0]
-        stage = Usd.Stage.Open(usd_path)
+        stage = Usd.Stage.Open(usd_files[0])
         if stage is None:
             raise RuntimeError("USD payload could not be opened")
+
+        time_codes_per_second = float(stage.GetTimeCodesPerSecond())
+        if time_codes_per_second <= 0:
+            raise RuntimeError(f"Invalid USD timeCodesPerSecond: {time_codes_per_second}")
+        if abs(time_codes_per_second - timeline_fps) > 0.01:
+            raise RuntimeError(
+                f"Timeline fps ({timeline_fps}) does not match USD timeCodesPerSecond "
+                f"({time_codes_per_second})"
+            )
 
         animation = find_animation(stage)
         joints = animation.GetJointsAttr().Get() or []
@@ -88,51 +113,85 @@ def patch_usd_file(source_usdz, destination_usdz):
         if not time_samples:
             raise RuntimeError("USDZ animation has no rotation time samples")
 
-        start_end = {name: [False, False] for name in TARGET_CLIPS}
+        stats = {
+            name: {"count": 0, "first": None, "last": None, "peak": 0.0}
+            for name in clips
+        }
         patched = 0
+
         for time_code in time_samples:
-            seconds = float(time_code) / FPS
-            clip = clip_for_time(seconds)
-            if clip is None:
+            seconds = float(time_code) / time_codes_per_second
+            match = next(
+                ((name, start, end) for name, (start, end) in clips.items()
+                 if start <= seconds <= end),
+                None,
+            )
+            if match is None:
                 continue
-            name, start, _ = clip
+
+            name, start, end = match
             values = rotations_attr.Get(time_code)
             if values is None or hips_index >= len(values):
                 raise RuntimeError(f"Missing Hips rotation at time code {time_code}")
-            elapsed = max(0.0, seconds - start)
-            angle = AMPLITUDE_DEGREES * math.sin(2.0 * math.pi * FREQUENCY_HZ * elapsed)
+
+            progress = min(1.0, max(0.0, (seconds - start) / (end - start)))
+            envelope = math.sin(math.pi * progress) ** 2
+            elapsed = seconds - start
+            angle = AMPLITUDE_DEGREES * math.sin(2.0 * math.pi * FREQUENCY_HZ * elapsed) * envelope
+
             values = list(values)
             values[hips_index] = quat_mul(values[hips_index], yaw_quaternion(angle))
             rotations_attr.Set(values, time_code)
-            patched += 1
-            start_end[name][0] = True
-            start_end[name][1] = True
 
-        for name, flags in start_end.items():
-            if not all(flags):
-                raise RuntimeError(f"No rotation samples patched for {name}")
+            item = stats[name]
+            item["count"] += 1
+            item["first"] = seconds if item["first"] is None else item["first"]
+            item["last"] = seconds
+            item["peak"] = max(item["peak"], abs(angle))
+            patched += 1
+
+        for name, (start, end) in clips.items():
+            item = stats[name]
+            if item["count"] < 2:
+                raise RuntimeError(f"Insufficient Hips samples for {name}: {item['count']}")
+            tolerance = 1.5 / timeline_fps
+            if abs(item["first"] - start) > tolerance or abs(item["last"] - end) > tolerance:
+                raise RuntimeError(
+                    f"{name} sample range {item['first']:.4f}-{item['last']:.4f}s "
+                    f"does not cover timeline range {start:.4f}-{end:.4f}s"
+                )
 
         stage.GetRootLayer().Save()
-        stage.Reload()
 
         os.makedirs(os.path.dirname(destination_usdz), exist_ok=True)
         with zipfile.ZipFile(destination_usdz, "w", compression=zipfile.ZIP_STORED) as archive:
             for name in names:
-                path = os.path.join(unpacked, name)
-                archive.write(path, name)
+                archive.write(os.path.join(unpacked, name), name)
 
-        print(f"Baked Hips Y sway: ±{AMPLITUDE_DEGREES}°, {FREQUENCY_HZ}Hz, {FPS:.0f}fps")
-        print(f"Patched rotation samples: {patched}")
-        print(f"Hips joint index: {hips_index}")
+        print(
+            f"Baked Hips Y sway: amplitude={AMPLITUDE_DEGREES:.1f}deg, "
+            f"frequency={FREQUENCY_HZ:.2f}Hz, envelope=zero-at-clip-ends"
+        )
+        print(f"Timeline fps: {timeline_fps:.2f}; USD timeCodesPerSecond: {time_codes_per_second:.2f}")
+        print(f"Hips joint index: {hips_index}; patched rotation samples: {patched}")
+        for name, (start, end) in clips.items():
+            item = stats[name]
+            print(
+                f"{name}: timeline={start:.4f}-{end:.4f}s; "
+                f"samples={item['count']} ({item['first']:.4f}-{item['last']:.4f}s); "
+                f"peak baked offset={item['peak']:.3f}deg"
+            )
 
 
 def main():
-    if len(sys.argv) != 3:
-        raise SystemExit("Usage: apply-ara-hip-sway.py <input.usdz> <output.usdz>")
-    source, destination = sys.argv[1:]
+    if len(sys.argv) != 4:
+        raise SystemExit(
+            "Usage: apply-ara-hip-sway.py <input.usdz> <output.usdz> <animation-timeline.json>"
+        )
+    source, destination, timeline = sys.argv[1:]
     if os.path.abspath(source) == os.path.abspath(destination):
         raise SystemExit("Input and output USDZ paths must differ")
-    patch_usd_file(source, destination)
+    patch_usd_file(source, destination, timeline)
 
 
 if __name__ == "__main__":
