@@ -261,20 +261,23 @@ struct CompanionChatView: View {
     }
 
     private var gestureTestControls: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             HStack {
+                Spacer()
                 Label("CHẾ ĐỘ TEST", systemImage: "hand.tap")
                     .font(.caption2.weight(.bold))
                 Spacer()
                 Button("Xong") { toggleGestureTestMode() }
                     .font(.caption.weight(.semibold))
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 9)
             .padding(.vertical, 7)
             .background(.ultraThinMaterial, in: Capsule())
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+            Spacer(minLength: 8)
+
+            HStack(alignment: .center) {
+                VStack(spacing: 7) {
                     gestureTestChip("Wave", clip: .wave)
                     gestureTestChip("Talk", clip: .talk)
                     gestureTestChip("Explain", clip: .talkExplain)
@@ -282,12 +285,10 @@ struct CompanionChatView: View {
                     gestureTestChip("Thinking", clip: .thinking)
                     gestureTestChip("Empathy", clip: .empathy)
                 }
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                VStack(spacing: 7) {
                     gestureTestChip("AraLaugh", clip: .laugh)
                     gestureTestChip("Laugh", clip: .naturalLaugh)
                     gestureTestChip("Cheer", clip: .cheer)
@@ -295,10 +296,12 @@ struct CompanionChatView: View {
                     gestureTestChip("Idle", clip: .idle)
                 }
             }
+
+            Spacer(minLength: 8)
         }
         .font(.caption)
         .foregroundStyle(.white)
-        .padding(8)
+        .padding(5)
     }
 
     private func gestureTestChip(_ title: String, clip: AraAvatarView.Clip) -> some View {
@@ -311,9 +314,10 @@ struct CompanionChatView: View {
                 }
                 Text(title)
             }
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .font(.system(size: 10, weight: .semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+            .frame(width: 82)
             .background(
                 avatarClip == clip ? activeTheme.accent : activeTheme.surface.opacity(0.96),
                 in: Capsule()
