@@ -30,7 +30,8 @@ struct CompanionChatView: View {
     @State private var message: String?
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
-    @State private var showGestureTestSheet = false
+    @State private var isGestureTestMode = false
+    @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
     var body: some View {
@@ -45,8 +46,18 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        AraAvatarView(clip: avatarClip, resetToFrontToken: speechStartToken) { log in
-                            addDiagnostic(log)
+                        ZStack {
+                            AraAvatarView(
+                                clip: avatarClip,
+                                resetToFrontToken: speechStartToken,
+                                repeatForTesting: isGestureTestMode
+                            ) { log in
+                                addDiagnostic(log)
+                            }
+
+                            if isGestureTestMode {
+                                gestureTestControls
+                            }
                         }
                         .frame(
                             width: min(proxy.size.width - 12, 410),
@@ -145,6 +156,7 @@ struct CompanionChatView: View {
         .onDisappear {
             cancelExplainGesture()
             cancelEmotionGesture()
+            gestureTestTask?.cancel()
             liveManager.end()
         }
     }
@@ -187,8 +199,8 @@ struct CompanionChatView: View {
             }
             .accessibilityLabel("Xem và sao chép log")
 
-            Button { showGestureTestSheet = true } label: {
-                Image(systemName: "figure.stand")
+            Button { toggleGestureTestMode() } label: {
+                Image(systemName: isGestureTestMode ? "figure.stand" : "figure.stand")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
@@ -217,7 +229,6 @@ struct CompanionChatView: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 8)
-        .sheet(isPresented: $showGestureTestSheet) { gestureTestSheet }
     }
 
     private var diagnosticLogSheet: some View {
@@ -248,72 +259,109 @@ struct CompanionChatView: View {
         }
     }
 
-    private var gestureTestSheet: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Chọn clip để Ara thực hiện trực tiếp.")
-                    .font(.headline)
-                Text("Dừng phiên chat thoại trước khi thử để trạng thái nghe/nói không ghi đè cử chỉ.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                gestureTestButton("Cheer", detail: "Cử chỉ vui mừng toàn thân", clip: .cheer)
-                gestureTestButton("Laugh", detail: "Cười rõ, nhún thân và đưa tay phải về bụng", clip: .naturalLaugh)
-                gestureTestButton("Cry", detail: "Khóc/sụt sùi toàn thân — chỉ thử thủ công", clip: .cry)
-                gestureTestButton("TalkExplain", detail: "Đưa tay lên ngang ngực rồi hạ xuống", clip: .talkExplain)
-                gestureTestButton("AraThinking", detail: "Cử chỉ suy nghĩ, chuyển động đầu và thân trên", clip: .thinking)
-                gestureTestButton("AraEmpathy", detail: "Cử chỉ đồng cảm, nhẹ nhàng và tiết chế", clip: .empathy)
-                gestureTestButton("AraLaugh", detail: "Cử chỉ cười trong hội thoại", clip: .laugh)
-                gestureTestButton("Wave", detail: "Vẫy tay chào", clip: .wave)
-
-                Button {
-                    testAraGesture(.idle)
-                } label: {
-                    Label("Về trạng thái nghỉ", systemImage: "arrow.uturn.backward")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(liveManager.state != .idle)
+    private var gestureTestControls: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Label("CHẾ ĐỘ TEST", systemImage: "hand.tap")
+                    .font(.caption2.weight(.bold))
+                Spacer()
+                Button("Xong") { toggleGestureTestMode() }
+                    .font(.caption.weight(.semibold))
             }
-            .padding()
-            .navigationTitle("Thử cử chỉ Ara")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Đóng") { showGestureTestSheet = false }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    gestureTestChip("Wave", clip: .wave)
+                    gestureTestChip("Talk", clip: .talk)
+                    gestureTestChip("Explain", clip: .talkExplain)
+                    gestureTestChip("Listen", clip: .listening)
+                    gestureTestChip("Thinking", clip: .thinking)
+                    gestureTestChip("Empathy", clip: .empathy)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    gestureTestChip("AraLaugh", clip: .laugh)
+                    gestureTestChip("Laugh", clip: .naturalLaugh)
+                    gestureTestChip("Cheer", clip: .cheer)
+                    gestureTestChip("Cry", clip: .cry)
+                    gestureTestChip("Idle", clip: .idle)
                 }
             }
         }
+        .font(.caption)
+        .foregroundStyle(.white)
+        .padding(8)
     }
 
-    private func gestureTestButton(_ title: String, detail: String, clip: AraAvatarView.Clip) -> some View {
+    private func gestureTestChip(_ title: String, clip: AraAvatarView.Clip) -> some View {
         Button {
             testAraGesture(clip)
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(title)
-                    Spacer()
-                    if avatarClip == clip {
-                        Image(systemName: "checkmark.circle.fill")
-                    }
+            HStack(spacing: 4) {
+                if avatarClip == clip {
+                    Image(systemName: "checkmark.circle.fill")
                 }
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(title)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 4)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .background(
+                avatarClip == clip ? activeTheme.accent : activeTheme.surface.opacity(0.96),
+                in: Capsule()
+            )
+            .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
         }
-        .buttonStyle(.bordered)
-        .disabled(liveManager.state != .idle)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Test Ara: \(title)")
+    }
+
+    private func toggleGestureTestMode() {
+        if isGestureTestMode {
+            gestureTestTask?.cancel()
+            gestureTestTask = nil
+            isGestureTestMode = false
+            avatarClip = .idle
+            addDiagnostic("[ARA TEST] Test mode closed")
+            return
+        }
+
+        if liveManager.state != .idle {
+            liveManager.end()
+        }
+        cancelExplainGesture()
+        cancelEmotionGesture()
+        gestureTestTask?.cancel()
+        isGestureTestMode = true
+        avatarClip = .idle
+        addDiagnostic("[ARA TEST] Test mode opened; voice session stopped")
     }
 
     private func testAraGesture(_ clip: AraAvatarView.Clip) {
+        guard isGestureTestMode else { return }
+        gestureTestTask?.cancel()
         cancelExplainGesture()
         cancelEmotionGesture()
         avatarClip = clip
-        addDiagnostic("[ARA TEST] Manual clip requested: \(clip.rawValue)")
+        addDiagnostic("[ARA TEST] Started: \(clip.rawValue); repeat window=7s")
+        gestureTestTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 7_000_000_000)
+            } catch {
+                return
+            }
+            guard isGestureTestMode, avatarClip == clip else { return }
+            avatarClip = .idle
+            addDiagnostic("[ARA TEST] Finished: \(clip.rawValue); returned to Idle")
+            gestureTestTask = nil
+        }
     }
 
     private func applyAraEmotion(_ expression: RobotFaceExpression) {
