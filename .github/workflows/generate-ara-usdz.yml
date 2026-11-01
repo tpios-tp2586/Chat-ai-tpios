@@ -152,7 +152,7 @@ jobs:
           cp input/verification-report.txt output-usdz/verification-report.txt
           node scripts/compact-glb-primitives.mjs "$SOURCE" "$COMPACT"
           "$PY" usdz-forge/engine/native/usdzconvert -v "$COMPACT" "$CONVERTED" 2>&1 | tee output-usdz/conversion-log.txt
-          "$PY" scripts/apply-ara-hip-sway.py "$CONVERTED" "$DEST" | tee output-usdz/hip-sway-diagnostics.txt
+          "$PY" scripts/apply-ara-hip-sway.py "$CONVERTED" "$DEST" output-usdz/animation-timeline.json | tee output-usdz/hip-sway-diagnostics.txt
           "$PY" usdz-forge/engine/inspect_usdz.py "$DEST" | tee output-usdz/usdz-report.txt
           "$PY" scripts/inspect-ara-usdz-animation.py "$DEST" output-usdz/animation-timeline.json | tee output-usdz/usdz-animation-diagnostics.txt
           ARA_PRESET="${{ inputs.preset }}" ARA_DETAIL="${{ inputs.detail }}" \
