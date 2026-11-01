@@ -28,7 +28,7 @@
 - Nguồn upstream có 70+ animation clips; rig GLB đã kiểm tra có 69 joints và 34 morph targets. Pipeline ChatAI tạo timeline hội thoại 8 clip/26 giây, đóng gói thành một USDZ animation để app cắt clip bằng RealityKit.
 - RealityKit có thể nhập timeline USDZ thành một global scene animation; không giả định tên clip gốc được giữ nguyên. App chủ động cắt các đoạn timeline. Các clip full-rig không được mặc định layer đồng thời.
 - Workflow/script chính: `scripts/split-glb-animations.mjs`, `scripts/compact-glb-primitives.mjs`, `scripts/apply-ara-talk-explain.mjs`, `scripts/inspect-ara-animation.mjs`, `scripts/ara-research-data.py`, `scripts/inspect-ara-usdz-animation.py`, `scripts/apply-ara-hip-sway.py`.
-- Commit code mới nhất đã xác minh: `18ca90205b756db66bafc09e1e796d171526eef1` — thêm bước bake Hips sway sau GLB→USDZ conversion, lưu USDZ trung gian và diagnostics. Chưa có bằng chứng từ commit này rằng asset mới đã được xác minh trên iPhone.
+- Commit code mới nhất đã xác minh: `8115df3a0cfe6c07248311fe1eb1ebd60529c49e` — script bake Hips sway nhận mốc clip từ `animation-timeline.json`; workflow đã truyền file timeline vào script. Chưa chạy workflow nên chưa xác minh USDZ sau conversion hoặc runtime trên iPhone.
 - Workflow có kiểm tra GLB và USDZ, joint animation, morphs, texture references và research bundle nén. Không chạy lại workflow chỉ để thử từng giả thuyết; ưu tiên gom kiểm tra cần thiết vào một lần chạy.
 
 ## Trạng thái kỹ thuật đã xác minh
@@ -39,10 +39,9 @@
 - Các kết quả run cũ và lịch sử thử nghiệm chi tiết nằm trong GitHub Actions artifacts/commits, không chép lại vào status này.
 
 ## Việc tiếp theo
-1. Rà soát và chỉnh script bake Hips sway để lấy thời gian clip từ `animation-timeline.json`, không dùng mốc thời gian ghi cứng; bảo đảm chuyển động êm ở đầu/cuối clip.
-2. Sau khi rà soát script và workflow, khi user yêu cầu, chạy một workflow generate/convert trên `main`; kiểm tra diagnostics GLB, USDZ, texture và research bundle trước.
-3. Chỉ sau khi kết quả post-conversion đạt yêu cầu mới build IPA bằng Codemagic.
-4. Cài/test trên iPhone thật, đối chiếu log và quan sát chuyển động; chỉ kết luận Ara ổn định khi có xác minh thực tế.
+1. Khi user yêu cầu, chạy một workflow generate/convert trên `main`; kiểm tra diagnostics Hips sway, GLB, USDZ, texture và research bundle. Xác nhận clip Talk/AraListening dùng đúng mốc timeline và offset Hips về 0 ở hai đầu clip.
+2. Chỉ sau khi kết quả post-conversion đạt yêu cầu mới build IPA bằng Codemagic.
+3. Cài/test trên iPhone thật, đối chiếu log và quan sát chuyển động; chỉ kết luận Ara ổn định khi có xác minh thực tế.
 
 ## Build và xác minh
 - Codemagic workflow chính: `ios-unsigned`; assistant không dispatch Codemagic trực tiếp.
