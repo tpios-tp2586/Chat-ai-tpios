@@ -15,9 +15,34 @@ struct AraAvatarView: View {
         case cheer = "Cheer"
         case naturalLaugh = "Laugh"
         case cry = "Cry"
+        case walk = "Walk"
+        case run = "Run"
+        case walkBackwards = "Walk backwards"
+        case strafeLeft = "Strafe left"
+        case strafeRight = "Strafe right"
+        case jumpStart = "Jump start"
+        case jumpAir = "Jump (in air)"
+        case jumpLand = "Jump land"
+        case sitDown = "Sit down (chair)"
+        case sitIdle = "Sit idle (chair)"
+        case standUp = "Stand up (chair)"
+        case lieDown = "Lie down"
+        case sleep = "Sleep"
+        case turnLeft45 = "Turn left 45°"
+        case turnLeft90 = "Turn left 90°"
+        case turnRight45 = "Turn right 45°"
+        case turnRight90 = "Turn right 90°"
+        case fullTurn = "Full turn 360°"
+        case rideHorse = "Ride horse (trot)"
 
         var loops: Bool {
-            self == .idle || self == .talk || self == .listening || self == .thinking || self == .empathy
+            switch self {
+            case .idle, .talk, .listening, .thinking, .empathy, .walk, .run,
+                 .walkBackwards, .strafeLeft, .strafeRight, .sitIdle, .sleep, .rideHorse:
+                return true
+            default:
+                return false
+            }
         }
     }
 
@@ -248,7 +273,7 @@ private final class AraAvatarLoader: ObservableObject {
         }
 
         let nextPlayback = model.playAnimation(
-            clip.loops || repeatForTesting ? animation.repeat() : animation,
+            clip.loops ? animation.repeat() : animation,
             transitionDuration: 0.25
         )
         playback = nextPlayback
