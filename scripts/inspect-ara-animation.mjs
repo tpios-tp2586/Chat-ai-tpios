@@ -70,7 +70,7 @@ function angleDeg(a, b) {
 
 const animations = doc.animations ?? [];
 const byName = new Map(animations.map((a) => [String(a.name ?? "").toLowerCase(), a]));
-const names = ["Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh", "Cheer", "Laugh"];
+const names = ["Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh", "Cheer", "Laugh", "Cry"];
 const report = [];
 report.push(`GLB animations=${animations.length}`);
 
