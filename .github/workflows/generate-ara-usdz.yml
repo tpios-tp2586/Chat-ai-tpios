@@ -196,7 +196,7 @@ jobs:
           name: Ara Avatar and Research Data v4
           body: |
             Generated from pinned Ara 3D Gen source e26cdef1464a0babf23bb0235b5f05930301ee25 with the ChatAI TalkExplain chest-level gesture patch. Hips sway is baked later in the Codemagic build.
-            Includes the generated source GLB, converted RealityKit USDZ, full keyframe-level GLB/USDZ research dataset, conversion log, diagnostics, and ten-clip test timeline with optional Cheer and Laugh gestures.
+            Includes the generated source GLB, converted RealityKit USDZ, full keyframe-level GLB/USDZ research dataset, conversion log, diagnostics, and up-to-ten-clip test timeline with optional Cheer and Laugh gestures.
             The compressed research JSON preserves all source GLB animation channels and converted USDZ skeletal/morph samples for offline analysis without rerunning Actions.
           files: |
             input/*.glb
