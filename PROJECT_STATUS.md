@@ -142,3 +142,10 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Commit UI: 783108e40bb24b2c32ca4039f2c58e0d0a608543; commit playback/test-loop: 3944f9c030ede52431a864495a116d8d66b6a493; commit chặn voice ghi đè test: 49a70cd09bee055850a55cd970c44483b6157f39.
 - Kiểm tra tĩnh sau cập nhật: xác nhận sheet test cũ đã được gỡ, đủ 11 nút clip, cờ test được truyền tới loader, clip test loop và tự về Idle sau 7 giây; các guard ngăn voice/transcript ghi đè chế độ test.
 - Chưa xác minh bằng Xcode/Codemagic hoặc iPhone thật trong phiên này. Cần user chạy workflow ios-unsigned trên Codemagic và kiểm tra bố cục overlay, từng nút, thời lượng loop 7 giây, dừng/chuyển clip và trở về Idle. Assistant không chạy Codemagic.
+
+
+## Codemagic guard compatibility for Ara gesture test — 2026-11-01
+- Build bị dừng tại assertion `Non-documentation changes since Ara asset run` vì guard cũ chỉ cho phép PROJECT_STATUS.md và codemagic.yaml, trong khi thay đổi test UI có chủ đích nằm ở CompanionChatView.swift và AraAvatarView.swift.
+- Đã sửa allowlist trong codemagic.yaml để chỉ cho phép thêm đúng hai file Swift test Ara này; các file nguồn/tài nguyên khác vẫn bị chặn như trước. Không bỏ guard ancestry hoặc kiểm tra thay đổi.
+- Commit: 4200b5d6774e8fe82b01bd818d1719cfb223ff8e.
+- Chưa chạy lại Codemagic; cần user chạy workflow ios-unsigned để xác minh bước bake USDZ và build IPA tiếp tục thành công. Assistant không tự chạy build.
