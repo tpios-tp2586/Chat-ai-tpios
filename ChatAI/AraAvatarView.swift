@@ -322,7 +322,7 @@ private struct AraRealityView: UIViewRepresentable {
             guard let coordinator, coordinator.currentClip == .idle,
                   let motionRoot = coordinator.motionRoot else { return }
             coordinator.idleSwayPhase += event.deltaTime
-            let angle = sin(coordinator.idleSwayPhase * 2 * .pi * 0.3) * (5 * .pi / 180)
+            let angle = sin(coordinator.idleSwayPhase * 2 * .pi * 0.3) * (3 * .pi / 180)
             motionRoot.orientation = simd_quatf(angle: Float(angle), axis: SIMD3<Float>(0, 0, 1))
         }
     }
