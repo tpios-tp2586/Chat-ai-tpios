@@ -10,8 +10,7 @@
 - Trước khi sửa: kiểm tra trạng thái repo và đọc code thực tế của đúng phạm vi; không đoán.
 - Ưu tiên thay đổi tối thiểu; không thêm dependency nếu không cần.
 - Bảo vệ chatbot/API, chat history, voice transport/pipeline, Text Chat và Chibi Chat. Không sửa Text Chat/Chibi Chat khi làm Ara.
-- Không chạy GitHub Actions hoặc Codemagic nếu chưa được user yêu cầu hoặc chưa cần để xác minh thay đổi cụ thể.
-- Không tự chạy/dispatch GitHub Actions (kể cả workflow generate/convert) khi chưa thật sự cần. Mỗi lần chạy có thể tiêu tốn GitHub Actions minutes/quota; trước khi chạy phải giải thích lý do và xin user xác nhận. Ưu tiên kiểm tra code, diff và cú pháp trước; chỉ chạy khi cần xác minh kết quả mà kiểm tra tĩnh không thể xác nhận.
+- Assistant không tự chạy/dispatch GitHub Actions hoặc Codemagic. User tự chạy thủ công và gửi kết quả để kiểm tra.
 - Không sửa file backup/backup workflow; user tự quản lý backup.
 - User thao tác chủ yếu trên iPhone; báo kết quả ngắn gọn, rõ ràng.
 - Session Checkpoint: đọc status một lần ở đầu phiên/khôi phục; trong phiên chỉ đọc file liên quan; checkpoint sau mỗi công đoạn quan trọng hoặc trước khi chuyển phiên. Khi cập nhật status, thay thế nội dung cũ bằng snapshot mới, không nối nhật ký.
@@ -29,9 +28,10 @@
 - Nguồn upstream có 70+ animation clips; rig GLB đã kiểm tra có 69 joints và 34 morph targets. Pipeline ChatAI tạo timeline hội thoại 8 clip/26 giây, đóng gói thành một USDZ animation để app cắt clip bằng RealityKit.
 - RealityKit có thể nhập timeline USDZ thành một global scene animation; không giả định tên clip gốc được giữ nguyên. App chủ động cắt các đoạn timeline. Các clip full-rig không được mặc định layer đồng thời.
 - Workflow/script chính: `scripts/split-glb-animations.mjs`, `scripts/compact-glb-primitives.mjs`, `scripts/apply-ara-talk-explain.mjs`, `scripts/inspect-ara-animation.mjs`, `scripts/ara-research-data.py`, `scripts/inspect-ara-usdz-animation.py`, `scripts/apply-ara-hip-sway.py`.
-- Commit code mới nhất: `387b910878a4a489021da54d7c1bfcc074d97697` — script Hips sway dùng timeline, yêu cầu 30 FPS, lấy rotation gốc bằng nội suy trước khi thay keyframes trong Talk/AraListening bằng mẫu 30 FPS, nhân thêm quaternion yaw Hips ±3° ở 0.8 Hz và giữ biên clip tại offset 0. Dùng `UsdUtils.CreateNewARKitUsdzPackage` để đóng gói USDZ đúng chuẩn thay vì tự zip bằng Python, sau đó mở lại package để kiểm tra.
-- Workflow vẫn theo thứ tự: convert GLB → USDZ gốc → patch bằng pxr → xuất `Ara-Avatar.usdz` → inspect USDZ/animation/texture/research bundle. Không sửa workflow trong checkpoint này.
-- Đã xác minh tại upstream `usdz-forge` pin `d474129ce1f026fa6904c9ac95dd74212a501a9d`: `engine/setup-engine.sh` cài `usd-core==26.5` vào `engine/python/bin/python3.14` và kiểm tra import `pxr.Usd`, `pxr.UsdSkel`. Workflow dùng đúng Python này cho converter, script patch, inspector và research data. Chưa chạy workflow nên chưa xác minh API USD ở runtime, package USDZ sau conversion hoặc runtime trên iPhone.
+- GitHub workflow `.github/workflows/generate-ara-usdz.yml` convert GLB thành `Ara-Avatar.usdz` chưa có Hips sway; artifact chứa USDZ, timeline và diagnostics. Hips sway không còn được bake trong GitHub Actions.
+- Codemagic `ios-unsigned` tải artifact mới nhất từ `main`, tạo Python virtualenv tạm, cài `usd-core==26.5` và kiểm tra `pxr.Usd`, `pxr.UsdSkel`, `pxr.UsdUtils`. Trước Xcode build, Codemagic chạy `scripts/apply-ara-hip-sway.py` để bake Hips Y ±3°/0.8 Hz/30 FPS vào `ChatAI/Resources/Ara-Avatar.usdz`, sau đó kiểm tra USDZ và animation. OpenUSD chỉ nằm trong môi trường build tạm, không thêm dependency vào app.
+- `AraAvatarView.swift` đã bỏ hoàn toàn Hips sway additive ±5° lúc runtime; sway chỉ còn trong USDZ đã bake.
+- Codemagic Xcode 16.4 runner công bố Python 3.12.7; PyPI có wheel macOS universal2 cho `usd-core==26.5`/CPython 3.12. Chưa chạy thực tế nên khả năng cài/import và xử lý USDZ trên Codemagic vẫn chờ user xác minh.
 - Workflow có kiểm tra GLB và USDZ, joint animation, morphs, texture references và research bundle nén. Không chạy lại workflow chỉ để thử từng giả thuyết; ưu tiên gom kiểm tra cần thiết vào một lần chạy.
 
 ## Trạng thái kỹ thuật đã xác minh
@@ -42,8 +42,8 @@
 - Các kết quả run cũ và lịch sử thử nghiệm chi tiết nằm trong GitHub Actions artifacts/commits, không chép lại vào status này.
 
 ## Việc tiếp theo
-1. Khi user yêu cầu, chạy một workflow generate/convert trên `main`; kiểm tra diagnostics Hips sway, GLB, USDZ, texture và research bundle. Xác nhận clip Talk/AraListening dùng đúng mốc timeline và offset Hips về 0 ở hai đầu clip.
-2. Chỉ sau khi kết quả post-conversion đạt yêu cầu mới build IPA bằng Codemagic.
+1. User chạy thủ công GitHub workflow trên `main` để tạo artifact USDZ chưa bake sway.
+2. Sau khi artifact mới hoàn tất, user chạy Codemagic; xác minh OpenUSD cài/import thành công, Hips sway được bake và USDZ qua kiểm tra trước khi build IPA.
 3. Cài/test trên iPhone thật, đối chiếu log và quan sát chuyển động; chỉ kết luận Ara ổn định khi có xác minh thực tế.
 
 ## Build và xác minh
