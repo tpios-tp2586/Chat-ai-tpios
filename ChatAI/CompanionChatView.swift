@@ -105,17 +105,17 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     let width: CGFloat = testPanelCollapsed ? 60 : 292 * CGFloat(testPanelScale)
                     let height: CGFloat = testPanelCollapsed ? 60 : 205 * CGFloat(testPanelScale)
-                    let defaultX: CGFloat = proxy.size.width / 2
-                    let defaultY: CGFloat = proxy.size.height - height / 2 - 100
-                    let x: CGFloat = min(max(defaultX + CGFloat(testPanelX), width / 2 + 4), proxy.size.width - width / 2 - 4)
-                    let y: CGFloat = min(max(defaultY + CGFloat(testPanelY), height / 2 + proxy.safeAreaInsets.top + 4), proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
+                    let defaultX = proxy.size.width / 2
+                    let defaultY = proxy.size.height - height / 2 - 100
+                    let x = min(max(defaultX + CGFloat(testPanelX), width / 2 + 4), proxy.size.width - width / 2 - 4)
+                    let y = min(max(defaultY + CGFloat(testPanelY), height / 2 + proxy.safeAreaInsets.top + 4), proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
 
                     Group {
                         if testPanelCollapsed {
                             Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                                     testPanelCollapsed = false
-                                    testPanelScale = max(testPanelScale, 0.85)
+                                    testPanelScale = max(testPanelScale, 0.8)
                                 }
                             } label: {
                                 Image(systemName: "testtube.2")
@@ -133,52 +133,6 @@ struct CompanionChatView: View {
                         }
                     }
                     .position(x: x, y: y)
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                testPanelX = testPanelX + (value.translation.width - testPanelDragStart.width)
-                                testPanelY = testPanelY + (value.translation.height - testPanelDragStart.height)
-                                testPanelDragStart = value.translation
-                            }
-                            .onEnded { _ in
-                                testPanelDragStart = .zero
-                                let left = x < proxy.size.width / 2
-                                testPanelX = Double((left ? width / 2 + 4 : proxy.size.width - width / 2 - 4) - defaultX)
-                            }
-                    )
-                    .overlay(alignment: .bottomTrailing) {
-                        if !testPanelCollapsed {
-                            HStack(spacing: 5) {
-                                Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        testPanelCollapsed = true
-                                    }
-                                } label: {
-                                    Image(systemName: "minus.magnifyingglass")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .frame(width: 28, height: 28)
-                                        .background(activeTheme.accent, in: Circle())
-                                }
-                                .accessibilityLabel("Thu gọn bảng Test")
-
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .frame(width: 28, height: 28)
-                                    .background(activeTheme.accent, in: Circle())
-                                    .gesture(
-                                        DragGesture()
-                                            .onChanged { value in
-                                                if testPanelResizeStart == 1.0 { testPanelResizeStart = testPanelScale }
-                                                testPanelScale = min(1.25, max(0.55, testPanelResizeStart + Double(value.translation.width / 260)))
-                                            }
-                                            .onEnded { _ in testPanelResizeStart = testPanelScale }
-                                    )
-                                    .accessibilityLabel("Kéo để thay đổi kích thước bảng Test")
-                            }
-                            .foregroundStyle(.white)
-                            .padding(6)
-                        }
-                    }
                 }
                 .zIndex(2)
             }
@@ -378,7 +332,44 @@ struct CompanionChatView: View {
     }
 
     private var araTestMenu: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 5) {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 13, weight: .bold))
+                Text("TEST ARA")
+                    .font(.system(size: 11, weight: .bold))
+                Spacer(minLength: 2)
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        testPanelCollapsed = true
+                    }
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 25, height: 25)
+                        .background(activeTheme.surface, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Thu gọn bảng Test")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(activeTheme.accent.opacity(0.9), in: RoundedRectangle(cornerRadius: 9))
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { value in
+                        testPanelX = testPanelDragStart.width + Double(value.translation.width)
+                        testPanelY = testPanelDragStart.height + Double(value.translation.height)
+                    }
+                    .onEnded { value in
+                        testPanelX = testPanelDragStart.width + Double(value.translation.width)
+                        testPanelY = testPanelDragStart.height + Double(value.translation.height)
+                        testPanelDragStart = CGSize(width: testPanelX, height: testPanelY)
+                    }
+            )
+
             HStack(spacing: 6) {
                 ForEach(araTestGroups, id: \.0) { group in
                     Button {
@@ -389,10 +380,10 @@ struct CompanionChatView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
+                            .padding(.vertical, 7)
                             .background(
                                 selectedTestGroup == group.0 ? activeTheme.accent : activeTheme.surface,
-                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                             )
                     }
                     .foregroundStyle(selectedTestGroup == group.0 ? .white : .primary)
@@ -402,30 +393,28 @@ struct CompanionChatView: View {
 
             if let group = araTestGroups.first(where: { $0.0 == selectedTestGroup }) {
                 ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 5) {
+                    VStack(spacing: 4) {
                         ForEach(group.2, id: \.0) { item in
                             Button {
-                                if item.1 == .jumpStart {
-                                    testJumpSequence()
-                                } else {
-                                    testAraGesture(item.1)
-                                }
+                                if item.1 == .jumpStart { testJumpSequence() }
+                                else { testAraGesture(item.1) }
                             } label: {
-                                HStack(spacing: 9) {
+                                HStack(spacing: 8) {
                                     Image(systemName: avatarClip == item.1 ? "checkmark.circle.fill" : "play.circle")
                                         .foregroundStyle(avatarClip == item.1 ? activeTheme.accent : .secondary)
                                     Text(item.0).font(.system(size: 13, weight: .medium))
                                     Spacer()
                                     if avatarClip == item.1 {
-                                        Text("Đang test").font(.system(size: 10, weight: .semibold))
+                                        Text("Đang test")
+                                            .font(.system(size: 10, weight: .semibold))
                                             .foregroundStyle(activeTheme.accent)
                                     }
                                 }
                                 .foregroundStyle(.primary)
-                                .padding(.horizontal, 11)
+                                .padding(.horizontal, 9)
                                 .padding(.vertical, 5)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(activeTheme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 9))
+                                .background(activeTheme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
                         }
@@ -433,12 +422,46 @@ struct CompanionChatView: View {
                 }
                 .frame(maxHeight: 116)
             }
+
+            HStack {
+                Spacer()
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 30)
+                    .background(activeTheme.accent, in: RoundedRectangle(cornerRadius: 9))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
+                            testPanelScale = testPanelScale < 0.9 ? 1.0 : 0.7
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                if !isResizingTestPanel {
+                                    testPanelResizeStart = testPanelScale
+                                    isResizingTestPanel = true
+                                }
+                                testPanelScale = min(1.25, max(0.55, testPanelResizeStart + Double(value.translation.width / 240)))
+                            }
+                            .onEnded { _ in
+                                testPanelResizeStart = testPanelScale
+                                isResizingTestPanel = false
+                            }
+                    )
+                    .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test")
+            }
         }
         .padding(7)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
+        .onAppear {
+            testPanelDragStart = CGSize(width: testPanelX, height: testPanelY)
+            testPanelResizeStart = testPanelScale
+        }
     }
 
     private func toggleGestureTestMode() {
