@@ -42,14 +42,19 @@ workflows:
 
           SOURCE_USDZ="$(find "$USD_TMP/artifact" -type f -name 'Ara-Avatar.usdz' -print -quit)"
           TIMELINE="$(find "$USD_TMP/artifact" -type f -name 'animation-timeline.json' -print -quit)"
-          test -s "$SOURCE_USDZ" || { echo "Unbaked Ara-Avatar.usdz is missing from the artifact."; exit 1; }
+          PIPELINE_MARKER="$(find "$USD_TMP/artifact" -type f -name 'ara-asset-pipeline.txt' -print -quit)"
+          test -s "$SOURCE_USDZ" || { echo "Ara-Avatar.usdz is missing from the artifact."; exit 1; }
           test -s "$TIMELINE" || { echo "animation-timeline.json is missing from the artifact."; exit 1; }
+          test -s "$PIPELINE_MARKER" && grep -qx 'hips_sway_baked=false' "$PIPELINE_MARKER" || {
+            echo "This is an old or already-baked Ara artifact. Run the updated GitHub workflow before Codemagic."
+            exit 1
+          }
 
           python3 -c 'import sys; assert (3, 9) <= sys.version_info[:2] < (3, 15), f"Unsupported Python: {sys.version}"'
           python3 -m venv "$USD_TMP/venv"
           USD_PY="$USD_TMP/venv/bin/python"
           "$USD_PY" -m pip install --disable-pip-version-check --only-binary=:all: usd-core==26.5
-          "$USD_PY" -c 'from pxr import Usd, UsdSkel, UsdUtils; print("OpenUSD 26.5 ready:", Usd.GetVersion())'
+          "$USD_PY" -c 'from pxr import Usd, UsdSkel, UsdUtils; print("OpenUSD 26.5 modules imported")'
 
           mkdir -p ChatAI/Resources
           cp "$TIMELINE" ChatAI/Resources/animation-timeline.json
