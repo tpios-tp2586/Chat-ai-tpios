@@ -23,6 +23,7 @@ struct AraAvatarView: View {
 
     let clip: Clip
     let resetToFrontToken: Int
+    let repeatForTesting: Bool
     let onLog: (String) -> Void
     @StateObject private var loader = AraAvatarLoader()
     @AppStorage("ara_avatar_zoom_scale_v3") private var savedZoomScale = 2.5
@@ -82,10 +83,13 @@ struct AraAvatarView: View {
             let sourceCommit = info?["ChatAISourceCommit"] as? String ?? "unknown"
             let buildNumber = info?["ChatAIBuildNumber"] as? String ?? "unknown"
             onLog("[BUILD] source=\(sourceCommit.prefix(12)) build=\(buildNumber)")
-            loader.show(clip)
+            loader.show(clip, repeatForTesting: repeatForTesting)
         }
         .onChange(of: clip) { newClip in
-            loader.show(newClip)
+            loader.show(newClip, repeatForTesting: repeatForTesting)
+        }
+        .onChange(of: repeatForTesting) { isTesting in
+            loader.show(clip, repeatForTesting: isTesting)
         }
         .onChange(of: resetToFrontToken) { _ in
             guard abs(rotationY) > 0.001 else { return }
@@ -116,20 +120,23 @@ private final class AraAvatarLoader: ObservableObject {
     var onLog: ((String) -> Void)?
 
     private var requestedClip: AraAvatarView.Clip?
+    private var requestedRepeatForTesting = false
     private var activeClip: AraAvatarView.Clip?
+    private var activeRepeatForTesting = false
     private var animations: [String: AnimationResource] = [:]
     private var loadSubscription: AnyCancellable?
     private var playback: AnimationPlaybackController?
 
-    func show(_ clip: AraAvatarView.Clip) {
+    func show(_ clip: AraAvatarView.Clip, repeatForTesting: Bool = false) {
         requestedClip = clip
+        requestedRepeatForTesting = repeatForTesting
         guard let entity else {
             guard loadSubscription == nil else { return }
             load()
             return
         }
-        guard activeClip != clip else { return }
-        play(clip, on: entity)
+        guard activeClip != clip || activeRepeatForTesting != repeatForTesting else { return }
+        play(clip, on: entity, repeatForTesting: repeatForTesting)
     }
 
     private func load() {
@@ -219,11 +226,11 @@ private final class AraAvatarLoader: ObservableObject {
                 self.onLog?("[ARA] Built \(clips.count) AnimationViews from \(source.name ?? "unnamed source"); source duration \(String(format: "%.2f", sourceDuration))s; \(clipSummary)")
 
                 guard let clip = self.requestedClip else { return }
-                self.play(clip, on: model)
+                self.play(clip, on: model, repeatForTesting: self.requestedRepeatForTesting)
             })
     }
 
-    private func play(_ clip: AraAvatarView.Clip, on model: Entity) {
+    private func play(_ clip: AraAvatarView.Clip, on model: Entity, repeatForTesting: Bool) {
         guard let animation = animations[clip.rawValue.lowercased()] else {
             status = "Không tìm thấy animation \(clip.rawValue) trong timeline Ara"
             onLog?("[ARA] Missing generated clip: \(clip.rawValue); available: \(animations.keys.sorted().joined(separator: ", "))")
@@ -241,11 +248,12 @@ private final class AraAvatarLoader: ObservableObject {
         }
 
         let nextPlayback = model.playAnimation(
-            clip.loops ? animation.repeat() : animation,
+            clip.loops || repeatForTesting ? animation.repeat() : animation,
             transitionDuration: 0.25
         )
         playback = nextPlayback
         activeClip = clip
+        activeRepeatForTesting = repeatForTesting
         status = "Đang phát animation \(clip.rawValue)"
         onLog?("[ARA] Playback started: clip=\(clip.rawValue), playing=\(nextPlayback.isPlaying), valid=\(nextPlayback.isValid), duration=\(String(format: "%.2f", nextPlayback.duration))s")
     }
