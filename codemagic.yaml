@@ -36,7 +36,7 @@ workflows:
             --data-urlencode "name=ara-avatar-research-bundle" \
             --data-urlencode "per_page=100" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts")"
-          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys,os; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-research-bundle" and not x.get("expired") and str(x.get("workflow_run",{}).get("id",""))==os.environ.get("RUN_ID","")]; print(a[0]["id"] if a else "")')"
+          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; run_id=sys.argv[1]; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-research-bundle" and not x.get("expired") and str(x.get("workflow_run",{}).get("id",""))==run_id]; print(a[0]["id"] if a else "")' "$RUN_ID")"
           test -n "$ARTIFACT_ID" || { echo "No Ara research bundle artifact exists for latest successful workflow run $RUN_ID."; exit 1; }
 
           curl --fail --location --silent --show-error \
