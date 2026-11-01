@@ -260,6 +260,9 @@ struct CompanionChatView: View {
                 gestureTestButton("Cheer", detail: "Cử chỉ vui mừng toàn thân", clip: .cheer)
                 gestureTestButton("Laugh", detail: "Cử chỉ cười từ animation nguồn", clip: .naturalLaugh)
                 gestureTestButton("TalkExplain", detail: "Đưa tay lên ngang ngực rồi hạ xuống", clip: .talkExplain)
+                gestureTestButton("AraThinking", detail: "Cử chỉ suy nghĩ, chuyển động đầu và thân trên", clip: .thinking)
+                gestureTestButton("AraEmpathy", detail: "Cử chỉ đồng cảm, nhẹ nhàng và tiết chế", clip: .empathy)
+                gestureTestButton("AraLaugh", detail: "Cử chỉ cười trong hội thoại", clip: .laugh)
                 gestureTestButton("Wave", detail: "Vẫy tay chào", clip: .wave)
 
                 Button {
