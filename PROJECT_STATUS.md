@@ -29,7 +29,8 @@
 - Nguồn upstream có 70+ animation clips; rig GLB đã kiểm tra có 69 joints và 34 morph targets. Pipeline ChatAI tạo timeline hội thoại 8 clip/26 giây, đóng gói thành một USDZ animation để app cắt clip bằng RealityKit.
 - RealityKit có thể nhập timeline USDZ thành một global scene animation; không giả định tên clip gốc được giữ nguyên. App chủ động cắt các đoạn timeline. Các clip full-rig không được mặc định layer đồng thời.
 - Workflow/script chính: `scripts/split-glb-animations.mjs`, `scripts/compact-glb-primitives.mjs`, `scripts/apply-ara-talk-explain.mjs`, `scripts/inspect-ara-animation.mjs`, `scripts/ara-research-data.py`, `scripts/inspect-ara-usdz-animation.py`, `scripts/apply-ara-hip-sway.py`.
-- Commit code mới nhất đã xác minh: `8115df3a0cfe6c07248311fe1eb1ebd60529c49e` — script bake Hips sway nhận mốc clip từ `animation-timeline.json`; workflow đã truyền file timeline vào script. Chưa chạy workflow nên chưa xác minh USDZ sau conversion hoặc runtime trên iPhone.
+- Commit code mới nhất: `4c149467621a2515c2b7ee844b01fd110fad2635` — script Hips sway dùng timeline, khóa FPS 30, chuẩn hóa envelope để đạt đỉnh mẫu ±3° tại 0.8 Hz và giữ offset bằng 0 ở hai đầu clip. Workflow truyền timeline, convert USDZ gốc → patch bằng pxr → xuất `Ara-Avatar.usdz` → chạy lại kiểm tra USDZ/animation/texture/research bundle.
+- Đã xác minh tại upstream `usdz-forge` pin `d474129ce1f026fa6904c9ac95dd74212a501a9d`: `engine/setup-engine.sh` cài `usd-core==26.5` vào `engine/python/bin/python3.14` và kiểm tra import `pxr.Usd`, `pxr.UsdSkel`. Workflow dùng đúng Python này cho converter, script patch, inspector và research data. Chưa chạy workflow nên chưa xác minh USDZ sau conversion hoặc runtime trên iPhone.
 - Workflow có kiểm tra GLB và USDZ, joint animation, morphs, texture references và research bundle nén. Không chạy lại workflow chỉ để thử từng giả thuyết; ưu tiên gom kiểm tra cần thiết vào một lần chạy.
 
 ## Trạng thái kỹ thuật đã xác minh
