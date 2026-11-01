@@ -25,7 +25,10 @@ while (offset < bytes.length) {
 }
 if (!json || !binary || json.buffers?.length !== 1) throw new Error("GLB is missing its JSON or embedded binary buffer");
 
-const requiredNames = ["Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh"];
+const requiredNames = [
+  "Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh",
+  "Walk", "Run", "Walk backwards", "Strafe left", "Strafe right", "Jump start", "Jump (in air)", "Jump land", "Sit down (chair)", "Sit idle (chair)", "Stand up (chair)", "Lie down", "Sleep", "Turn left 45°", "Turn left 90°", "Turn right 45°", "Turn right 90°", "Full turn 360°", "Ride horse (trot)"
+];
 const optionalNames = ["Cheer", "Laugh", "Cry"];
 const findAnimation = name => (json.animations ?? []).find(item => item.name?.toLowerCase() === name.toLowerCase());
 const selected = [
