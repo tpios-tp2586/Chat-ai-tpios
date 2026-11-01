@@ -116,3 +116,10 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Kết luận test hiện tại: Wave/Talk/Explain chạy đúng và có khác biệt rõ; Listen/Thinking/Empathy/AraLaugh ít khác biệt; Laugh/Cheer có biên độ mạnh; Cry sai sắc thái. Chưa có clip cười nhẹ hoặc khóc tự nhiên được xác nhận phù hợp để tự động kích hoạt.
 - Bố cục hai cột được commit tại `16d29cbb3af77a010390bbe8c8cc71b489ee370a`; commit status trước đó `3b95b0f9b79bdd1f41a18d281e3311a577f1abfc`. Build/iPhone verification của các thay đổi layout sau commit cần được ghi riêng khi có kết quả.
 - Chỉ cập nhật UI test nếu user yêu cầu hoặc khi bước test kế tiếp đã được chốt; không tự ý sửa code trong lượt cập nhật status này.
+
+## Ara v5 — pipeline preparation in progress
+- Main commit `a1b64e3af99e3f0705e2ec9b7f2e2fad3df5e64d` expands `scripts/split-glb-animations.mjs` to require the 19 additional source clips for the approved test actions, while retaining the existing 8 required conversation clips and 3 optional clips.
+- `.github/workflows/generate-ara-usdz.yml` now publishes to the new immutable tag `ara-avatar-v5`; v4 remains unchanged. The existing GLB-to-USDZ conversion on macOS, texture packaging, USDZ inspection, timeline checks and research bundle generation are retained.
+- `codemagic.yaml` now fetches and validates `ara-avatar-v5`, then continues using the existing OpenUSD 26.5 Hips-sway bake, USDZ validation and IPA-only packaging.
+- This is pipeline preparation only. The Ara Swift runtime and test UI have not yet been expanded to expose/play the new clips. Do not dispatch the manual GitHub workflow or Codemagic build until runtime integration and validation are complete.
+- No GitHub Actions/Codemagic run was started by the assistant. Release v5 has not yet been generated; release v4 remains the verified baseline.
