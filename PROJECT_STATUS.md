@@ -91,3 +91,10 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Codemagic workflow chính: `ios-unsigned`; assistant không dispatch Codemagic trực tiếp.
 - Build simulator chỉ xác nhận compile/package, không thay thế kiểm thử trên iPhone thật.
 - Không build IPA từ asset mới trước khi review kết quả USDZ post-conversion.
+
+## Rà soát pipeline trước Action v4 — 2026-11-01
+- Đã sửa workflow tạo USDZ: bỏ điều kiện cố định `endTimeCode=780`; giờ tính FPS và endTimeCode kỳ vọng trực tiếp từ `animation-timeline.json`, rồi đối chiếu với báo cáo USDZ (sai lệch tối đa 1 timecode).
+- Đã siết Codemagic: chỉ chấp nhận artifact `ara-avatar-research-bundle` thuộc **lần chạy Ara workflow thành công mới nhất trên main**, và SHA của workflow run phải trùng SHA hiện tại của `main`. Nếu Action chưa chạy thành công trên commit hiện tại, Codemagic dừng thay vì âm thầm lấy artifact cũ.
+- Codemagic vẫn chỉ đóng gói IPA; không thêm ZIP artifact riêng.
+- Các cập nhật nằm trên `main`; không tạo nhánh. Sau commit trạng thái này, user cần chạy Action một lần trên đúng HEAD hiện tại; chỉ khi Action thành công mới chạy Codemagic.
+- Chưa chạy Action hoặc Codemagic trong đợt sửa này. Chưa xác minh runtime của bộ 11 clip trên iPhone; việc đó vẫn cần sau khi có asset v4.
