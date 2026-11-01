@@ -108,8 +108,9 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 
 
 ## Codemagic 403 khi tải Ara v4 — 2026-11-01
-- Lần build Codemagic sau khi chuyển sang tải trực tiếp Release v4 dừng ở step `Download and bake Ara USDZ with OpenUSD`, trước khi chạy OpenUSD/Xcode. Log có `curl: (56) ... 403`, tiếp theo là `JSONDecodeError` do script cũ đưa phản hồi rỗng/lỗi HTTP vào Python như JSON.
-- Chưa xác định được chính xác endpoint bị 403 từ log rút gọn hiện có. Khả năng cần kiểm tra đầu tiên là quyền của `GITHUB_TOKEN` trong Codemagic đối với repo private: fine-grained PAT cần **Contents: Read** và **Actions: Read** (classic PAT cần quyền `repo`). Không gửi token vào chat/log.
-- Đã sửa `codemagic.yaml`: mọi GET GitHub API đi qua helper kiểm tra HTTP status trước khi parse JSON; khi 403, log sẽ chỉ rõ endpoint và hướng dẫn quyền token, không còn traceback JSONDecodeError che mất nguyên nhân. Tải 3 asset bằng GitHub Release Asset API theo asset ID với `Accept: application/octet-stream`, thay vì browser download URL.
-- Không chạy GitHub Action, không chạy Codemagic trong lúc sửa. Không thay đổi asset/release v4. Nếu build tiếp tục báo 403, xem endpoint được in trong log và xác nhận quyền token; không cần chạy lại Action.
-- Commit sửa xử lý lỗi: `2f74a219c80a60f111878788800c7278fc52dccc`. Cần kiểm tra lại Codemagic sau khi xác nhận token có quyền đọc Contents và Actions.
+- Nguyên nhân kỹ thuật đã khoanh vùng: commit `293d2692b18b52b02d47cd6e4d4310c9fb051d3d` đưa thêm yêu cầu gọi API `/commits/main` để kiểm tra SHA. Đây là endpoint cần quyền đọc Contents; luồng cũ chủ yếu dùng Actions API. Sau đó chuyển nguồn tải sang GitHub Release cũng làm phát sinh thêm các endpoint cần Contents: Read.
+- User xác nhận không thay token hoặc cấu hình Codemagic; token là loại không thời hạn. Vì vậy không kết luận token hết hạn và không yêu cầu tạo token mới.
+- Đã sửa `codemagic.yaml`: dùng commit checkout sẵn trong Codemagic để kiểm tra ancestry và các file thay đổi sau Ara workflow run, bỏ API call lấy `main` SHA và API compare. Chỉ cho phép thay đổi `PROJECT_STATUS.md` và `codemagic.yaml` sau asset run.
+- Pipeline ưu tiên tải tài nguyên từ Release `ara-avatar-v4` khi token có quyền Contents. Nếu Release/Contents API bị từ chối, tự động fallback sang artifact `ara-avatar-research-bundle` đúng workflow run ID; không lấy artifact của run khác và không dùng artifact đã hết hạn. Fallback chỉ cần Actions: Read.
+- Đã xác minh artifact đúng run #15 / ID `41266922525` tồn tại, chưa hết hạn: artifact ID `13067582323`, dự kiến hết hạn `2027-01-30T02:52:28Z`. Release v4 vẫn là nguồn ưu tiên lâu dài.
+- Commit sửa pipeline hiện tại: `52607439c61a69f0be05c8dc4a93ccb89a09db7e` (sau đó có commit tinh chỉnh thông báo quyền API). Không chạy GitHub Action hoặc Codemagic trong lúc sửa; chưa xác minh build IPA sau thay đổi. User tự chạy Codemagic và gửi log để kiểm tra.
