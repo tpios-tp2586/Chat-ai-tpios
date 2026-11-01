@@ -339,18 +339,39 @@ struct CompanionChatView: View {
                 Text("TEST ARA")
                     .font(.system(size: 11, weight: .bold))
                 Spacer(minLength: 2)
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .frame(width: 25, height: 25)
+                    .background(activeTheme.surface, in: Circle())
+                    .contentShape(Circle())
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                if !isResizingTestPanel {
+                                    testPanelResizeStart = testPanelScale
+                                    isResizingTestPanel = true
+                                }
+                                testPanelScale = min(1.25, max(0.55, testPanelResizeStart + Double(value.translation.width / 240)))
+                            }
+                            .onEnded { _ in
+                                testPanelResizeStart = testPanelScale
+                                isResizingTestPanel = false
+                            }
+                    )
+                    .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test")
+
                 Button {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                         testPanelCollapsed = true
                     }
                 } label: {
-                    Image(systemName: "minus")
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
                         .font(.system(size: 11, weight: .bold))
                         .frame(width: 25, height: 25)
                         .background(activeTheme.surface, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Thu gọn bảng Test")
+                .accessibilityLabel("Thu bảng Test về icon")
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
@@ -421,35 +442,6 @@ struct CompanionChatView: View {
                 .frame(maxHeight: 116)
             }
 
-            HStack {
-                Spacer()
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 30)
-                    .background(activeTheme.accent, in: RoundedRectangle(cornerRadius: 9))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
-                            testPanelScale = testPanelScale < 0.9 ? 1.0 : 0.7
-                        }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                if !isResizingTestPanel {
-                                    testPanelResizeStart = testPanelScale
-                                    isResizingTestPanel = true
-                                }
-                                testPanelScale = min(1.25, max(0.55, testPanelResizeStart + Double(value.translation.width / 240)))
-                            }
-                            .onEnded { _ in
-                                testPanelResizeStart = testPanelScale
-                                isResizingTestPanel = false
-                            }
-                    )
-                    .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test")
-            }
         }
         .padding(7)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
