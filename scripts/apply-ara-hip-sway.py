@@ -7,7 +7,7 @@ import sys
 import tempfile
 import zipfile
 
-from pxr import Gf, Usd, UsdSkel
+from pxr import Gf, Usd, UsdSkel, UsdUtils
 
 AMPLITUDE_DEGREES = 3.0
 FREQUENCY_HZ = 0.8
@@ -75,6 +75,17 @@ def find_joint(joints, wanted):
     raise RuntimeError(f"Joint {wanted!r} not found in USDZ animation")
 
 
+def frame_times(start, end, fps):
+    duration = end - start
+    count = int(math.floor(duration * fps + 1e-7))
+    times = [start + frame / fps for frame in range(count + 1)]
+    if end - times[-1] > 1e-7:
+        times.append(end)
+    else:
+        times[-1] = end
+    return times
+
+
 def patch_usd_file(source_usdz, destination_usdz, timeline_path):
     timeline_fps, clips = load_target_clips(timeline_path)
 
@@ -83,7 +94,6 @@ def patch_usd_file(source_usdz, destination_usdz, timeline_path):
         os.makedirs(unpacked)
         with zipfile.ZipFile(source_usdz, "r") as archive:
             archive.extractall(unpacked)
-            names = archive.namelist()
 
         usd_files = []
         for root, _, files in os.walk(unpacked):
@@ -110,89 +120,81 @@ def patch_usd_file(source_usdz, destination_usdz, timeline_path):
         joints = animation.GetJointsAttr().Get() or []
         hips_index = find_joint(joints, "Hips")
         rotations_attr = animation.GetRotationsAttr()
-        time_samples = rotations_attr.GetTimeSamples()
-        if not time_samples:
+        original_time_samples = rotations_attr.GetTimeSamples()
+        if not original_time_samples:
             raise RuntimeError("USDZ animation has no rotation time samples")
 
-        # Normalize the tapered sine per clip so its sampled peak reaches 3 degrees
-        # while the offset still returns to zero at both clip boundaries.
-        peak_wave = {}
+        # Capture interpolated original rotations before replacing clip samples.
+        baked_clips = {}
         for name, (start, end) in clips.items():
-            peak = 0.0
-            for time_code in time_samples:
-                seconds = float(time_code) / time_codes_per_second
-                if start <= seconds <= end:
-                    progress = min(1.0, max(0.0, (seconds - start) / (end - start)))
-                    envelope = math.sin(math.pi * progress) ** 2
-                    wave = math.sin(2.0 * math.pi * FREQUENCY_HZ * (seconds - start)) * envelope
-                    peak = max(peak, abs(wave))
-            if peak < 1e-6:
-                raise RuntimeError(f"No usable 0.8 Hz Hips sway samples for {name}")
-            peak_wave[name] = peak
+            samples = []
+            for seconds in frame_times(start, end, timeline_fps):
+                time_code = seconds * time_codes_per_second
+                original = rotations_attr.Get(Usd.TimeCode(time_code))
+                if original is None or hips_index >= len(original):
+                    raise RuntimeError(f"Missing original rotations for {name} at {seconds:.6f}s")
+                samples.append((seconds, time_code, list(original)))
 
-        stats = {
-            name: {"count": 0, "first": None, "last": None, "peak": 0.0}
-            for name in clips
-        }
-        patched = 0
-
-        for time_code in time_samples:
-            seconds = float(time_code) / time_codes_per_second
-            match = next(
-                ((name, start, end) for name, (start, end) in clips.items()
-                 if start <= seconds <= end),
-                None,
+            peak_wave = max(
+                abs(math.sin(2.0 * math.pi * FREQUENCY_HZ * (seconds - start)) *
+                    math.sin(math.pi * (seconds - start) / (end - start)) ** 2)
+                for seconds, _, _ in samples
             )
-            if match is None:
-                continue
+            if peak_wave < 1e-6:
+                raise RuntimeError(f"No usable 0.8 Hz Hips sway samples for {name}")
+            baked_clips[name] = (start, end, samples, peak_wave)
 
-            name, start, end = match
-            values = rotations_attr.Get(time_code)
-            if values is None or hips_index >= len(values):
-                raise RuntimeError(f"Missing Hips rotation at time code {time_code}")
+        # Remove old keys inside the target clips so the new motion is truly baked at 30 FPS.
+        for time_code in original_time_samples:
+            seconds = float(time_code) / time_codes_per_second
+            if any(start <= seconds <= end for start, end in clips.values()):
+                rotations_attr.ClearAtTime(Usd.TimeCode(time_code))
 
-            progress = min(1.0, max(0.0, (seconds - start) / (end - start)))
-            envelope = math.sin(math.pi * progress) ** 2
-            elapsed = seconds - start
-            wave = math.sin(2.0 * math.pi * FREQUENCY_HZ * elapsed) * envelope
-            angle = AMPLITUDE_DEGREES * wave / peak_wave[name]
-
-            values = list(values)
-            values[hips_index] = quat_mul(values[hips_index], yaw_quaternion(angle))
-            rotations_attr.Set(values, time_code)
-
-            item = stats[name]
-            item["count"] += 1
-            item["first"] = seconds if item["first"] is None else item["first"]
-            item["last"] = seconds
-            item["peak"] = max(item["peak"], abs(angle))
-            patched += 1
-
-        for name, (start, end) in clips.items():
-            item = stats[name]
-            if item["count"] < 2:
-                raise RuntimeError(f"Insufficient Hips samples for {name}: {item['count']}")
-            tolerance = 1.5 / timeline_fps
-            if abs(item["first"] - start) > tolerance or abs(item["last"] - end) > tolerance:
-                raise RuntimeError(
-                    f"{name} sample range {item['first']:.4f}-{item['last']:.4f}s "
-                    f"does not cover timeline range {start:.4f}-{end:.4f}s"
-                )
+        stats = {}
+        patched = 0
+        for name, (start, end, samples, peak_wave) in baked_clips.items():
+            peak = 0.0
+            for seconds, time_code, original in samples:
+                progress = (seconds - start) / (end - start)
+                envelope = math.sin(math.pi * progress) ** 2
+                wave = math.sin(2.0 * math.pi * FREQUENCY_HZ * (seconds - start)) * envelope
+                angle = AMPLITUDE_DEGREES * wave / peak_wave
+                original[hips_index] = quat_mul(original[hips_index], yaw_quaternion(angle))
+                if not rotations_attr.Set(original, Usd.TimeCode(time_code)):
+                    raise RuntimeError(f"Could not author {name} rotation at {seconds:.6f}s")
+                peak = max(peak, abs(angle))
+                patched += 1
+            stats[name] = {
+                "count": len(samples),
+                "first": samples[0][0],
+                "last": samples[-1][0],
+                "peak": peak,
+            }
 
         stage.GetRootLayer().Save()
 
         os.makedirs(os.path.dirname(destination_usdz), exist_ok=True)
-        with zipfile.ZipFile(destination_usdz, "w", compression=zipfile.ZIP_STORED) as archive:
-            for name in names:
-                archive.write(os.path.join(unpacked, name), name)
+        if not UsdUtils.CreateNewARKitUsdzPackage(usd_files[0], destination_usdz):
+            raise RuntimeError("OpenUSD failed to package the edited stage as an ARKit USDZ")
+
+        # Reopen the actual package; this also catches broken package dependencies.
+        packaged_stage = Usd.Stage.Open(destination_usdz)
+        if packaged_stage is None:
+            raise RuntimeError("Repacked Ara-Avatar.usdz could not be reopened")
+        packaged_animation = find_animation(packaged_stage)
+        packaged_rotations = packaged_animation.GetRotationsAttr()
+        for name, (start, end) in clips.items():
+            for seconds in (start, end):
+                value = packaged_rotations.Get(Usd.TimeCode(seconds * time_codes_per_second))
+                if value is None or hips_index >= len(value):
+                    raise RuntimeError(f"Packaged USDZ is missing {name} boundary at {seconds:.6f}s")
 
         print(
             f"Baked Hips Y sway: amplitude={AMPLITUDE_DEGREES:.1f}deg, "
-            f"frequency={FREQUENCY_HZ:.2f}Hz, envelope=zero-at-clip-ends"
+            f"frequency={FREQUENCY_HZ:.2f}Hz, sample rate={timeline_fps:.0f}FPS"
         )
-        print(f"Timeline fps: {timeline_fps:.2f}; USD timeCodesPerSecond: {time_codes_per_second:.2f}")
-        print("Per-clip tapered sway normalized to a sampled peak of +/-3.000deg")
-        print(f"Hips joint index: {hips_index}; patched rotation samples: {patched}")
+        print(f"USD timeCodesPerSecond: {time_codes_per_second:.2f}; Hips joint index: {hips_index}")
+        print(f"Patched Hips rotation samples: {patched}")
         for name, (start, end) in clips.items():
             item = stats[name]
             print(
