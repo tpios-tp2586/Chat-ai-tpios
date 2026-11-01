@@ -82,7 +82,7 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 ## Việc tiếp theo
 1. Review toàn bộ diff trên `main` cho bộ conversation 11 clips và các diagnostics; không tạo thêm clip thử rời rạc.
 2. Khi đã chốt review, user chạy GitHub Action **một lần duy nhất** trên `main` để tạo Release `ara-avatar-v4`; kiểm tra timeline có 11 clips, diagnostics, USDZ texture/package và SHA256.
-3. Chỉ sau khi v4 được xác minh, user chạy Codemagic để bake Hips sway 5° và build IPA (artifact IPA בלבד).
+3. Chỉ sau khi v4 được xác minh, user chạy Codemagic để bake Hips sway 5° và build IPA (artifact chỉ IPA).
 4. Test 11 clips trên iPhone thật: đặc biệt so sánh AraLaugh với Laugh; Cheer và Cry chỉ test thủ công; kiểm tra chuyển tiếp về Talk/Idle và không giật.
 5. Sau test mới quyết định mapping tự động theo ngữ cảnh, thêm gesture procedural nếu còn thiếu; lip-sync/viseme vẫn là giai đoạn riêng.
 
