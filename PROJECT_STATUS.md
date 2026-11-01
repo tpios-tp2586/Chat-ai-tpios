@@ -121,3 +121,13 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Chưa có log chi tiết của lần build trong phiên này nên **chưa xác định được lần chạy thành công thực tế dùng nhánh tải Release hay nhánh fallback Actions artifact**. Cả hai đều được ràng buộc về đúng bộ Ara v4/run #15; không dùng artifact mới nhất tùy tiện.
 - Không cần thay token hoặc tạo GitHub Action run mới cho lần build này. Assistant không chạy Codemagic; build do user chủ động thực hiện.
 - Bước kế tiếp chuyển sang kiểm thử trực quan 11 clip Ara trên iPhone; ưu tiên so sánh `AraLaugh` và `Laugh`, thử thủ công `Cheer`/`Cry`, kiểm tra chuyển tiếp và độ tự nhiên.
+
+## Quy trình test cử chỉ trực quan trên iPhone — đã thống nhất
+- Khi cần test hoặc đánh giá lại animation Ara, tạm hiển thị một cụm nút test ngay trên màn hình Chat Voice, bố trí xung quanh nhân vật Ara để dễ quan sát và thao tác.
+- Mỗi nút gọi trực tiếp đúng clip tương ứng (ví dụ Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh, Laugh, Cheer, Cry). Không giả định clip đã được tích hợp tự động vào hội thoại chỉ vì nút test chạy được.
+- Khi user bấm nút, Ara thực hiện trọn hành động với thời lượng đủ lâu để quan sát rõ toàn bộ động tác; không cắt clip quá sớm. Với clip one-shot, giữ pose cuối một khoảng ngắn nếu cần, sau đó chuyển mượt về Idle. Clip loop chỉ loop trong thời gian test có kiểm soát.
+- Không để thao tác test làm animation trước bị cắt đột ngột hoặc tạo nhiều animation chồng nhau. Khi bấm clip khác, dừng/chuyển clip trước có kiểm soát và ghi nhận rõ clip thực tế được phát.
+- Đánh giá trực tiếp trên iPhone: động tác tay/chân/thân/đầu, biên độ, độ tự nhiên, độ giật, thời lượng, pose kết thúc, chuyển tiếp về Idle và lỗi rig. Ghi nhận clip đạt / cần chỉnh / không phù hợp; không test lại clip đã được xác nhận nếu không có thay đổi liên quan.
+- Sau khi clip được xác nhận bằng mắt, mới quyết định giữ/bỏ và tích hợp trigger theo ngữ cảnh hội thoại. Sau đó kiểm thử hội thoại thật để xác nhận hệ thống tự chọn đúng cử chỉ; nút test không phải bằng chứng của trigger tự động.
+- Cụm nút và logic test chỉ là công cụ phát triển tạm thời. Khi hoàn tất chọn clip, mapping hội thoại và kiểm thử thực tế, phải gỡ toàn bộ UI test cùng code/test hooks không còn cần khỏi màn hình Chat Voice; không để xuất hiện trong bản production.
+- Giữ nguyên phạm vi an toàn: không sửa Text Chat, Chibi Chat, chatbot/API, chat history hoặc voice pipeline khi chỉ bổ sung công cụ test animation Ara. Ưu tiên thay đổi tối thiểu; không chạy Action/Codemagic tự động.
