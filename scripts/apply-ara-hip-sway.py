@@ -11,6 +11,7 @@ from pxr import Gf, Usd, UsdSkel
 
 AMPLITUDE_DEGREES = 3.0
 FREQUENCY_HZ = 0.8
+TARGET_FPS = 30.0
 TARGET_CLIPS = {"Talk", "AraListening"}
 
 
@@ -40,8 +41,8 @@ def load_target_clips(timeline_path):
         timeline = json.load(source)
 
     fps = float(timeline["fps"])
-    if fps <= 0:
-        raise RuntimeError(f"Invalid timeline fps: {fps}")
+    if abs(fps - TARGET_FPS) > 0.01:
+        raise RuntimeError(f"Expected {TARGET_FPS:.0f} FPS timeline, found {fps}")
 
     clips = {}
     for clip in timeline["clips"]:
@@ -113,6 +114,22 @@ def patch_usd_file(source_usdz, destination_usdz, timeline_path):
         if not time_samples:
             raise RuntimeError("USDZ animation has no rotation time samples")
 
+        # Normalize the tapered sine per clip so its sampled peak reaches 3 degrees
+        # while the offset still returns to zero at both clip boundaries.
+        peak_wave = {}
+        for name, (start, end) in clips.items():
+            peak = 0.0
+            for time_code in time_samples:
+                seconds = float(time_code) / time_codes_per_second
+                if start <= seconds <= end:
+                    progress = min(1.0, max(0.0, (seconds - start) / (end - start)))
+                    envelope = math.sin(math.pi * progress) ** 2
+                    wave = math.sin(2.0 * math.pi * FREQUENCY_HZ * (seconds - start)) * envelope
+                    peak = max(peak, abs(wave))
+            if peak < 1e-6:
+                raise RuntimeError(f"No usable 0.8 Hz Hips sway samples for {name}")
+            peak_wave[name] = peak
+
         stats = {
             name: {"count": 0, "first": None, "last": None, "peak": 0.0}
             for name in clips
@@ -137,7 +154,8 @@ def patch_usd_file(source_usdz, destination_usdz, timeline_path):
             progress = min(1.0, max(0.0, (seconds - start) / (end - start)))
             envelope = math.sin(math.pi * progress) ** 2
             elapsed = seconds - start
-            angle = AMPLITUDE_DEGREES * math.sin(2.0 * math.pi * FREQUENCY_HZ * elapsed) * envelope
+            wave = math.sin(2.0 * math.pi * FREQUENCY_HZ * elapsed) * envelope
+            angle = AMPLITUDE_DEGREES * wave / peak_wave[name]
 
             values = list(values)
             values[hips_index] = quat_mul(values[hips_index], yaw_quaternion(angle))
@@ -173,6 +191,7 @@ def patch_usd_file(source_usdz, destination_usdz, timeline_path):
             f"frequency={FREQUENCY_HZ:.2f}Hz, envelope=zero-at-clip-ends"
         )
         print(f"Timeline fps: {timeline_fps:.2f}; USD timeCodesPerSecond: {time_codes_per_second:.2f}")
+        print("Per-clip tapered sway normalized to a sampled peak of +/-3.000deg")
         print(f"Hips joint index: {hips_index}; patched rotation samples: {patched}")
         for name, (start, end) in clips.items():
             item = stats[name]
