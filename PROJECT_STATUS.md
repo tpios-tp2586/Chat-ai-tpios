@@ -50,19 +50,26 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Đánh giá trên iPhone thật: độ tự nhiên, độ rõ khi nhìn, độ lặp, độ trễ, giật/chồng animation, lỗi rig/bàn tay và ảnh hưởng hiệu năng.
 - Ghi log có chọn lọc: clip được chọn, lý do/cue, start/end, fallback; không tạo log khổng lồ.
 
-## Pipeline Ara hiện tại — trạng thái và giới hạn đã xác minh
-- Workflow tạo asset: `.github/workflows/generate-ara-usdz.yml` trên `main`, chạy thủ công.
-- Upstream: https://github.com/olatunde85/3d-gen, pin commit `e26cdef1464a0babf23bb0235b5f05930301ee25`.
-- Nguồn GLB hiện có 75 animation clips; rig GLB đã kiểm tra có 69 joints và 34 morph targets.
-- **Giới hạn hiện tại:** `scripts/split-glb-animations.mjs` chỉ chọn 8 clip (Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh), ghép thành timeline 26 giây; script yêu cầu các clip có cùng rig channels, output shape và LINEAR interpolation.
-- Release `ara-avatar-v3` hiện đã lưu GLB nguồn 75 animation cùng `ara-research-data.json.gz` (dữ liệu kênh animation GLB), USDZ hiện tại, timeline và diagnostics. Có thể dùng GLB/research dataset trong Release để nghiên cứu clip khác mà không sinh lại GLB upstream.
-- Tuy nhiên USDZ hiện tại chỉ chứa timeline 8 clip nói trên; research dataset có dữ liệu kênh của 75 clip GLB nhưng phần USDZ samples chỉ mô tả USDZ 8 clip. Không nhầm dữ liệu nghiên cứu GLB với việc app đã có thể phát mọi clip trong USDZ.
-- Trước đợt tạo asset tổng hợp tiếp theo: bổ sung báo cáo inventory đủ 75 clip (tên, duration, số channels, joints/paths, interpolation, rig compatibility); đánh giá clip hữu ích theo danh mục cử chỉ; chọn bộ đầy đủ để test và phát triển; sau đó mới ghép timeline/convert/validate một lần.
-- Workflow hiện tại dùng tag `ara-avatar-v3` và `overwrite_files=true`; cần sửa quy trình phát hành sang tag/version mới bất biến cho bộ asset tổng hợp kế tiếp, không ghi đè dữ liệu Release cũ.
-- Workflow hiện tạo `Ara-Avatar.usdz` chưa bake Hips sway, marker `hips_sway_baked=false`, timeline và research bundle. Hips sway được bake ở Codemagic trước Xcode build bằng `scripts/apply-ara-hip-sway.py` (Hips Y ±3°, 0.8 Hz, 30 FPS, clip Talk và AraListening).
-- Runtime Hips sway additive đã được bỏ khỏi `AraAvatarView.swift`; sway được bake vào USDZ ở bước Codemagic.
-- Script chính: `scripts/split-glb-animations.mjs`, `scripts/compact-glb-primitives.mjs`, `scripts/apply-ara-talk-explain.mjs`, `scripts/inspect-ara-animation.mjs`, `scripts/ara-research-data.py`, `scripts/inspect-ara-usdz-animation.py`, `scripts/apply-ara-hip-sway.py`.
-- Codemagic `ios-unsigned` tải Ara research bundle, kiểm tra marker, cài OpenUSD trong Python virtualenv tạm, bake Hips sway, kiểm tra USDZ rồi build IPA. OpenUSD không được thêm vào app.
+## Pipeline Ara hiện tại — nghiên cứu inventory hoàn tất, chưa chạy Action mới
+- Workflow tạo asset: `.github/workflows/generate-ara-usdz.yml` trên `main`, chạy thủ công. Upstream `olatunde85/3d-gen` được pin tại `e26cdef1464a0babf23bb0235b5f05930301ee25`.
+- Release `ara-avatar-v3` giữ GLB nguồn `Athletic_woman.glb`, USDZ 8 clip, timeline, diagnostics và `ara-research-data.json.gz`. Research bundle hiện đã được tải và phân tích offline; không cần chạy lại upstream để nghiên cứu 75 clip.
+- Nguồn có **75 animation clips, 69 joints, 34 morph targets**. Đã kiểm tra toàn bộ dataset: mỗi clip đều có 71 channels (69 rotation, 1 Hips translation, 1 blendshape weights), cùng target signature/output width, tất cả LINEAR; không tìm thấy clip nào lệch rig channels hoặc interpolation. Tổng thời lượng 75 clip khoảng 138.59 giây.
+- 75 clip được phân loại thành: conversational/emotes; locomotion; jump/fall; combat/reactions; turns; sitting/lying; weapons; vehicles. Các nhóm locomotion/combat/weapons/vehicles/sitting/lying không phù hợp avatar trợ lý đứng trò chuyện hiện tại nên giữ trong research dataset, không đưa vào runtime pack lần này.
+- **Bộ conversation test được chọn: 11 clips, khoảng 32.57 giây**:
+  - 8 clip nền hiện tại: Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh.
+  - 3 clip bổ sung: Cheer, Laugh, Cry. Đây là bộ có ích cho chào hỏi, giải thích, lắng nghe, suy nghĩ, đồng cảm, cười, vui mừng và phản ứng buồn; Cry chỉ để test thủ công, chưa tự động kích hoạt.
+- Đánh giá từ keyframes GLB:
+  - `TalkExplain` có chuyển động tay phải rõ: RightArm khoảng 52.9°, RightForeArm 39.7°, RightHand 31.1° so với đầu clip; giữ làm cử chỉ giải thích.
+  - `Wave` đưa tay phải lên vị trí chào; pose khác Talk khoảng 103° ở RightArm và 95° ở RightForeArm; dùng one-shot.
+  - `Cheer` nâng cả hai tay mạnh, khoảng 100° ở hai cánh tay/cẳng tay; chỉ dùng cho vui mừng rõ, không tự kích hoạt khi trò chuyện thường.
+  - `Laugh` có nhún thân, đầu ngửa nhẹ, tay phải đặt bụng và morph cười (mouthSmile, jawOpen, eyeSquint); là ứng viên cười rõ hơn.
+  - `Cry` có biểu cảm buồn và chuyển động thân/tay rất mạnh; chỉ thử thủ công, không map tự động vào trạng thái buồn.
+  - `AraListening`, `AraThinking`, `AraEmpathy` chủ yếu là vi chuyển động đầu/cổ/thân trên (khoảng 1–5°), không có facial morph đặc trưng ngoài chớp mắt; giữ vai trò trạng thái nền nhẹ, không xem là cử chỉ tay rõ.
+  - `AraLaugh` cũng khá nhẹ (đầu/mắt), không có morph cười rõ. Hiện logic tự động vẫn gọi `AraLaugh`; sẽ so sánh với clip `Laugh` trên iPhone trước khi đổi mapping.
+- App enum/test panel đã có Cheer, Laugh, Cry để thử thủ công. `AraAvatarLoader` vẫn yêu cầu 8 clip nền; 3 clip bổ sung là optional để không làm hỏng load nếu asset thiếu.
+- Hip sway đã được chỉnh `AMPLITUDE_DEGREES = 5.0`, `FREQUENCY_HZ = 0.8`, 30 FPS; chỉ bake vào Talk và AraListening. Giữ nguyên, không thêm runtime sway chồng lên.
+- Workflow trên `main` hiện phát hành tag mới `ara-avatar-v4`, `overwrite_files: false`; release body mô tả bộ tối đa 11 clip. Không ghi đè v3.
+- Các cập nhật code chuẩn bị cho bộ 11 clip đã commit trên `main`; **chưa chạy Action mới, chưa tạo ara-avatar-v4 và chưa build Codemagic**. Release v3 vẫn là asset đã xác minh hiện có, chỉ chứa 8 clip.
 
 ## Trạng thái kỹ thuật đã xác minh
 - Runtime log: Ara USDZ tải từ app bundle thành công (~25.5 MB); RealityKit import 1 global scene animation; app tạo 8 AnimationViews từ timeline.
@@ -73,11 +80,11 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Không kết luận chuyển động tự nhiên/chất lượng chỉ từ log; cần video/quan sát iPhone thật và kiểm thử từng clip.
 
 ## Việc tiếp theo
-1. Nghiên cứu inventory đầy đủ 75 animation từ GLB/research dataset đã lưu trong Release hiện tại; phân loại theo danh mục cử chỉ ở trên, không chạy Action.
-2. Kiểm tra clip nào dùng được ngay, clip nào thiếu, clip nào trùng lặp/không phù hợp; xác minh compatibility của rig channels và converter trước khi chốt bộ master.
-3. Chuẩn bị một thay đổi gộp cho workflow/scripts: master USDZ/timeline đầy đủ cho bộ clip đã duyệt, manifest dễ tra cứu, diagnostics per-clip, research data và Release version mới bất biến.
-4. Chỉ sau khi review xong toàn bộ thay đổi mới báo user chạy GitHub Action thủ công một lần; sau khi Release asset hoàn tất mới chạy Codemagic để bake/đóng gói và build IPA.
-5. Test trên iPhone thật từng nhóm cử chỉ và chuyển tiếp; sau đó mới phát triển logic chọn gesture theo ngữ cảnh. Lip-sync/viseme làm ở giai đoạn sau.
+1. Review toàn bộ diff trên `main` cho bộ conversation 11 clips và các diagnostics; không tạo thêm clip thử rời rạc.
+2. Khi đã chốt review, user chạy GitHub Action **một lần duy nhất** trên `main` để tạo Release `ara-avatar-v4`; kiểm tra timeline có 11 clips, diagnostics, USDZ texture/package và SHA256.
+3. Chỉ sau khi v4 được xác minh, user chạy Codemagic để bake Hips sway 5° và build IPA (artifact IPA בלבד).
+4. Test 11 clips trên iPhone thật: đặc biệt so sánh AraLaugh với Laugh; Cheer và Cry chỉ test thủ công; kiểm tra chuyển tiếp về Talk/Idle và không giật.
+5. Sau test mới quyết định mapping tự động theo ngữ cảnh, thêm gesture procedural nếu còn thiếu; lip-sync/viseme vẫn là giai đoạn riêng.
 
 ## Build và xác minh
 - Codemagic workflow chính: `ios-unsigned`; assistant không dispatch Codemagic trực tiếp.
