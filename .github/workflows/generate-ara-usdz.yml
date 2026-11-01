@@ -157,8 +157,26 @@ jobs:
           ARA_PRESET="${{ inputs.preset }}" ARA_DETAIL="${{ inputs.detail }}" \
             "$PY" scripts/ara-research-data.py "$GLB" "$DEST" output-usdz/animation-timeline.json
           grep -q "skelAnimations: 1" output-usdz/usdz-report.txt
-          grep -Eq "endTimeCode[[:space:]]*:[[:space:]]*780" output-usdz/usdz-report.txt
-          grep -q "timeCodesPerSecond: 30.0" output-usdz/usdz-report.txt
+          "$PY" - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          timeline = json.loads(Path("output-usdz/animation-timeline.json").read_text())
+          expected_fps = float(timeline["fps"])
+          expected_end = max(float(clip["end"]) for clip in timeline["clips"])
+          expected_end_code = round(expected_end * expected_fps)
+
+          report = Path("output-usdz/usdz-report.txt").read_text()
+          fps_match = re.search(r"timeCodesPerSecond\\s*:\\s*([0-9.]+)", report)
+          end_match = re.search(r"endTimeCode\\s*:\\s*([0-9.]+)", report)
+          if not fps_match or abs(float(fps_match.group(1)) - expected_fps) > 0.01:
+              raise SystemExit(f"USDZ FPS does not match timeline ({expected_fps})")
+          if not end_match or abs(float(end_match.group(1)) - expected_end_code) > 1:
+              actual = end_match.group(1) if end_match else "missing"
+              raise SystemExit(f"USDZ endTimeCode {actual} does not match timeline {expected_end_code}")
+          print(f"USDZ timeline verified: {expected_end:.4f}s, {expected_fps:.0f} FPS, endTimeCode={expected_end_code}")
+          PY
           grep -q "GLB animations=75" output-usdz/animation-diagnostics.txt
           "$PY" - <<'PY'
           import re
