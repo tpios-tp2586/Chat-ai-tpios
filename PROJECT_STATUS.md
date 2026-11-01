@@ -95,7 +95,7 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Không sửa Text Chat, Chibi Chat, chatbot/API, history hoặc voice pipeline khi chỉ bổ sung công cụ test Ara.
 
 ## Ara gesture test UI — trạng thái hiện tại
-- UI test đã chuyển sang menu nổi gọn ngay trong màn hình Chat Voice: icon Test trên header; bấm để mở/đóng, không dùng sheet che màn hình và không thu nhỏ Ara.
+- UI test dùng menu nổi gọn trong Chat Voice: icon Test trên header; menu neo sát cạnh dưới, tránh che mặt/thân trên Ara; danh sách animation một cột cuộn dọc, giới hạn chiều cao 116pt; không thu nhỏ model. Commit điều chỉnh vị trí menu sau phản hồi ảnh iPhone: `d1e3bb16ba4ec82e845137bc67adcfc99ef5bb9a`.
 - Menu gồm một hàng ngang chọn nhóm (Biểu cảm, Di chuyển, Xoay, Tư thế, Nhảy, Khác) và danh sách chức năng một cột có thể cuộn dọc. Nhân vật Ara vẫn giữ kích thước khung hiển thị hiện tại; menu chỉ phủ một phần vùng phía trên khi mở.
 - Chọn chức năng gọi trực tiếp clip tương ứng; mục đang chạy có dấu nhận biết. Jump sequence chạy Jump start → Jump air → Jump land → Idle.
 - Mở chế độ test sẽ dừng phiên voice đang chạy như hành vi test hiện tại; đóng menu kết thúc test và trả Ara về Idle. Log chẩn đoán và nút sao chép log được giữ nguyên.
