@@ -149,3 +149,11 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Đã sửa allowlist trong codemagic.yaml để chỉ cho phép thêm đúng hai file Swift test Ara này; các file nguồn/tài nguyên khác vẫn bị chặn như trước. Không bỏ guard ancestry hoặc kiểm tra thay đổi.
 - Commit: 4200b5d6774e8fe82b01bd818d1719cfb223ff8e.
 - Chưa chạy lại Codemagic; cần user chạy workflow ios-unsigned để xác minh bước bake USDZ và build IPA tiếp tục thành công. Assistant không tự chạy build.
+
+
+## Điều chỉnh bố cục nút test Ara quanh nhân vật — 2026-11-01
+- User nhắc lại yêu cầu đã chốt: các nút test phải bố trí xung quanh nhân vật Ara, không xếp thành hai hàng ngang phủ lên vùng avatar.
+- Đã đổi overlay trong `ChatAI/CompanionChatView.swift`: 6 nút thành cột dọc bên trái, 5 nút thành cột dọc bên phải; thanh trạng thái test và nút Xong ở phía trên. Thu gọn chip để dành vùng trung tâm cho Ara.
+- Giữ nguyên 11 clip, hành vi test/loop 7 giây, log và các guard voice. Không sửa Text Chat, Chibi Chat, API/history hoặc voice pipeline.
+- Commit bố cục: `16d29cbb3af77a010390bbe8c8cc71b489ee370a`.
+- Chưa có Xcode/Codemagic/iPhone verification cho bố cục mới; cần build IPA và xem trực tiếp trên iPhone để đánh giá độ cân đối, tránh che tay/thân Ara.
