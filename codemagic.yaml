@@ -38,7 +38,7 @@ workflows:
                 echo "GitHub API returned HTTP $status: $url"
                 python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); print("GitHub message: "+str(d.get("message","(no message)")))' "$output" 2>/dev/null || cat "$output"
                 if [ "$status" = "403" ]; then
-                  echo "Check GITHUB_TOKEN permissions for this private repository: Contents: Read and Actions: Read."
+                  echo "Check GITHUB_TOKEN access for this endpoint: Release/commit APIs need Contents: Read; Actions APIs need Actions: Read."
                 fi
                 return 1
                 ;;
@@ -57,9 +57,8 @@ workflows:
             exit 1
           }
 
-          # Use the checked-out commit instead of GET /commits/main and /compare.
-          # Those endpoints require Contents: Read, while the existing artifact
-          # fallback only needs the Actions: Read permission already in use.
+          # Use the checked-out commit for the ancestry and changed-file guard.
+          # The matching Actions artifact fallback only needs Actions: Read.
           MAIN_SHA="$(git rev-parse HEAD)"
           if ! git cat-file -e "$RUN_SHA^{commit}" 2>/dev/null; then
             git fetch --no-tags origin "$RUN_SHA"
