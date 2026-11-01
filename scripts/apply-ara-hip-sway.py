@@ -110,10 +110,11 @@ def patch_usd_file(source_usdz, destination_usdz, timeline_path):
         time_codes_per_second = float(stage.GetTimeCodesPerSecond())
         if time_codes_per_second <= 0:
             raise RuntimeError(f"Invalid USD timeCodesPerSecond: {time_codes_per_second}")
-        if abs(time_codes_per_second - timeline_fps) > 0.01:
+        fps_ratio = time_codes_per_second / timeline_fps
+        if fps_ratio < 1 or abs(fps_ratio - round(fps_ratio)) > 0.01:
             raise RuntimeError(
-                f"Timeline fps ({timeline_fps}) does not match USD timeCodesPerSecond "
-                f"({time_codes_per_second})"
+                f"USD timeCodesPerSecond ({time_codes_per_second}) must be an integer "
+                f"multiple of timeline fps ({timeline_fps})"
             )
 
         animation = find_animation(stage)
