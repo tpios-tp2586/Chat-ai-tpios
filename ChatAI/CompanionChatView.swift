@@ -32,7 +32,7 @@ struct CompanionChatView: View {
     @State private var showDiagnosticLog = false
     @State private var isGestureTestMode = false
     @State private var showAraTestMenu = false
-    @State private var selectedTestGroup = "Biểu cảm"
+    @State private var selectedTestGroup = "Khi trò chuyện"
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -277,52 +277,45 @@ struct CompanionChatView: View {
 
     private var araTestGroups: [(String, String, [(String, AraAvatarView.Clip)])] {
         [
-            ("Biểu cảm", "face.smiling", [
-                ("Idle", .idle), ("Talk", .talk), ("TalkExplain", .talkExplain),
-                ("Wave", .wave), ("Laugh", .naturalLaugh)
+            ("Khi trò chuyện", "face.smiling", [
+                ("Idle", .idle), ("AraListening", .listening), ("AraThinking", .thinking),
+                ("Talk", .talk), ("TalkExplain", .talkExplain),
+                ("AraEmpathy", .empathy), ("AraLaugh", .laugh), ("Laugh", .naturalLaugh)
             ]),
-            ("Di chuyển", "figure.walk", [
-                ("Walk", .walk), ("Run", .run), ("Walk backwards", .walkBackwards),
-                ("Strafe left", .strafeLeft), ("Strafe right", .strafeRight)
-            ]),
-            ("Xoay", "arrow.trianglehead.2.clockwise.rotate.90", [
-                ("Turn left 45°", .turnLeft45), ("Turn left 90°", .turnLeft90),
-                ("Turn right 45°", .turnRight45), ("Turn right 90°", .turnRight90),
-                ("Full turn 360°", .fullTurn)
-            ]),
-            ("Tư thế", "figure.stand", [
-                ("Idle / nghỉ", .idle), ("Sit down (chair)", .sitDown),
-                ("Sit idle (chair)", .sitIdle), ("Stand up (chair)", .standUp),
-                ("Lie down", .lieDown), ("Sleep", .sleep)
-            ]),
-            ("Nhảy", "figure.jumprope", [("Jump sequence", .jumpStart)]),
-            ("Khác", "ellipsis", [("Ride horse (trot)", .rideHorse)])
+            ("Theo yêu cầu", "hand.tap", [
+                ("Wave", .wave), ("Walk", .walk), ("Run", .run),
+                ("Walk backwards", .walkBackwards), ("Strafe left", .strafeLeft),
+                ("Strafe right", .strafeRight), ("Turn left 45°", .turnLeft45),
+                ("Turn left 90°", .turnLeft90), ("Turn right 45°", .turnRight45),
+                ("Turn right 90°", .turnRight90), ("Full turn 360°", .fullTurn),
+                ("Sit down (chair)", .sitDown), ("Sit idle (chair)", .sitIdle),
+                ("Stand up (chair)", .standUp), ("Lie down", .lieDown),
+                ("Sleep", .sleep), ("Jump sequence", .jumpStart),
+                ("Ride horse (trot)", .rideHorse)
+            ])
         ]
     }
 
     private var araTestMenu: some View {
         VStack(spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    ForEach(araTestGroups, id: \.0) { group in
-                        Button {
-                            selectedTestGroup = group.0
-                        } label: {
-                            VStack(spacing: 3) {
-                                Image(systemName: group.1).font(.system(size: 15, weight: .semibold))
-                                Text(group.0).font(.system(size: 10, weight: .medium))
-                            }
-                            .foregroundStyle(selectedTestGroup == group.0 ? .white : .primary)
-                            .frame(minWidth: 55)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 8)
+            HStack(spacing: 6) {
+                ForEach(araTestGroups, id: \.0) { group in
+                    Button {
+                        selectedTestGroup = group.0
+                    } label: {
+                        Label(group.0, systemImage: group.1)
+                            .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
                             .background(
                                 selectedTestGroup == group.0 ? activeTheme.accent : activeTheme.surface,
-                                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                             )
-                        }
-                        .buttonStyle(.plain)
                     }
+                    .foregroundStyle(selectedTestGroup == group.0 ? .white : .primary)
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -360,9 +353,10 @@ struct CompanionChatView: View {
                 .frame(maxHeight: 116)
             }
         }
-        .padding(8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
+        .padding(7)
+        .frame(maxWidth: 292)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
     }
 
