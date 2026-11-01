@@ -95,22 +95,12 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Không sửa Text Chat, Chibi Chat, chatbot/API, history hoặc voice pipeline khi chỉ bổ sung công cụ test Ara.
 
 ## Ara gesture test UI — trạng thái hiện tại
-- Test UI được bật bằng icon `figure.stand` ở header Chat Voice; các nút hiển thị thành hai cột dọc hai bên Ara, có nút `Xong` để thoát chế độ test. User đã xác nhận nhìn thấy hai cột nút trên iPhone.
-- Các nút test hiện có: Wave, Talk, Explain, Listen, Thinking, Empathy, AraLaugh, Laugh, Cheer, Cry và Idle.
-- Mỗi clip test loop 7 giây rồi tự trở về Idle; chọn clip khác hủy lượt test trước. Voice/transcript/emotion callbacks không được ghi đè clip khi đang test.
-- User đã test liên tiếp Wave → Talk → Explain; cả ba nút chạy đúng clip tương ứng, không bị gọi nhầm clip.
-- User nhận xét Listen/AraListening, Thinking/AraThinking, Empathy/AraEmpathy và AraLaugh nhìn gần giống nhau, không tạo khác biệt trực quan đủ rõ trong lần test hiện tại.
-- **Quyết định test tạm thời:** xem Idle là trạng thái nghỉ/trung tính mặc định, không gọi Idle là biểu cảm. Tạm gom Listen, Thinking, Empathy và AraLaugh vào nhóm clip nền/ít khác biệt; không ưu tiên các nút này trong lượt test kế tiếp. Không xóa enum, animation clip, timeline hoặc dữ liệu trong Release v4.
-- Nếu sau này cần test sâu lại các trạng thái lắng nghe/suy nghĩ/đồng cảm/cười nhẹ hoặc có bộ asset/cử chỉ mới, đưa các nút Listen, Thinking, Empathy, AraLaugh trở lại cụm test để so sánh trực tiếp. Dữ liệu gốc v4 vẫn được giữ để tái sử dụng; không chạy lại GitHub Action chỉ để mở lại nút test.
-- **Kết quả test trực quan Laugh/Cheer/Cry trên iPhone (user mô tả):**
-  - `Laugh`: hai tay ôm bụng, cười nhưng thân người giật giật; động tác cười mạnh và giật, không phù hợp làm cười nhẹ mặc định.
-  - `Cheer`: hai tay nâng ngang vai hướng lên, đầu ngước lên rồi nhảy giật giật; phù hợp cổ vũ/phấn khích mạnh, không dùng cho vui nhẹ thông thường.
-  - `Cry`: hai tay chéo ôm trước ngực, khom lưng, biểu hiện/âm thanh giống cười khẹt khẹt hoặc buồn nôn hơn là khóc; không ánh xạ vào trạng thái buồn/khóc.
-  - Đây là đánh giá trực quan của user; giữ nguyên asset và clip gốc, chưa sửa mapping tự động.
-- Kết luận test hiện tại: Wave/Talk/Explain chạy đúng và có khác biệt rõ; Listen/Thinking/Empathy/AraLaugh ít khác biệt; Laugh/Cheer có biên độ mạnh; Cry sai sắc thái. Chưa có clip cười nhẹ hoặc khóc tự nhiên được xác nhận phù hợp để tự động kích hoạt.
-- Bố cục hai cột được commit tại `16d29cbb3af77a010390bbe8c8cc71b489ee370a`; commit status trước đó `3b95b0f9b79bdd1f41a18d281e3311a577f1abfc`. Build/iPhone verification của các thay đổi layout sau commit cần được ghi riêng khi có kết quả.
-- Chỉ cập nhật UI test nếu user yêu cầu hoặc khi bước test kế tiếp đã được chốt; không tự ý sửa code trong lượt cập nhật status này.
-
+- UI test đã chuyển sang menu nổi gọn ngay trong màn hình Chat Voice: icon Test trên header; bấm để mở/đóng, không dùng sheet che màn hình và không thu nhỏ Ara.
+- Menu gồm một hàng ngang chọn nhóm (Biểu cảm, Di chuyển, Xoay, Tư thế, Nhảy, Khác) và danh sách chức năng một cột có thể cuộn dọc. Nhân vật Ara vẫn giữ kích thước khung hiển thị hiện tại; menu chỉ phủ một phần vùng phía trên khi mở.
+- Chọn chức năng gọi trực tiếp clip tương ứng; mục đang chạy có dấu nhận biết. Jump sequence chạy Jump start → Jump air → Jump land → Idle.
+- Mở chế độ test sẽ dừng phiên voice đang chạy như hành vi test hiện tại; đóng menu kết thúc test và trả Ara về Idle. Log chẩn đoán và nút sao chép log được giữ nguyên.
+- Commit UI mới: `c199066b1616955a9f423f3b50b1df021aabb3ab` trên `main`. Chưa build Codemagic/chưa xác minh giao diện trên iPhone; cần user chạy build thủ công để test trực quan.
+- Không sửa chatbot/API, voice pipeline, Text Chat hoặc Chibi Chat.
 ## Ara v5 — pipeline preparation in progress
 - Main commit `a1b64e3af99e3f0705e2ec9b7f2e2fad3df5e64d` expands `scripts/split-glb-animations.mjs` to require the 19 additional source clips for the approved test actions, while retaining the existing 8 required conversation clips and 3 optional clips.
 - `.github/workflows/generate-ara-usdz.yml` now publishes to the new immutable tag `ara-avatar-v5`; v4 remains unchanged. The existing GLB-to-USDZ conversion on macOS, texture packaging, USDZ inspection, timeline checks and research bundle generation are retained.
