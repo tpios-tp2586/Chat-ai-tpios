@@ -201,7 +201,7 @@ private final class AraAvatarLoader: ObservableObject {
                     return
                 }
 
-                let requiredNames = ["idle", "wave", "talk", "talkexplain", "aralistening", "arathinking", "araempathy", "aralaugh", "cheer", "laugh"]
+                let requiredNames = ["idle", "wave", "talk", "talkexplain", "aralistening", "arathinking", "araempathy", "aralaugh"]
                 let missing = requiredNames.filter { clips[$0] == nil }
                 guard missing.isEmpty else {
                     self.status = "Thiếu clip animation: \(missing.joined(separator: ", "))"
