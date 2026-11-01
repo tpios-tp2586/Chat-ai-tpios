@@ -39,6 +39,7 @@ struct CompanionChatView: View {
     @AppStorage("ara_test_panel_collapsed") private var testPanelCollapsed = false
     @GestureState private var testPanelDragOffset = CGSize.zero
     @State private var testPanelResizeStart = 1.0
+    @State private var isResizingTestPanel = false
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
