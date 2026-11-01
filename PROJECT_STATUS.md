@@ -131,3 +131,14 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Sau khi clip được xác nhận bằng mắt, mới quyết định giữ/bỏ và tích hợp trigger theo ngữ cảnh hội thoại. Sau đó kiểm thử hội thoại thật để xác nhận hệ thống tự chọn đúng cử chỉ; nút test không phải bằng chứng của trigger tự động.
 - Cụm nút và logic test chỉ là công cụ phát triển tạm thời. Khi hoàn tất chọn clip, mapping hội thoại và kiểm thử thực tế, phải gỡ toàn bộ UI test cùng code/test hooks không còn cần khỏi màn hình Chat Voice; không để xuất hiện trong bản production.
 - Giữ nguyên phạm vi an toàn: không sửa Text Chat, Chibi Chat, chatbot/API, chat history hoặc voice pipeline khi chỉ bổ sung công cụ test animation Ara. Ưu tiên thay đổi tối thiểu; không chạy Action/Codemagic tự động.
+
+
+## Ara gesture test UI implementation — 2026-11-01
+- Đã thay sheet test cũ bằng cụm nút test overlay trực tiếp quanh vùng hiển thị Ara trong Chat Voice; có 2 hàng cuộn ngang để thao tác trên iPhone.
+- Các nút hiện có: Wave, Talk, Explain/TalkExplain, Listen/AraListening, Thinking/AraThinking, Empathy/AraEmpathy, AraLaugh, Laugh, Cheer, Cry và Idle.
+- Bật chế độ test sẽ dừng phiên voice đang chạy để state hội thoại không ghi đè clip. Trong chế độ test, các callback voice/transcript/emotion không được phép thay clip test.
+- Mỗi clip test được loop trong cửa sổ 7 giây để quan sát rõ; hết thời gian tự trở về Idle. Bấm clip khác sẽ hủy timer cũ, dừng playback trước và chạy clip mới; có log Started/Finished.
+- Chỉ thay đổi CompanionChatView.swift và AraAvatarView.swift; không thay đổi Text Chat, Chibi Chat, API/history hoặc voice pipeline. Không thêm dependency.
+- Commit UI: 783108e40bb24b2c32ca4039f2c58e0d0a608543; commit playback/test-loop: 3944f9c030ede52431a864495a116d8d66b6a493; commit chặn voice ghi đè test: 49a70cd09bee055850a55cd970c44483b6157f39.
+- Kiểm tra tĩnh sau cập nhật: xác nhận sheet test cũ đã được gỡ, đủ 11 nút clip, cờ test được truyền tới loader, clip test loop và tự về Idle sau 7 giây; các guard ngăn voice/transcript ghi đè chế độ test.
+- Chưa xác minh bằng Xcode/Codemagic hoặc iPhone thật trong phiên này. Cần user chạy workflow ios-unsigned trên Codemagic và kiểm tra bố cục overlay, từng nút, thời lượng loop 7 giây, dừng/chuyển clip và trở về Idle. Assistant không chạy Codemagic.
