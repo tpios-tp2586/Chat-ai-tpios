@@ -168,8 +168,8 @@ jobs:
           expected_end_code = round(expected_end * expected_fps)
 
           report = Path("output-usdz/usdz-report.txt").read_text()
-          fps_match = re.search(r"timeCodesPerSecond\\s*:\\s*([0-9.]+)", report)
-          end_match = re.search(r"endTimeCode\\s*:\\s*([0-9.]+)", report)
+          fps_match = re.search(r"timeCodesPerSecond\s*:\s*([0-9.]+)", report)
+          end_match = re.search(r"endTimeCode\s*:\s*([0-9.]+)", report)
           if not fps_match or abs(float(fps_match.group(1)) - expected_fps) > 0.01:
               raise SystemExit(f"USDZ FPS does not match timeline ({expected_fps})")
           if not end_match or abs(float(end_match.group(1)) - expected_end_code) > 1:
