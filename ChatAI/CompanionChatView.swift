@@ -30,6 +30,7 @@ struct CompanionChatView: View {
     @State private var message: String?
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
+    @State private var showGestureTestSheet = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
     var body: some View {
@@ -84,6 +85,7 @@ struct CompanionChatView: View {
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
+        .sheet(isPresented: $showGestureTestSheet) { gestureTestSheet }
         .onChange(of: liveManager.lines.count) { _ in
             if let line = liveManager.lines.last {
                 if line.role == .user {
@@ -186,6 +188,19 @@ struct CompanionChatView: View {
             }
             .accessibilityLabel("Xem và sao chép log")
 
+            Button { showGestureTestSheet = true } label: {
+                Image(systemName: "figure.stand")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(activeTheme.accent)
+                    .frame(width: 42, height: 42)
+                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
+                    }
+            }
+            .accessibilityLabel("Thử cử chỉ Ara")
+
             Button { nightMode.toggle() } label: {
                 Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
                     .font(.system(size: 15, weight: .semibold))
@@ -231,6 +246,70 @@ struct CompanionChatView: View {
                     Button("Đóng") { showDiagnosticLog = false }
                 } }
         }
+    }
+
+    private var gestureTestSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Chọn clip để Ara thực hiện trực tiếp.")
+                    .font(.headline)
+                Text("Dừng phiên chat thoại trước khi thử để trạng thái nghe/nói không ghi đè cử chỉ.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                gestureTestButton("Cheer", detail: "Cử chỉ vui mừng toàn thân", clip: .cheer)
+                gestureTestButton("Laugh", detail: "Cử chỉ cười từ animation nguồn", clip: .naturalLaugh)
+                gestureTestButton("TalkExplain", detail: "Đưa tay lên ngang ngực rồi hạ xuống", clip: .talkExplain)
+                gestureTestButton("Wave", detail: "Vẫy tay chào", clip: .wave)
+
+                Button {
+                    testAraGesture(.idle)
+                } label: {
+                    Label("Về trạng thái nghỉ", systemImage: "arrow.uturn.backward")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(liveManager.state != .idle)
+            }
+            .padding()
+            .navigationTitle("Thử cử chỉ Ara")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Đóng") { showGestureTestSheet = false }
+                }
+            }
+        }
+    }
+
+    private func gestureTestButton(_ title: String, detail: String, clip: AraAvatarView.Clip) -> some View {
+        Button {
+            testAraGesture(clip)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    if avatarClip == clip {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
+                }
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.bordered)
+        .disabled(liveManager.state != .idle)
+    }
+
+    private func testAraGesture(_ clip: AraAvatarView.Clip) {
+        cancelExplainGesture()
+        cancelEmotionGesture()
+        avatarClip = clip
+        addDiagnostic("[ARA TEST] Manual clip requested: \(clip.rawValue)")
     }
 
     private func applyAraEmotion(_ expression: RobotFaceExpression) {
