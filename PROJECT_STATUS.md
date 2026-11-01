@@ -40,7 +40,7 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 3. **Suy nghĩ:** Thinking/pause; nhớ lại; phân vân; tò mò; chuyển từ suy nghĩ về trạng thái nói.
 4. **Nói và giải thích:** Talk trung tính; giải thích bằng lòng bàn tay mở; nhấn ý bằng một tay; trình bày/mời xem; chỉ hướng hoặc chỉ vật thể khi có ngữ cảnh; đếm ý 1–2–3 nếu có clip phù hợp.
 5. **Cảm xúc:** Smile; laugh; empathy/quan tâm; concern/buồn nhẹ; surprise; confusion; reassurance/động viên. Cần phân biệt biểu cảm mặt với cử chỉ thân thể.
-6. **Chuyển tiếp xã giao:** Greeting/wave; farewell; chuyển clip mượt và không giật về Idle/Talk.
+6. **Chuyển tiếp xã giao:** Greeting/wave; farewell; chuyển clip mượt và không giật về Idle.
 7. **Phối hợp nâng cao:** Cử chỉ không lấn át lời nói; không lặp vô hạn động tác one-shot; ưu tiên tay trái/phải có chủ đích; tránh xuyên thân/mặt và tư thế bàn tay lỗi; tương thích về sau với facial expression và viseme.
 
 ## Kế hoạch kiểm thử
@@ -81,9 +81,9 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Không kết luận chuyển động tự nhiên/chất lượng chỉ từ log; cần video/quan sát iPhone thật và kiểm thử từng clip.
 
 ## Việc tiếp theo
-1. Codemagic đã tải được đúng bộ Ara USDZ/timeline và build IPA thành công sau khi sửa pipeline (xem mục xác minh build bên dưới).
-2. Test từng clip trên iPhone thật: đặc biệt so sánh AraLaugh với Laugh; Cheer và Cry chỉ test thủ công; kiểm tra chuyển tiếp về Talk/Idle, độ tự nhiên và hiện tượng giật/chồng animation.
-3. Sau test mới quyết định mapping tự động theo ngữ cảnh, thêm gesture procedural nếu còn thiếu; lip-sync/viseme vẫn là giai đoạn riêng.
+1. Tiếp tục kiểm thử trực quan các clip còn lại trên iPhone, ưu tiên Laugh, Cheer và Cry; phân biệt rõ chuyển động toàn thân với vi chuyển động đầu/mặt.
+2. Chốt danh sách clip thực sự khác biệt và mapping tự động theo ngữ cảnh; chỉ bổ sung gesture procedural nếu test cho thấy thiếu động tác cụ thể.
+3. Lip-sync/viseme vẫn là giai đoạn riêng.
 4. Nếu cần nghiên cứu lại tài nguyên hiện có, dùng GLB/research bundle/diagnostics từ Release v4. Chỉ tạo release tài nguyên phiên bản mới khi thực sự thay đổi hoặc bổ sung asset; cập nhật PROJECT_STATUS.md sau khi release mới được xác minh.
 
 ## Build và xác minh
@@ -91,69 +91,23 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Build simulator chỉ xác nhận compile/package, không thay thế kiểm thử trên iPhone thật.
 - Không build IPA từ asset mới trước khi review kết quả USDZ post-conversion.
 
-## Xác minh Action v4 và quy tắc tái sử dụng tài nguyên — 2026-11-01
-- Action run: **#15**, ID `41266922525`, trạng thái `completed / success`, branch `main`, commit đầu vào `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`.
-- Release: [`ara-avatar-v4`](https://github.com/tpios-tp2586/Chat-ai-tpios/releases/tag/ara-avatar-v4), tên `Ara Avatar and Research Data v4`, publish `2026-11-01T02:56:14Z`.
-- Release assets đã xác minh metadata:
-  - `Ara-Avatar.usdz` — 25,500,329 bytes; SHA256 `442e51bf45e4a6fcd2d9d322597b635531e0059be065be35b94f3320ce6ee124`.
-  - `Athletic_woman.glb` — 17,534,748 bytes; SHA256 `5e922c88cb665593ab4c47973b6368df0205996f24290654a83d38cb47dd2e1e`.
-  - `ara-research-data.json.gz` — 3,235,099 bytes; SHA256 `144bc52b1e9d3a33fc71e28e2ba03c79f4d2e65d193bec5371abf71af9ef95ed`.
-  - `animation-timeline.json` — 1,608 bytes; SHA256 `23abe4d940a022ade19276740296e348900dffea4996f95f57f156dbb0f3e0fe`.
-  - Diagnostics/report files: `animation-diagnostics.txt`, `conversion-log.txt`, `texture-diagnostics.txt`, `usdz-animation-diagnostics.txt`, `usdz-report.txt`, `verification-report.txt`; checksum manifest `SHA256SUMS.txt`.
-- Workflow artifacts cũng đã được tạo, chưa hết hạn: `ara-avatar-research-bundle` ID `13067582323` (~13.25 MB) và `ara-avatar-glb` ID `13067517492` (~8.15 MB). Release là nguồn tham chiếu lâu dài ưu tiên; workflow artifacts là bản phụ để tải khi cần.
-- **Quy tắc từ nay:** dùng dữ liệu Release v4 để nghiên cứu, kiểm tra rig/animation, chọn clip và chuẩn bị test. Không chạy lại Action chỉ để lấy lại dữ liệu hoặc đổi logic Swift. Nếu thay đổi/bổ sung tài nguyên (GLB/clip/timeline/USDZ/texture), tạo release phiên bản mới, không ghi đè v4; sau khi xác minh mới cập nhật status.
-- Codemagic tải trực tiếp `Ara-Avatar.usdz`, `animation-timeline.json` và `ara-asset-pipeline.txt` từ Release `ara-avatar-v4` (không phụ thuộc workflow artifact có thời hạn). Trước khi tải, Codemagic xác nhận tag `ara-avatar-v4` trỏ đúng commit SHA của lần Action thành công mới nhất. Codemagic vẫn chỉ xuất IPA, không ZIP. Guard cho phép commit chỉ thay đổi `PROJECT_STATUS.md` và `codemagic.yaml` sau Action; nếu có thay đổi file app, script animation hoặc workflow tạo asset sau SHA của Action, Codemagic sẽ từ chối release cũ và yêu cầu Action/release tài nguyên mới.
-- **Chưa xác minh:** nội dung timeline/diagnostics bên trong từng asset chưa được đọc lại độc lập từ release binary trong phiên này; chất lượng chuyển động, texture khi render và chuyển tiếp clip phải kiểm tra trên iPhone. Không coi Action success là bằng chứng chuyển động tự nhiên hoặc app runtime thành công.
-
-
-## Codemagic 403 khi tải Ara v4 — 2026-11-01
-- Nguyên nhân kỹ thuật đã khoanh vùng: commit `293d2692b18b52b02d47cd6e4d4310c9fb051d3d` đưa thêm yêu cầu gọi API `/commits/main` để kiểm tra SHA. Đây là endpoint cần quyền đọc Contents; luồng cũ chủ yếu dùng Actions API. Sau đó chuyển nguồn tải sang GitHub Release cũng làm phát sinh thêm các endpoint cần Contents: Read.
-- User xác nhận không thay token hoặc cấu hình Codemagic; token là loại không thời hạn. Vì vậy không kết luận token hết hạn và không yêu cầu tạo token mới.
-- Đã sửa `codemagic.yaml`: dùng commit checkout sẵn trong Codemagic để kiểm tra ancestry và các file thay đổi sau Ara workflow run, bỏ API call lấy `main` SHA và API compare. Chỉ cho phép thay đổi `PROJECT_STATUS.md` và `codemagic.yaml` sau asset run.
-- Pipeline ưu tiên tải tài nguyên từ Release `ara-avatar-v4` khi token có quyền Contents. Nếu Release/Contents API bị từ chối, tự động fallback sang artifact `ara-avatar-research-bundle` đúng workflow run ID; không lấy artifact của run khác và không dùng artifact đã hết hạn. Fallback chỉ cần Actions: Read.
-- Đã xác minh artifact đúng run #15 / ID `41266922525` tồn tại, chưa hết hạn: artifact ID `13067582323`, dự kiến hết hạn `2027-01-30T02:52:28Z`. Release v4 vẫn là nguồn ưu tiên lâu dài.
-- Commit sửa pipeline: `1272e4a71b6f93d3597e96542d1a4bf5651cb396`. Không chạy GitHub Action hoặc Codemagic trong lúc sửa; user đã tự chạy workflow `ios-unsigned` và xác nhận build thành công (chi tiết ở mục xác minh build bên dưới).
-
-## Codemagic build xác nhận lấy đúng Ara USDZ — 2026-11-01
-- User xác nhận workflow `ios-unsigned` trên Codemagic **build thành công** sau commit sửa pipeline `1272e4a71b6f93d3597e96542d1a4bf5651cb396`.
-- Pipeline hiện chọn dữ liệu theo đúng Ara workflow run #15 / ID `41266922525`, commit nguồn `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`: ưu tiên Release bất biến `ara-avatar-v4`; nếu Release API/asset download không truy cập được thì chỉ fallback sang artifact `ara-avatar-research-bundle` thuộc đúng run ID này.
-- Build thành công xác nhận pipeline đã lấy được bộ đầu vào Ara hợp lệ (`Ara-Avatar.usdz`, `animation-timeline.json`, marker `hips_sway_baked=false`), qua bước bake/validate OpenUSD và hoàn tất build IPA.
-- Chưa có log chi tiết của lần build trong phiên này nên **chưa xác định được lần chạy thành công thực tế dùng nhánh tải Release hay nhánh fallback Actions artifact**. Cả hai đều được ràng buộc về đúng bộ Ara v4/run #15; không dùng artifact mới nhất tùy tiện.
-- Không cần thay token hoặc tạo GitHub Action run mới cho lần build này. Assistant không chạy Codemagic; build do user chủ động thực hiện.
-- Bước kế tiếp chuyển sang kiểm thử trực quan 11 clip Ara trên iPhone; ưu tiên so sánh `AraLaugh` và `Laugh`, thử thủ công `Cheer`/`Cry`, kiểm tra chuyển tiếp và độ tự nhiên.
-
 ## Quy trình test cử chỉ trực quan trên iPhone — đã thống nhất
-- Khi cần test hoặc đánh giá lại animation Ara, tạm hiển thị một cụm nút test ngay trên màn hình Chat Voice, bố trí xung quanh nhân vật Ara để dễ quan sát và thao tác.
-- Mỗi nút gọi trực tiếp đúng clip tương ứng (ví dụ Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh, Laugh, Cheer, Cry). Không giả định clip đã được tích hợp tự động vào hội thoại chỉ vì nút test chạy được.
-- Khi user bấm nút, Ara thực hiện trọn hành động với thời lượng đủ lâu để quan sát rõ toàn bộ động tác; không cắt clip quá sớm. Với clip one-shot, giữ pose cuối một khoảng ngắn nếu cần, sau đó chuyển mượt về Idle. Clip loop chỉ loop trong thời gian test có kiểm soát.
-- Không để thao tác test làm animation trước bị cắt đột ngột hoặc tạo nhiều animation chồng nhau. Khi bấm clip khác, dừng/chuyển clip trước có kiểm soát và ghi nhận rõ clip thực tế được phát.
-- Đánh giá trực tiếp trên iPhone: động tác tay/chân/thân/đầu, biên độ, độ tự nhiên, độ giật, thời lượng, pose kết thúc, chuyển tiếp về Idle và lỗi rig. Ghi nhận clip đạt / cần chỉnh / không phù hợp; không test lại clip đã được xác nhận nếu không có thay đổi liên quan.
-- Sau khi clip được xác nhận bằng mắt, mới quyết định giữ/bỏ và tích hợp trigger theo ngữ cảnh hội thoại. Sau đó kiểm thử hội thoại thật để xác nhận hệ thống tự chọn đúng cử chỉ; nút test không phải bằng chứng của trigger tự động.
-- Cụm nút và logic test chỉ là công cụ phát triển tạm thời. Khi hoàn tất chọn clip, mapping hội thoại và kiểm thử thực tế, phải gỡ toàn bộ UI test cùng code/test hooks không còn cần khỏi màn hình Chat Voice; không để xuất hiện trong bản production.
-- Giữ nguyên phạm vi an toàn: không sửa Text Chat, Chibi Chat, chatbot/API, chat history hoặc voice pipeline khi chỉ bổ sung công cụ test animation Ara. Ưu tiên thay đổi tối thiểu; không chạy Action/Codemagic tự động.
+- Khi cần test hoặc đánh giá lại animation Ara, tạm hiển thị cụm nút test ngay trên màn hình Chat Voice, bố trí xung quanh nhân vật Ara.
+- Mỗi nút gọi trực tiếp đúng clip tương ứng. Không giả định clip đã được tích hợp tự động vào hội thoại chỉ vì nút test chạy được.
+- Clip test loop trong thời gian có kiểm soát để quan sát; khi chọn clip khác phải dừng/chuyển clip trước có kiểm soát; sau test trở về Idle.
+- Đánh giá trực tiếp trên iPhone: động tác tay/chân/thân/đầu, biên độ, độ tự nhiên, độ giật, thời lượng, pose kết thúc, chuyển tiếp và lỗi rig.
+- Sau khi clip được xác nhận bằng mắt, mới quyết định giữ/bỏ và tích hợp trigger theo ngữ cảnh. Test nút không chứng minh trigger tự động.
+- Cụm nút và logic test chỉ là công cụ phát triển tạm thời. Khi hoàn tất chọn clip, mapping hội thoại và kiểm thử thực tế, phải gỡ UI test cùng code/test hooks không còn cần khỏi production.
+- Không sửa Text Chat, Chibi Chat, chatbot/API, history hoặc voice pipeline khi chỉ bổ sung công cụ test Ara.
 
-
-## Ara gesture test UI implementation — 2026-11-01
-- Đã thay sheet test cũ bằng cụm nút test overlay trực tiếp quanh vùng hiển thị Ara trong Chat Voice; có 2 hàng cuộn ngang để thao tác trên iPhone.
-- Các nút hiện có: Wave, Talk, Explain/TalkExplain, Listen/AraListening, Thinking/AraThinking, Empathy/AraEmpathy, AraLaugh, Laugh, Cheer, Cry và Idle.
-- Bật chế độ test sẽ dừng phiên voice đang chạy để state hội thoại không ghi đè clip. Trong chế độ test, các callback voice/transcript/emotion không được phép thay clip test.
-- Mỗi clip test được loop trong cửa sổ 7 giây để quan sát rõ; hết thời gian tự trở về Idle. Bấm clip khác sẽ hủy timer cũ, dừng playback trước và chạy clip mới; có log Started/Finished.
-- Chỉ thay đổi CompanionChatView.swift và AraAvatarView.swift; không thay đổi Text Chat, Chibi Chat, API/history hoặc voice pipeline. Không thêm dependency.
-- Commit UI: 783108e40bb24b2c32ca4039f2c58e0d0a608543; commit playback/test-loop: 3944f9c030ede52431a864495a116d8d66b6a493; commit chặn voice ghi đè test: 49a70cd09bee055850a55cd970c44483b6157f39.
-- Kiểm tra tĩnh sau cập nhật: xác nhận sheet test cũ đã được gỡ, đủ 11 nút clip, cờ test được truyền tới loader, clip test loop và tự về Idle sau 7 giây; các guard ngăn voice/transcript ghi đè chế độ test.
-- Chưa xác minh bằng Xcode/Codemagic hoặc iPhone thật trong phiên này. Cần user chạy workflow ios-unsigned trên Codemagic và kiểm tra bố cục overlay, từng nút, thời lượng loop 7 giây, dừng/chuyển clip và trở về Idle. Assistant không chạy Codemagic.
-
-
-## Codemagic guard compatibility for Ara gesture test — 2026-11-01
-- Build bị dừng tại assertion `Non-documentation changes since Ara asset run` vì guard cũ chỉ cho phép PROJECT_STATUS.md và codemagic.yaml, trong khi thay đổi test UI có chủ đích nằm ở CompanionChatView.swift và AraAvatarView.swift.
-- Đã sửa allowlist trong codemagic.yaml để chỉ cho phép thêm đúng hai file Swift test Ara này; các file nguồn/tài nguyên khác vẫn bị chặn như trước. Không bỏ guard ancestry hoặc kiểm tra thay đổi.
-- Commit: 4200b5d6774e8fe82b01bd818d1719cfb223ff8e.
-- Chưa chạy lại Codemagic; cần user chạy workflow ios-unsigned để xác minh bước bake USDZ và build IPA tiếp tục thành công. Assistant không tự chạy build.
-
-
-## Điều chỉnh bố cục nút test Ara quanh nhân vật — 2026-11-01
-- User nhắc lại yêu cầu đã chốt: các nút test phải bố trí xung quanh nhân vật Ara, không xếp thành hai hàng ngang phủ lên vùng avatar.
-- Đã đổi overlay trong `ChatAI/CompanionChatView.swift`: 6 nút thành cột dọc bên trái, 5 nút thành cột dọc bên phải; thanh trạng thái test và nút Xong ở phía trên. Thu gọn chip để dành vùng trung tâm cho Ara.
-- Giữ nguyên 11 clip, hành vi test/loop 7 giây, log và các guard voice. Không sửa Text Chat, Chibi Chat, API/history hoặc voice pipeline.
-- Commit bố cục: `16d29cbb3af77a010390bbe8c8cc71b489ee370a`.
-- Chưa có Xcode/Codemagic/iPhone verification cho bố cục mới; cần build IPA và xem trực tiếp trên iPhone để đánh giá độ cân đối, tránh che tay/thân Ara.
+## Ara gesture test UI — trạng thái hiện tại
+- Test UI được bật bằng icon `figure.stand` ở header Chat Voice; các nút hiển thị thành hai cột dọc hai bên Ara, có nút `Xong` để thoát chế độ test. User đã xác nhận nhìn thấy hai cột nút trên iPhone.
+- Các nút test hiện có: Wave, Talk, Explain, Listen, Thinking, Empathy, AraLaugh, Laugh, Cheer, Cry và Idle.
+- Mỗi clip test loop 7 giây rồi tự trở về Idle; chọn clip khác hủy lượt test trước. Voice/transcript/emotion callbacks không được ghi đè clip khi đang test.
+- User đã test liên tiếp Wave → Talk → Explain; cả ba nút chạy đúng clip tương ứng, không bị gọi nhầm clip.
+- User nhận xét Listen/AraListening, Thinking/AraThinking, Empathy/AraEmpathy và AraLaugh nhìn gần giống nhau, không tạo khác biệt trực quan đủ rõ trong lần test hiện tại.
+- **Quyết định test tạm thời:** xem Idle là trạng thái nghỉ/trung tính mặc định, không gọi Idle là biểu cảm. Tạm gom Listen, Thinking, Empathy và AraLaugh vào nhóm clip nền/ít khác biệt; không ưu tiên các nút này trong lượt test kế tiếp. Không xóa enum, animation clip, timeline hoặc dữ liệu trong Release v4.
+- Nếu sau này cần test sâu lại các trạng thái lắng nghe/suy nghĩ/đồng cảm/cười nhẹ hoặc có bộ asset/cử chỉ mới, đưa các nút Listen, Thinking, Empathy, AraLaugh trở lại cụm test để so sánh trực tiếp. Dữ liệu gốc v4 vẫn được giữ để tái sử dụng; không chạy lại GitHub Action chỉ để mở lại nút test.
+- Các clip chưa có kết quả đánh giá trực quan đầy đủ: Laugh, Cheer, Cry. Tiếp tục test riêng trước khi quyết định mapping.
+- Bố cục hai cột được commit tại `16d29cbb3af77a010390bbe8c8cc71b489ee370a`; commit status trước đó `3b95b0f9b79bdd1f41a18d281e3311a577f1abfc`. Build/iPhone verification của các thay đổi layout sau commit cần được ghi riêng khi có kết quả.
+- Chỉ cập nhật UI test nếu user yêu cầu hoặc khi bước test kế tiếp đã được chốt; không tự ý sửa code trong lượt cập nhật status này.
