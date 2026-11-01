@@ -81,8 +81,8 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Không kết luận chuyển động tự nhiên/chất lượng chỉ từ log; cần video/quan sát iPhone thật và kiểm thử từng clip.
 
 ## Việc tiếp theo
-1. Tiếp tục kiểm thử trực quan các clip còn lại trên iPhone, ưu tiên Laugh, Cheer và Cry; phân biệt rõ chuyển động toàn thân với vi chuyển động đầu/mặt.
-2. Chốt danh sách clip thực sự khác biệt và mapping tự động theo ngữ cảnh; chỉ bổ sung gesture procedural nếu test cho thấy thiếu động tác cụ thể.
+1. Đã hoàn tất lượt test trực quan Laugh, Cheer và Cry trên iPhone. Chưa đổi mapping tự động.
+2. Laugh/Cheer chỉ cân nhắc cho tình huống cười lớn/cổ vũ mạnh; Cry không dùng làm cử chỉ khóc vì biểu hiện quan sát được sai sắc thái. Bước tiếp theo là quyết định giữ chúng ở chế độ test/thủ công hay tìm clip thay thế nhẹ nhàng, tự nhiên hơn.
 3. Lip-sync/viseme vẫn là giai đoạn riêng.
 4. Nếu cần nghiên cứu lại tài nguyên hiện có, dùng GLB/research bundle/diagnostics từ Release v4. Chỉ tạo release tài nguyên phiên bản mới khi thực sự thay đổi hoặc bổ sung asset; cập nhật PROJECT_STATUS.md sau khi release mới được xác minh.
 
@@ -108,6 +108,11 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - User nhận xét Listen/AraListening, Thinking/AraThinking, Empathy/AraEmpathy và AraLaugh nhìn gần giống nhau, không tạo khác biệt trực quan đủ rõ trong lần test hiện tại.
 - **Quyết định test tạm thời:** xem Idle là trạng thái nghỉ/trung tính mặc định, không gọi Idle là biểu cảm. Tạm gom Listen, Thinking, Empathy và AraLaugh vào nhóm clip nền/ít khác biệt; không ưu tiên các nút này trong lượt test kế tiếp. Không xóa enum, animation clip, timeline hoặc dữ liệu trong Release v4.
 - Nếu sau này cần test sâu lại các trạng thái lắng nghe/suy nghĩ/đồng cảm/cười nhẹ hoặc có bộ asset/cử chỉ mới, đưa các nút Listen, Thinking, Empathy, AraLaugh trở lại cụm test để so sánh trực tiếp. Dữ liệu gốc v4 vẫn được giữ để tái sử dụng; không chạy lại GitHub Action chỉ để mở lại nút test.
-- Các clip chưa có kết quả đánh giá trực quan đầy đủ: Laugh, Cheer, Cry. Tiếp tục test riêng trước khi quyết định mapping.
+- **Kết quả test trực quan Laugh/Cheer/Cry trên iPhone (user mô tả):**
+  - `Laugh`: hai tay ôm bụng, cười nhưng thân người giật giật; động tác cười mạnh và giật, không phù hợp làm cười nhẹ mặc định.
+  - `Cheer`: hai tay nâng ngang vai hướng lên, đầu ngước lên rồi nhảy giật giật; phù hợp cổ vũ/phấn khích mạnh, không dùng cho vui nhẹ thông thường.
+  - `Cry`: hai tay chéo ôm trước ngực, khom lưng, biểu hiện/âm thanh giống cười khẹt khẹt hoặc buồn nôn hơn là khóc; không ánh xạ vào trạng thái buồn/khóc.
+  - Đây là đánh giá trực quan của user; giữ nguyên asset và clip gốc, chưa sửa mapping tự động.
+- Kết luận test hiện tại: Wave/Talk/Explain chạy đúng và có khác biệt rõ; Listen/Thinking/Empathy/AraLaugh ít khác biệt; Laugh/Cheer có biên độ mạnh; Cry sai sắc thái. Chưa có clip cười nhẹ hoặc khóc tự nhiên được xác nhận phù hợp để tự động kích hoạt.
 - Bố cục hai cột được commit tại `16d29cbb3af77a010390bbe8c8cc71b489ee370a`; commit status trước đó `3b95b0f9b79bdd1f41a18d281e3311a577f1abfc`. Build/iPhone verification của các thay đổi layout sau commit cần được ghi riêng khi có kết quả.
 - Chỉ cập nhật UI test nếu user yêu cầu hoặc khi bước test kế tiếp đã được chốt; không tự ý sửa code trong lượt cập nhật status này.
