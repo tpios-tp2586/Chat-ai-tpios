@@ -141,6 +141,7 @@ jobs:
           GLB="$(find input -maxdepth 1 -type f -name '*.glb' -print -quit)"
           test -n "$GLB"
           mkdir -p clips output-usdz
+          printf 'hips_sway_baked=false\n' > output-usdz/ara-asset-pipeline.txt
           node scripts/split-glb-animations.mjs "$GLB" clips
           SOURCE="clips/Ara-Avatar.glb"
           COMPACT="clips/Ara-Avatar.compact.glb"
@@ -209,5 +210,6 @@ jobs:
             output-usdz/conversion-log.txt
             output-usdz/SHA256SUMS.txt
             output-usdz/usdz-report.txt
+            output-usdz/ara-asset-pipeline.txt
           fail_on_unmatched_files: true
           overwrite_files: true
