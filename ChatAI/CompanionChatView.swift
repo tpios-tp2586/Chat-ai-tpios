@@ -31,6 +31,8 @@ struct CompanionChatView: View {
     @State private var nightMode = false
     @State private var showDiagnosticLog = false
     @State private var isGestureTestMode = false
+    @State private var showExpressionTests = false
+    @State private var showActionTests = false
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -55,9 +57,6 @@ struct CompanionChatView: View {
                                 addDiagnostic(log)
                             }
 
-                            if isGestureTestMode {
-                                gestureTestControls
-                            }
                         }
                         .frame(
                             width: min(proxy.size.width - 12, 410),
@@ -96,6 +95,8 @@ struct CompanionChatView: View {
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
+        .sheet(isPresented: $showExpressionTests) { expressionTestSheet }
+        .sheet(isPresented: $showActionTests) { actionTestSheet }
         .onChange(of: liveManager.lines.count) { _ in
             if let line = liveManager.lines.last {
                 if line.role == .user {
@@ -200,7 +201,10 @@ struct CompanionChatView: View {
             }
             .accessibilityLabel("Xem và sao chép log")
 
-            Button { toggleGestureTestMode() } label: {
+            Button {
+                if isGestureTestMode { toggleGestureTestMode() }
+                else { toggleGestureTestMode(); showExpressionTests = true }
+            } label: {
                 Image(systemName: isGestureTestMode ? "xmark" : "figure.stand")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
@@ -212,6 +216,13 @@ struct CompanionChatView: View {
                     }
             }
             .accessibilityLabel(isGestureTestMode ? "Đóng chế độ test Ara" : "Thử cử chỉ Ara")
+
+            if isGestureTestMode {
+                Button { showExpressionTests = true } label: { Image(systemName: "face.smiling") }
+                    .accessibilityLabel("Biểu cảm & lời nói")
+                Button { showActionTests = true } label: { Image(systemName: "figure.run") }
+                    .accessibilityLabel("Theo yêu cầu")
+            }
 
             Button { nightMode.toggle() } label: {
                 Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
@@ -260,48 +271,58 @@ struct CompanionChatView: View {
         }
     }
 
-    private var gestureTestControls: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Label("CHẾ ĐỘ TEST", systemImage: "hand.tap")
-                    .font(.caption2.weight(.bold))
-                Spacer()
-                Button("Xong") { toggleGestureTestMode() }
-                    .font(.caption.weight(.semibold))
+    private var expressionTestSheet: some View {
+        testSheet(title: "Biểu cảm & lời nói", groups: [
+            ("Nói chuyện", [("Idle", AraAvatarView.Clip.idle), ("Talk", .talk), ("TalkExplain", .talkExplain)]),
+            ("Biểu cảm", [("Wave", .wave), ("Laugh", .naturalLaugh)])
+        ])
+    }
+
+    private var actionTestSheet: some View {
+        testSheet(title: "Theo yêu cầu", groups: [
+            ("Di chuyển", [("Walk", .walk), ("Run", .run), ("Walk backwards", .walkBackwards), ("Strafe left", .strafeLeft), ("Strafe right", .strafeRight)]),
+            ("Xoay", [("Turn left 45°", .turnLeft45), ("Turn left 90°", .turnLeft90), ("Turn right 45°", .turnRight45), ("Turn right 90°", .turnRight90), ("Full turn 360°", .fullTurn)]),
+            ("Tư thế", [("Idle / nghỉ", .idle), ("Sit down (chair)", .sitDown), ("Sit idle (chair)", .sitIdle), ("Stand up (chair)", .standUp), ("Lie down", .lieDown), ("Sleep", .sleep)]),
+            ("Nhảy", [("Jump sequence", .jumpStart)]),
+            ("Cử chỉ & phương tiện", [("Wave", .wave), ("Laugh", .naturalLaugh), ("Ride horse (trot)", .rideHorse)])
+        ])
+    }
+
+    private func testSheet(title: String, groups: [(String, [(String, AraAvatarView.Clip)])]) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach(groups, id: \.0) { group in
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text(group.0).font(.subheadline.weight(.semibold))
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                                ForEach(group.1, id: \.0) { item in
+                                    Button {
+                                        if item.1 == .jumpStart {
+                                            testJumpSequence()
+                                        } else {
+                                            testAraGesture(item.1)
+                                        }
+                                    } label: {
+                                        Text(item.0).frame(maxWidth: .infinity).padding(.vertical, 11)
+                                            .background(avatarClip == item.1 ? activeTheme.accent : activeTheme.surface,
+                                                        in: RoundedRectangle(cornerRadius: 12))
+                                    }.buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }.padding()
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
-
-            Spacer(minLength: 8)
-
-            HStack(alignment: .center) {
-                VStack(spacing: 7) {
-                    gestureTestChip("Wave", clip: .wave)
-                    gestureTestChip("Talk", clip: .talk)
-                    gestureTestChip("Explain", clip: .talkExplain)
-                    gestureTestChip("Listen", clip: .listening)
-                    gestureTestChip("Thinking", clip: .thinking)
-                    gestureTestChip("Empathy", clip: .empathy)
-                }
-
-                Spacer(minLength: 0)
-
-                VStack(spacing: 7) {
-                    gestureTestChip("AraLaugh", clip: .laugh)
-                    gestureTestChip("Laugh", clip: .naturalLaugh)
-                    gestureTestChip("Cheer", clip: .cheer)
-                    gestureTestChip("Cry", clip: .cry)
-                    gestureTestChip("Idle", clip: .idle)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Đóng") { showExpressionTests = false; showActionTests = false }
                 }
             }
-
-            Spacer(minLength: 8)
         }
-        .font(.caption)
-        .foregroundStyle(.white)
-        .padding(5)
+        .presentationDetents([.medium, .large])
     }
 
     private func gestureTestChip(_ title: String, clip: AraAvatarView.Clip) -> some View {
@@ -355,18 +376,49 @@ struct CompanionChatView: View {
         cancelExplainGesture()
         cancelEmotionGesture()
         avatarClip = clip
-        addDiagnostic("[ARA TEST] Started: \(clip.rawValue); repeat window=7s")
+        let duration = araClipDuration(clip)
+        addDiagnostic("[ARA TEST] Started: \(clip.rawValue); duration=\(String(format: "%.2f", duration))s; loops=\(clip.loops)")
+        guard !clip.loops else { gestureTestTask = nil; return }
         gestureTestTask = Task { @MainActor in
-            do {
-                try await Task.sleep(nanoseconds: 7_000_000_000)
-            } catch {
-                return
-            }
+            do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
+            catch { return }
             guard isGestureTestMode, avatarClip == clip else { return }
             avatarClip = .idle
             addDiagnostic("[ARA TEST] Finished: \(clip.rawValue); returned to Idle")
             gestureTestTask = nil
         }
+    }
+
+    private func testJumpSequence() {
+        guard isGestureTestMode else { return }
+        gestureTestTask?.cancel()
+        cancelExplainGesture()
+        cancelEmotionGesture()
+        gestureTestTask = Task { @MainActor in
+            for clip in [AraAvatarView.Clip.jumpStart, .jumpAir, .jumpLand] {
+                guard !Task.isCancelled, isGestureTestMode else { return }
+                avatarClip = clip
+                let duration = araClipDuration(clip)
+                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
+                do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
+                catch { return }
+            }
+            guard !Task.isCancelled, isGestureTestMode else { return }
+            avatarClip = .idle
+            addDiagnostic("[ARA TEST] Jump sequence finished; returned to Idle")
+            gestureTestTask = nil
+        }
+    }
+
+    private func araClipDuration(_ clip: AraAvatarView.Clip) -> TimeInterval {
+        guard let url = Bundle.main.url(forResource: "animation-timeline", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let clips = root["clips"] as? [[String: Any]],
+              let item = clips.first(where: { ($0["name"] as? String)?.caseInsensitiveCompare(clip.rawValue) == .orderedSame }),
+              let start = item["start"] as? Double,
+              let end = item["end"] as? Double else { return 1.0 }
+        return max(0.1, end - start)
     }
 
     private func applyAraEmotion(_ expression: RobotFaceExpression) {
