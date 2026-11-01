@@ -85,7 +85,6 @@ struct CompanionChatView: View {
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
-        .sheet(isPresented: $showGestureTestSheet) { gestureTestSheet }
         .onChange(of: liveManager.lines.count) { _ in
             if let line = liveManager.lines.last {
                 if line.role == .user {
@@ -218,6 +217,7 @@ struct CompanionChatView: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 8)
+        .sheet(isPresented: $showGestureTestSheet) { gestureTestSheet }
     }
 
     private var diagnosticLogSheet: some View {
