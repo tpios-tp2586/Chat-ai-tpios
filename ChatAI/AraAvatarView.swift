@@ -14,6 +14,7 @@ struct AraAvatarView: View {
         case laugh = "AraLaugh"
         case cheer = "Cheer"
         case naturalLaugh = "Laugh"
+        case cry = "Cry"
 
         var loops: Bool {
             self == .idle || self == .talk || self == .listening || self == .thinking || self == .empathy
