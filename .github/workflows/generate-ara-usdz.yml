@@ -192,11 +192,11 @@ jobs:
       - name: Publish versioned Ara research assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ara-avatar-v3
-          name: Ara Avatar and Research Data v3
+          tag_name: ara-avatar-v4
+          name: Ara Avatar and Research Data v4
           body: |
             Generated from pinned Ara 3D Gen source e26cdef1464a0babf23bb0235b5f05930301ee25 with the ChatAI TalkExplain chest-level gesture patch. Hips sway is baked later in the Codemagic build.
-            Includes the generated source GLB, converted RealityKit USDZ, full keyframe-level GLB/USDZ research dataset, conversion log, diagnostics, and eight-clip 26-second timeline.
+            Includes the generated source GLB, converted RealityKit USDZ, full keyframe-level GLB/USDZ research dataset, conversion log, diagnostics, and ten-clip test timeline with optional Cheer and Laugh gestures.
             The compressed research JSON preserves all source GLB animation channels and converted USDZ skeletal/morph samples for offline analysis without rerunning Actions.
           files: |
             input/*.glb
@@ -212,4 +212,4 @@ jobs:
             output-usdz/usdz-report.txt
             output-usdz/ara-asset-pipeline.txt
           fail_on_unmatched_files: true
-          overwrite_files: true
+          overwrite_files: false
