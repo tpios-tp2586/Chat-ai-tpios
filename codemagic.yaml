@@ -53,28 +53,37 @@ workflows:
             printf '%s' "$COMPARE_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin); changed={x["filename"] for x in d.get("files",[])}; allowed={"PROJECT_STATUS.md","codemagic.yaml"}; status=d.get("status"); assert status in ("ahead","identical"), f"Asset run SHA is not an ancestor of main: {status}"; assert changed and changed <= allowed, f"Non-documentation changes since Ara asset run: {sorted(changed-allowed)}"; print("Only status/pipeline documentation changed after the successful Ara asset run.")'
           fi
 
-          ARTIFACTS_JSON="$(curl --fail --silent --show-error --get \
+          RELEASE_SHA="$(curl --fail --silent --show-error \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $GITHUB_TOKEN" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
-            --data-urlencode "name=ara-avatar-research-bundle" \
-            --data-urlencode "per_page=100" \
-            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts")"
-          ARTIFACT_ID="$(printf '%s' "$ARTIFACTS_JSON" | python3 -c 'import json,sys; run_id=sys.argv[1]; a=[x for x in json.load(sys.stdin).get("artifacts",[]) if x.get("name")=="ara-avatar-research-bundle" and not x.get("expired") and str(x.get("workflow_run",{}).get("id",""))==run_id]; print(a[0]["id"] if a else "")' "$RUN_ID")"
-          test -n "$ARTIFACT_ID" || { echo "No Ara research bundle artifact exists for latest successful workflow run $RUN_ID."; exit 1; }
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/commits/ara-avatar-v4" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')"
+          test "$RELEASE_SHA" = "$RUN_SHA" || {
+            echo "Release ara-avatar-v4 does not match the latest successful Ara workflow run."
+            exit 1
+          }
+
+          RELEASE_JSON="$(curl --fail --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/tags/ara-avatar-v4")"
+          ASSET_URLS="$(printf '%s' "$RELEASE_JSON" | python3 -c 'import json,sys; a={x["name"]:x["browser_download_url"] for x in json.load(sys.stdin).get("assets",[])}; names=("Ara-Avatar.usdz","animation-timeline.json","ara-asset-pipeline.txt"); missing=[n for n in names if not a.get(n)]; assert not missing, f"Release assets missing: {missing}"; print(" ".join(a[n] for n in names))')"
+          read -r USDZ_URL TIMELINE_URL PIPELINE_URL <<< "$ASSET_URLS"
 
           curl --fail --location --silent --show-error \
-            --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $GITHUB_TOKEN" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/actions/artifacts/$ARTIFACT_ID/zip" \
-            --output "$USD_TMP/ara-avatar-research-bundle.zip"
-          mkdir -p "$USD_TMP/artifact"
-          unzip -oq "$USD_TMP/ara-avatar-research-bundle.zip" -d "$USD_TMP/artifact"
+            "$USDZ_URL" --output "$USD_TMP/Ara-Avatar.usdz"
+          curl --fail --location --silent --show-error \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            "$TIMELINE_URL" --output "$USD_TMP/animation-timeline.json"
+          curl --fail --location --silent --show-error \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            "$PIPELINE_URL" --output "$USD_TMP/ara-asset-pipeline.txt"
 
-          SOURCE_USDZ="$(find "$USD_TMP/artifact" -type f -name 'Ara-Avatar.usdz' -print -quit)"
-          TIMELINE="$(find "$USD_TMP/artifact" -type f -name 'animation-timeline.json' -print -quit)"
-          PIPELINE_MARKER="$(find "$USD_TMP/artifact" -type f -name 'ara-asset-pipeline.txt' -print -quit)"
+          SOURCE_USDZ="$USD_TMP/Ara-Avatar.usdz"
+          TIMELINE="$USD_TMP/animation-timeline.json"
+          PIPELINE_MARKER="$USD_TMP/ara-asset-pipeline.txt"
           test -s "$SOURCE_USDZ" || { echo "Ara-Avatar.usdz is missing from the artifact."; exit 1; }
           test -s "$TIMELINE" || { echo "animation-timeline.json is missing from the artifact."; exit 1; }
           test -s "$PIPELINE_MARKER" && grep -qx 'hips_sway_baked=false' "$PIPELINE_MARKER" || {
