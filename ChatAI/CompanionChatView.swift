@@ -33,6 +33,12 @@ struct CompanionChatView: View {
     @State private var isGestureTestMode = false
     @State private var showAraTestMenu = false
     @State private var selectedTestGroup = "Khi trò chuyện"
+    @AppStorage("ara_test_panel_scale") private var testPanelScale = 1.0
+    @AppStorage("ara_test_panel_x") private var testPanelX = 0.0
+    @AppStorage("ara_test_panel_y") private var testPanelY = 0.0
+    @AppStorage("ara_test_panel_collapsed") private var testPanelCollapsed = false
+    @State private var testPanelDragStart = CGSize.zero
+    @State private var testPanelResizeStart = 1.0
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -94,12 +100,87 @@ struct CompanionChatView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .overlay(alignment: .bottom) {
+        .overlay {
             if showAraTestMenu {
-                araTestMenu
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 94)
-                    .zIndex(2)
+                GeometryReader { proxy in
+                    let width = testPanelCollapsed ? 60.0 : 292.0 * testPanelScale
+                    let height = testPanelCollapsed ? 60.0 : 205.0 * testPanelScale
+                    let defaultX = proxy.size.width / 2
+                    let defaultY = proxy.size.height - height / 2 - 100
+                    let x = min(max(defaultX + testPanelX, width / 2 + 4), proxy.size.width - width / 2 - 4)
+                    let y = min(max(defaultY + testPanelY, height / 2 + proxy.safeAreaInsets.top + 4), proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
+
+                    Group {
+                        if testPanelCollapsed {
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                                    testPanelCollapsed = false
+                                    testPanelScale = max(testPanelScale, 0.85)
+                                }
+                            } label: {
+                                Image(systemName: "testtube.2")
+                                    .font(.system(size: 21, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 60, height: 60)
+                                    .background(activeTheme.accent, in: Circle())
+                            }
+                            .accessibilityLabel("Mở bảng Test Ara")
+                        } else {
+                            araTestMenu
+                                .frame(width: 292, height: 205)
+                                .scaleEffect(testPanelScale, anchor: .center)
+                                .frame(width: width, height: height)
+                        }
+                    }
+                    .position(x: x, y: y)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                testPanelX = testPanelX + (value.translation.width - testPanelDragStart.width)
+                                testPanelY = testPanelY + (value.translation.height - testPanelDragStart.height)
+                                testPanelDragStart = value.translation
+                            }
+                            .onEnded { _ in
+                                testPanelDragStart = .zero
+                                let left = x < proxy.size.width / 2
+                                testPanelX = (left ? width / 2 + 4 : proxy.size.width - width / 2 - 4) - defaultX
+                            }
+                    )
+                    .overlay(alignment: .bottomTrailing) {
+                        if !testPanelCollapsed {
+                            HStack(spacing: 5) {
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        testPanelCollapsed = true
+                                    }
+                                } label: {
+                                    Image(systemName: "minus.magnifyingglass")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .frame(width: 28, height: 28)
+                                        .background(activeTheme.accent, in: Circle())
+                                }
+                                .accessibilityLabel("Thu gọn bảng Test")
+
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .frame(width: 28, height: 28)
+                                    .background(activeTheme.accent, in: Circle())
+                                    .gesture(
+                                        DragGesture()
+                                            .onChanged { value in
+                                                if testPanelResizeStart == 1.0 { testPanelResizeStart = testPanelScale }
+                                                testPanelScale = min(1.25, max(0.55, testPanelResizeStart + Double(value.translation.width / 260)))
+                                            }
+                                            .onEnded { _ in testPanelResizeStart = testPanelScale }
+                                    )
+                                    .accessibilityLabel("Kéo để thay đổi kích thước bảng Test")
+                            }
+                            .foregroundStyle(.white)
+                            .padding(6)
+                        }
+                    }
+                }
+                .zIndex(2)
             }
         }
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
@@ -354,7 +435,7 @@ struct CompanionChatView: View {
             }
         }
         .padding(7)
-        .frame(maxWidth: 292)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
