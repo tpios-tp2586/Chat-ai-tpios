@@ -52,7 +52,7 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 
 ## Pipeline Ara hiện tại — Release v4 đã phát hành
 - Workflow tạo asset: `.github/workflows/generate-ara-usdz.yml` trên `main`, chạy thủ công. Upstream `olatunde85/3d-gen` được pin tại `e26cdef1464a0babf23bb0235b5f05930301ee25`.
-- Release `ara-avatar-v4` là bộ tài nguyên chuẩn hiện tại. Release chứa GLB nguồn, USDZ RealityKit, timeline, research dataset đầy đủ, conversion log, diagnostics và checksum. Dữ liệu được lưu lâu dài trên GitHub Releases; khi cần phân tích/test lại, lấy trực tiếp từ release này, không chạy lại Action để lấy dữ liệu cũ.
+- Release `ara-avatar-v4` là bộ tài nguyên chuẩn hiện tại. Release chứa GLB nguồn, USDZ RealityKit, timeline, research dataset đầy đủ, conversion log, diagnostics và checksum. Dữ liệu được lưu lâu dài trên GitHub Releases; khi cần phân tích/test lại, lấy trực tiếp từ release này, không chạy lại Action để lấy dữ liệu cũ. Codemagic đã build thành công sau khi pipeline được sửa; luồng lấy USDZ/timeline đã trả về đúng bộ dữ liệu Ara v4.
 - Nguồn có **75 animation clips, 69 joints, 34 morph targets**. Đã kiểm tra toàn bộ dataset: mỗi clip đều có 71 channels (69 rotation, 1 Hips translation, 1 blendshape weights), cùng target signature/output width, tất cả LINEAR; không tìm thấy clip nào lệch rig channels hoặc interpolation. Tổng thời lượng 75 clip khoảng 138.59 giây.
 - 75 clip được phân loại thành: conversational/emotes; locomotion; jump/fall; combat/reactions; turns; sitting/lying; weapons; vehicles. Các nhóm locomotion/combat/weapons/vehicles/sitting/lying không phù hợp avatar trợ lý đứng trò chuyện hiện tại nên giữ trong research dataset, không đưa vào runtime pack lần này.
 - **Bộ conversation test được chọn: 11 clips, khoảng 32.57 giây**:
@@ -81,11 +81,10 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Không kết luận chuyển động tự nhiên/chất lượng chỉ từ log; cần video/quan sát iPhone thật và kiểm thử từng clip.
 
 ## Việc tiếp theo
-1. Lấy `Ara-Avatar.usdz` và `animation-timeline.json` từ Release `ara-avatar-v4` qua Codemagic; bake Hips sway 5° và build IPA. Assistant không tự chạy Codemagic.
-2. Kiểm tra log build, xác nhận IPA-only và xác minh app load đúng USDZ/timeline.
-3. Test từng clip trên iPhone thật: đặc biệt so sánh AraLaugh với Laugh; Cheer và Cry chỉ test thủ công; kiểm tra chuyển tiếp về Talk/Idle, độ tự nhiên và hiện tượng giật/chồng animation.
-4. Sau test mới quyết định mapping tự động theo ngữ cảnh, thêm gesture procedural nếu còn thiếu; lip-sync/viseme vẫn là giai đoạn riêng.
-5. Nếu cần nghiên cứu lại tài nguyên hiện có, dùng GLB/research bundle/diagnostics từ Release v4. Chỉ tạo release tài nguyên phiên bản mới khi thực sự thay đổi hoặc bổ sung asset; cập nhật PROJECT_STATUS.md sau khi release mới được xác minh.
+1. Codemagic đã tải được đúng bộ Ara USDZ/timeline và build IPA thành công sau khi sửa pipeline (xem mục xác minh build bên dưới).
+2. Test từng clip trên iPhone thật: đặc biệt so sánh AraLaugh với Laugh; Cheer và Cry chỉ test thủ công; kiểm tra chuyển tiếp về Talk/Idle, độ tự nhiên và hiện tượng giật/chồng animation.
+3. Sau test mới quyết định mapping tự động theo ngữ cảnh, thêm gesture procedural nếu còn thiếu; lip-sync/viseme vẫn là giai đoạn riêng.
+4. Nếu cần nghiên cứu lại tài nguyên hiện có, dùng GLB/research bundle/diagnostics từ Release v4. Chỉ tạo release tài nguyên phiên bản mới khi thực sự thay đổi hoặc bổ sung asset; cập nhật PROJECT_STATUS.md sau khi release mới được xác minh.
 
 ## Build và xác minh
 - Codemagic workflow chính: `ios-unsigned`; assistant không dispatch Codemagic trực tiếp.
@@ -114,3 +113,11 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Pipeline ưu tiên tải tài nguyên từ Release `ara-avatar-v4` khi token có quyền Contents. Nếu Release/Contents API bị từ chối, tự động fallback sang artifact `ara-avatar-research-bundle` đúng workflow run ID; không lấy artifact của run khác và không dùng artifact đã hết hạn. Fallback chỉ cần Actions: Read.
 - Đã xác minh artifact đúng run #15 / ID `41266922525` tồn tại, chưa hết hạn: artifact ID `13067582323`, dự kiến hết hạn `2027-01-30T02:52:28Z`. Release v4 vẫn là nguồn ưu tiên lâu dài.
 - Commit sửa pipeline hiện tại: `1272e4a71b6f93d3597e96542d1a4bf5651cb396`. Không chạy GitHub Action hoặc Codemagic trong lúc sửa; chưa xác minh build IPA sau thay đổi. User tự chạy Codemagic và gửi log để kiểm tra.
+
+## Codemagic build xác nhận lấy đúng Ara USDZ — 2026-11-01
+- User xác nhận workflow `ios-unsigned` trên Codemagic **build thành công** sau commit sửa pipeline `1272e4a71b6f93d3597e96542d1a4bf5651cb396`.
+- Pipeline hiện chọn dữ liệu theo đúng Ara workflow run #15 / ID `41266922525`, commit nguồn `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`: ưu tiên Release bất biến `ara-avatar-v4`; nếu Release API/asset download không truy cập được thì chỉ fallback sang artifact `ara-avatar-research-bundle` thuộc đúng run ID này.
+- Build thành công xác nhận pipeline đã lấy được bộ đầu vào Ara hợp lệ (`Ara-Avatar.usdz`, `animation-timeline.json`, marker `hips_sway_baked=false`), qua bước bake/validate OpenUSD và hoàn tất build IPA.
+- Chưa có log chi tiết của lần build trong phiên này nên **chưa xác định được lần chạy thành công thực tế dùng nhánh tải Release hay nhánh fallback Actions artifact**. Cả hai đều được ràng buộc về đúng bộ Ara v4/run #15; không dùng artifact mới nhất tùy tiện.
+- Không cần thay token hoặc tạo GitHub Action run mới cho lần build này. Assistant không chạy Codemagic; build do user chủ động thực hiện.
+- Bước kế tiếp chuyển sang kiểm thử trực quan 11 clip Ara trên iPhone; ưu tiên so sánh `AraLaugh` và `Laugh`, thử thủ công `Cheer`/`Cry`, kiểm tra chuyển tiếp và độ tự nhiên.
