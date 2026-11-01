@@ -103,12 +103,12 @@ struct CompanionChatView: View {
         .overlay {
             if showAraTestMenu {
                 GeometryReader { proxy in
-                    let width = testPanelCollapsed ? 60.0 : 292.0 * testPanelScale
-                    let height = testPanelCollapsed ? 60.0 : 205.0 * testPanelScale
-                    let defaultX = proxy.size.width / 2
-                    let defaultY = proxy.size.height - height / 2 - 100
-                    let x = min(max(defaultX + testPanelX, width / 2 + 4), proxy.size.width - width / 2 - 4)
-                    let y = min(max(defaultY + testPanelY, height / 2 + proxy.safeAreaInsets.top + 4), proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
+                    let width: CGFloat = testPanelCollapsed ? 60 : 292 * CGFloat(testPanelScale)
+                    let height: CGFloat = testPanelCollapsed ? 60 : 205 * CGFloat(testPanelScale)
+                    let defaultX: CGFloat = proxy.size.width / 2
+                    let defaultY: CGFloat = proxy.size.height - height / 2 - 100
+                    let x: CGFloat = min(max(defaultX + CGFloat(testPanelX), width / 2 + 4), proxy.size.width - width / 2 - 4)
+                    let y: CGFloat = min(max(defaultY + CGFloat(testPanelY), height / 2 + proxy.safeAreaInsets.top + 4), proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
 
                     Group {
                         if testPanelCollapsed {
@@ -143,7 +143,7 @@ struct CompanionChatView: View {
                             .onEnded { _ in
                                 testPanelDragStart = .zero
                                 let left = x < proxy.size.width / 2
-                                testPanelX = (left ? width / 2 + 4 : proxy.size.width - width / 2 - 4) - defaultX
+                                testPanelX = Double((left ? width / 2 + 4 : proxy.size.width - width / 2 - 4) - defaultX)
                             }
                     )
                     .overlay(alignment: .bottomTrailing) {
