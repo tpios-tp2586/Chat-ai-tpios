@@ -70,7 +70,7 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - App enum/test panel đã có Cheer, Laugh, Cry để thử thủ công. `AraAvatarLoader` vẫn yêu cầu 8 clip nền; 3 clip bổ sung là optional để không làm hỏng load nếu asset thiếu.
 - Hip sway đã được chỉnh `AMPLITUDE_DEGREES = 5.0`, `FREQUENCY_HZ = 0.8`, 30 FPS; chỉ bake vào Talk và AraListening. Giữ nguyên, không thêm runtime sway chồng lên.
 - Workflow phát hành theo tag bất biến `ara-avatar-v4`, `overwrite_files: false`; không ghi đè release đã phát hành. Release notes mô tả timeline hội thoại tối đa 11 clip, gồm Cheer, Laugh và Cry tùy chọn.
-- GitHub Action run **#15** (`41266922525`) hoàn tất `success` ngày 2026-11-01 trên `main`, commit `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`. Release `ara-avatar-v4` được publish thành công. Chưa build Codemagic từ v4 và chưa kiểm thử bộ clip trên iPhone; playback/độ tự nhiên vẫn cần xác minh thực tế.
+- GitHub Action run **#15** (`41266922525`) hoàn tất `success` ngày 2026-11-01 trên `main`, commit `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`. Release `ara-avatar-v4` được publish thành công. Codemagic đã build IPA thành công từ pipeline lấy dữ liệu Ara v4 sau khi sửa; bộ clip vẫn cần kiểm thử trực quan trên iPhone.
 
 ## Trạng thái kỹ thuật đã xác minh
 - Runtime log: Ara USDZ tải từ app bundle thành công (~25.5 MB); RealityKit import 1 global scene animation; app tạo 8 AnimationViews từ timeline.
@@ -112,7 +112,7 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Đã sửa `codemagic.yaml`: dùng commit checkout sẵn trong Codemagic để kiểm tra ancestry và các file thay đổi sau Ara workflow run, bỏ API call lấy `main` SHA và API compare. Chỉ cho phép thay đổi `PROJECT_STATUS.md` và `codemagic.yaml` sau asset run.
 - Pipeline ưu tiên tải tài nguyên từ Release `ara-avatar-v4` khi token có quyền Contents. Nếu Release/Contents API bị từ chối, tự động fallback sang artifact `ara-avatar-research-bundle` đúng workflow run ID; không lấy artifact của run khác và không dùng artifact đã hết hạn. Fallback chỉ cần Actions: Read.
 - Đã xác minh artifact đúng run #15 / ID `41266922525` tồn tại, chưa hết hạn: artifact ID `13067582323`, dự kiến hết hạn `2027-01-30T02:52:28Z`. Release v4 vẫn là nguồn ưu tiên lâu dài.
-- Commit sửa pipeline hiện tại: `1272e4a71b6f93d3597e96542d1a4bf5651cb396`. Không chạy GitHub Action hoặc Codemagic trong lúc sửa; chưa xác minh build IPA sau thay đổi. User tự chạy Codemagic và gửi log để kiểm tra.
+- Commit sửa pipeline: `1272e4a71b6f93d3597e96542d1a4bf5651cb396`. Không chạy GitHub Action hoặc Codemagic trong lúc sửa; user đã tự chạy workflow `ios-unsigned` và xác nhận build thành công (chi tiết ở mục xác minh build bên dưới).
 
 ## Codemagic build xác nhận lấy đúng Ara USDZ — 2026-11-01
 - User xác nhận workflow `ios-unsigned` trên Codemagic **build thành công** sau commit sửa pipeline `1272e4a71b6f93d3597e96542d1a4bf5651cb396`.
