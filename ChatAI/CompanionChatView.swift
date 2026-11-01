@@ -114,6 +114,7 @@ struct CompanionChatView: View {
             applyAraEmotion(expression)
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
+            guard !isGestureTestMode else { return }
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
                 cancelExplainGesture()
@@ -138,7 +139,7 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.state) { state in
             addDiagnostic("[VOICE] Trạng thái: \(String(describing: state))")
-            guard !liveManager.aiSpeaking else { return }
+            guard !isGestureTestMode, !liveManager.aiSpeaking else { return }
             switch state {
             case .idle:
                 emotion = .idle
@@ -200,7 +201,7 @@ struct CompanionChatView: View {
             .accessibilityLabel("Xem và sao chép log")
 
             Button { toggleGestureTestMode() } label: {
-                Image(systemName: isGestureTestMode ? "figure.stand" : "figure.stand")
+                Image(systemName: isGestureTestMode ? "xmark" : "figure.stand")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
@@ -210,7 +211,7 @@ struct CompanionChatView: View {
                             .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
                     }
             }
-            .accessibilityLabel("Thử cử chỉ Ara")
+            .accessibilityLabel(isGestureTestMode ? "Đóng chế độ test Ara" : "Thử cử chỉ Ara")
 
             Button { nightMode.toggle() } label: {
                 Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
@@ -365,7 +366,7 @@ struct CompanionChatView: View {
     }
 
     private func applyAraEmotion(_ expression: RobotFaceExpression) {
-        guard avatarClip != .wave && avatarClip != .talkExplain else { return }
+        guard !isGestureTestMode, avatarClip != .wave && avatarClip != .talkExplain else { return }
         switch expression {
         case .listening:
             avatarClip = .listening
@@ -425,7 +426,7 @@ struct CompanionChatView: View {
     }
 
     private func handleLatestTranscript() {
-        guard let line = liveManager.lines.last else { return }
+        guard !isGestureTestMode, let line = liveManager.lines.last else { return }
         message = line.text
         withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
             emotion = line.role == .user ? .listening : emotionForAssistantText(line.text)
