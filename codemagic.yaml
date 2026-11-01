@@ -83,11 +83,7 @@ workflows:
               python3 -c 'import json,sys; a={x["name"]:x for x in json.load(open(sys.argv[1])).get("assets",[])}; names=("Ara-Avatar.usdz","animation-timeline.json","ara-asset-pipeline.txt"); missing=[n for n in names if n not in a]; assert not missing, f"Release assets missing: {missing}"; [print(n, a[n]["id"]) for n in names]' "$USD_TMP/release.json" > "$USD_TMP/asset-ids.txt"; then
               RELEASE_DOWNLOAD_OK=1
               while read -r ASSET_NAME ASSET_ID; do
-                status="$(curl --silent --show-error --location --output "$USD_TMP/$ASSET_NAME" --write-out '%{http_code}' \\
-                  --header "Accept: application/octet-stream" \\
-                  --header "Authorization: Bearer $GITHUB_TOKEN" \\
-                  --header "X-GitHub-Api-Version: 2022-11-28" \\
-                  "$API/releases/assets/$ASSET_ID")" || status="000"
+                status="$(curl --silent --show-error --location --output "$USD_TMP/$ASSET_NAME" --write-out '%{http_code}' --header "Accept: application/octet-stream" --header "Authorization: Bearer $GITHUB_TOKEN" --header "X-GitHub-Api-Version: 2022-11-28" "$API/releases/assets/$ASSET_ID")" || status="000"
                 case "$status" in
                   2*) ;;
                   *)
@@ -116,11 +112,7 @@ workflows:
               echo "No unexpired Ara research bundle exists for successful workflow run $RUN_ID."
               exit 1
             }
-            curl --fail --location --silent --show-error \\
-              --header "Accept: application/vnd.github+json" \\
-              --header "Authorization: Bearer $GITHUB_TOKEN" \\
-              --header "X-GitHub-Api-Version: 2022-11-28" \\
-              "$API/actions/artifacts/$ARTIFACT_ID/zip" --output "$USD_TMP/ara-avatar-research-bundle.zip"
+            curl --fail --location --silent --show-error --header "Accept: application/vnd.github+json" --header "Authorization: Bearer $GITHUB_TOKEN" --header "X-GitHub-Api-Version: 2022-11-28" "$API/actions/artifacts/$ARTIFACT_ID/zip" --output "$USD_TMP/ara-avatar-research-bundle.zip"
             mkdir -p "$USD_TMP/artifact"
             unzip -oq "$USD_TMP/ara-avatar-research-bundle.zip" -d "$USD_TMP/artifact"
             SOURCE_USDZ="$(find "$USD_TMP/artifact" -type f -name 'Ara-Avatar.usdz' -print -quit)"
@@ -132,12 +124,6 @@ workflows:
             PIPELINE_MARKER="$USD_TMP/ara-asset-pipeline.txt"
           fi
 
-          SOURCE_USDZ="$USD_TMP/Ara-Avatar.usdz"
-          TIMELINE="$USD_TMP/animation-timeline.json"
-          PIPELINE_MARKER="$USD_TMP/ara-asset-pipeline.txt"
-          SOURCE_USDZ="$USD_TMP/Ara-Avatar.usdz"
-          TIMELINE="$USD_TMP/animation-timeline.json"
-          PIPELINE_MARKER="$USD_TMP/ara-asset-pipeline.txt"
           test -s "$SOURCE_USDZ" || { echo "Ara-Avatar.usdz is missing from the artifact."; exit 1; }
           test -s "$TIMELINE" || { echo "animation-timeline.json is missing from the artifact."; exit 1; }
           test -s "$PIPELINE_MARKER" && grep -qx 'hips_sway_baked=false' "$PIPELINE_MARKER" || {
