@@ -25,12 +25,17 @@ while (offset < bytes.length) {
 }
 if (!json || !binary || json.buffers?.length !== 1) throw new Error("GLB is missing its JSON or embedded binary buffer");
 
-const selectedNames = ["Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh"];
-const selected = selectedNames.map(name => {
-  const animation = (json.animations ?? []).find(item => item.name?.toLowerCase() === name.toLowerCase());
-  if (!animation) throw new Error("Required animation not found in GLB: " + name);
-  return animation;
-});
+const requiredNames = ["Idle", "Wave", "Talk", "TalkExplain", "AraListening", "AraThinking", "AraEmpathy", "AraLaugh"];
+const optionalNames = ["Cheer", "Laugh"];
+const findAnimation = name => (json.animations ?? []).find(item => item.name?.toLowerCase() === name.toLowerCase());
+const selected = [
+  ...requiredNames.map(name => {
+    const animation = findAnimation(name);
+    if (!animation) throw new Error("Required animation not found in GLB: " + name);
+    return { name, animation, optional: false };
+  }),
+  ...optionalNames.map(name => ({ name, animation: findAnimation(name), optional: true })),
+];
 
 const componentCounts = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
 const appended = [];
@@ -86,43 +91,88 @@ function appendFloatAccessor(values, type, includeBounds) {
 const tracksByTarget = new Map();
 const timeline = [];
 let cursor = 0;
-for (const animation of selected) {
+for (const item of selected) {
+  const { name, animation, optional } = item;
+  if (!animation) {
+    if (optional) {
+      console.log("Skipped optional clip " + name + ": not found in source GLB");
+      continue;
+    }
+    throw new Error("Required animation not found in GLB: " + name);
+  }
+
   const trackMap = new Map();
   let duration = 0;
-  for (const channel of animation.channels) {
-    const sampler = animation.samplers[channel.sampler];
-    const input = readAccessor(sampler.input);
-    const output = readAccessor(sampler.output);
-    const key = channel.target.node + ":" + channel.target.path;
-    if (trackMap.has(key)) throw new Error(animation.name + " has duplicate track " + key);
-    const times = input.values;
-    if (times.length < 2 || times[0] !== 0) throw new Error(animation.name + "/" + key + " must start at t=0");
-    if (sampler.interpolation !== "LINEAR") throw new Error(animation.name + "/" + key + " uses unsupported interpolation " + sampler.interpolation);
-    if (output.values.length % times.length !== 0) throw new Error(animation.name + "/" + key + " input/output count mismatch");
-    const valuesPerKeyframe = output.values.length / times.length;
-    if (channel.target.path !== "weights" && valuesPerKeyframe !== output.components) {
-      throw new Error(animation.name + "/" + key + " has an unexpected output shape");
+  try {
+    for (const channel of animation.channels) {
+      const sampler = animation.samplers[channel.sampler];
+      const input = readAccessor(sampler.input);
+      const output = readAccessor(sampler.output);
+      const key = channel.target.node + ":" + channel.target.path;
+      if (trackMap.has(key)) throw new Error("duplicate track " + key);
+      const times = input.values;
+      if (times.length < 2 || times[0] !== 0) throw new Error(key + " must start at t=0");
+      if (sampler.interpolation !== "LINEAR") throw new Error(key + " uses unsupported interpolation " + sampler.interpolation);
+      if (output.values.length % times.length !== 0) throw new Error(key + " input/output count mismatch");
+      const valuesPerKeyframe = output.values.length / times.length;
+      if (channel.target.path !== "weights" && valuesPerKeyframe !== output.components) {
+        throw new Error(key + " has an unexpected output shape");
+      }
+      duration = Math.max(duration, times[times.length - 1]);
+      trackMap.set(key, {
+        times,
+        values: output.values,
+        outputType: output.accessor.type,
+        valuesPerKeyframe,
+      });
     }
-    duration = Math.max(duration, times[times.length - 1]);
-    trackMap.set(key, {
-      times,
-      values: output.values,
-      outputType: output.accessor.type,
-      valuesPerKeyframe,
-    });
+  } catch (error) {
+    if (optional) {
+      console.log("Skipped optional clip " + name + ": " + error.message);
+      continue;
+    }
+    throw new Error(name + ": " + error.message);
   }
-  if (trackMap.size === 0) throw new Error(animation.name + " has no animation channels");
+
+  if (trackMap.size === 0) {
+    if (optional) {
+      console.log("Skipped optional clip " + name + ": no animation channels");
+      continue;
+    }
+    throw new Error(name + " has no animation channels");
+  }
+
+  const channelMismatch = tracksByTarget.size > 0 &&
+    (trackMap.size !== tracksByTarget.size || [...tracksByTarget.keys()].some(key => !trackMap.has(key)));
+  if (channelMismatch) {
+    if (optional) {
+      console.log("Skipped optional clip " + name + ": rig channels differ from the Ara timeline");
+      continue;
+    }
+    throw new Error(name + " does not animate the same rig channels as the other clips");
+  }
+
+  let shapeMismatch = null;
+  for (const [key, track] of trackMap) {
+    const existing = tracksByTarget.get(key);
+    if (existing?.length && (existing[0].outputType !== track.outputType || existing[0].valuesPerKeyframe !== track.valuesPerKeyframe)) {
+      shapeMismatch = key;
+      break;
+    }
+  }
+  if (shapeMismatch) {
+    if (optional) {
+      console.log("Skipped optional clip " + name + ": output shape changed for " + shapeMismatch);
+      continue;
+    }
+    throw new Error("Output shape changed for " + shapeMismatch);
+  }
+
   if (tracksByTarget.size === 0) {
     for (const key of trackMap.keys()) tracksByTarget.set(key, []);
   }
-  if (trackMap.size !== tracksByTarget.size || [...tracksByTarget.keys()].some(key => !trackMap.has(key))) {
-    throw new Error(animation.name + " does not animate the same rig channels as the other clips");
-  }
   for (const [key, track] of trackMap) {
     const list = tracksByTarget.get(key);
-    if (list.length && (list[0].outputType !== track.outputType || list[0].valuesPerKeyframe !== track.valuesPerKeyframe)) {
-      throw new Error("Output shape changed for " + key);
-    }
     const shiftedTimes = track.times.map((time, index) => cursor + time + (cursor > 0 && index === 0 ? 0.0001 : 0));
     list.push({ times: shiftedTimes, values: track.values, outputType: track.outputType, valuesPerKeyframe: track.valuesPerKeyframe });
   }
