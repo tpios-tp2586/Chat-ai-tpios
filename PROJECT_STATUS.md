@@ -50,27 +50,21 @@ Mục tiêu là có đủ clip để thử hành vi hội thoại thực tế, k
 - Đánh giá trên iPhone thật: độ tự nhiên, độ rõ khi nhìn, độ lặp, độ trễ, giật/chồng animation, lỗi rig/bàn tay và ảnh hưởng hiệu năng.
 - Ghi log có chọn lọc: clip được chọn, lý do/cue, start/end, fallback; không tạo log khổng lồ.
 
-## Pipeline Ara hiện tại — Release v4 đã phát hành
-- Workflow tạo asset: `.github/workflows/generate-ara-usdz.yml` trên `main`, chạy thủ công. Upstream `olatunde85/3d-gen` được pin tại `e26cdef1464a0babf23bb0235b5f05930301ee25`.
-- Release `ara-avatar-v4` là bộ tài nguyên chuẩn hiện tại. Release chứa GLB nguồn, USDZ RealityKit, timeline, research dataset đầy đủ, conversion log, diagnostics và checksum. Dữ liệu được lưu lâu dài trên GitHub Releases; khi cần phân tích/test lại, lấy trực tiếp từ release này, không chạy lại Action để lấy dữ liệu cũ. Codemagic đã build thành công sau khi pipeline được sửa; luồng lấy USDZ/timeline đã trả về đúng bộ dữ liệu Ara v4.
-- Nguồn có **75 animation clips, 69 joints, 34 morph targets**. Đã kiểm tra toàn bộ dataset: mỗi clip đều có 71 channels (69 rotation, 1 Hips translation, 1 blendshape weights), cùng target signature/output width, tất cả LINEAR; không tìm thấy clip nào lệch rig channels hoặc interpolation. Tổng thời lượng 75 clip khoảng 138.59 giây.
-- 75 clip được phân loại thành: conversational/emotes; locomotion; jump/fall; combat/reactions; turns; sitting/lying; weapons; vehicles. Các nhóm locomotion/combat/weapons/vehicles/sitting/lying không phù hợp avatar trợ lý đứng trò chuyện hiện tại nên giữ trong research dataset, không đưa vào runtime pack lần này.
-- **Bộ conversation test được chọn: 11 clips, khoảng 32.57 giây**:
-  - 8 clip nền hiện tại: Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh.
-  - 3 clip bổ sung: Cheer, Laugh, Cry. Đây là bộ có ích cho chào hỏi, giải thích, lắng nghe, suy nghĩ, đồng cảm, cười, vui mừng và phản ứng buồn; Cry chỉ để test thủ công, chưa tự động kích hoạt.
-- Đánh giá từ keyframes GLB:
-  - `TalkExplain` có chuyển động tay phải rõ: RightArm khoảng 52.9°, RightForeArm 39.7°, RightHand 31.1° so với đầu clip; giữ làm cử chỉ giải thích.
-  - `Wave` đưa tay phải lên vị trí chào; pose khác Talk khoảng 103° ở RightArm và 95° ở RightForeArm; dùng one-shot.
-  - `Cheer` nâng cả hai tay mạnh, khoảng 100° ở hai cánh tay/cẳng tay; chỉ dùng cho vui mừng rõ, không tự kích hoạt khi trò chuyện thường.
-  - `Laugh` có nhún thân, đầu ngửa nhẹ, tay phải đặt bụng và morph cười (mouthSmile, jawOpen, eyeSquint); là ứng viên cười rõ hơn.
-  - `Cry` có biểu cảm buồn và chuyển động thân/tay rất mạnh; chỉ thử thủ công, không map tự động vào trạng thái buồn.
-  - `AraListening`, `AraThinking`, `AraEmpathy` chủ yếu là vi chuyển động đầu/cổ/thân trên (khoảng 1–5°), không có facial morph đặc trưng ngoài chớp mắt; giữ vai trò trạng thái nền nhẹ, không xem là cử chỉ tay rõ.
-  - `AraLaugh` cũng khá nhẹ (đầu/mắt), không có morph cười rõ. Hiện logic tự động vẫn gọi `AraLaugh`; sẽ so sánh với clip `Laugh` trên iPhone trước khi đổi mapping.
-- Các cử chỉ chưa có clip chuyên biệt trong nguồn: gật đầu đồng ý một lần, đưa tay lên ngực để trấn an/đồng cảm, chỉ hướng và đếm ý. Không tự đoán IK target để nhồi vào lần build này; chỉ bổ sung procedural clip sau khi test bộ hiện có và xác định rõ động tác còn thiếu.
-- App enum/test panel đã có Cheer, Laugh, Cry để thử thủ công. `AraAvatarLoader` vẫn yêu cầu 8 clip nền; 3 clip bổ sung là optional để không làm hỏng load nếu asset thiếu.
-- Hip sway asset đã được chỉnh `AMPLITUDE_DEGREES = 5.0`, `FREQUENCY_HZ = 0.8`, 30 FPS; giữ nguyên trong Talk và AraListening. Riêng Idle đã bổ sung runtime sway quanh trục Z, biên độ ±3°, tần số 0.3 Hz qua `SceneEvents.Update`; chỉ chạy khi clip Idle và reset về trung tính khi chuyển clip. Thay đổi Swift đã commit `8ee571ab247cbcbe19839ab17ed60e671faab63b`; chưa build/test trên iPhone, cần user xác minh độ tự nhiên và việc chuyển clip.
-- Workflow phát hành theo tag bất biến `ara-avatar-v4`, `overwrite_files: false`; không ghi đè release đã phát hành. Release notes mô tả timeline hội thoại tối đa 11 clip, gồm Cheer, Laugh và Cry tùy chọn.
-- GitHub Action run **#15** (`41266922525`) hoàn tất `success` ngày 2026-11-01 trên `main`, commit `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`. Release `ara-avatar-v4` được publish thành công. Codemagic đã build IPA thành công từ pipeline lấy dữ liệu Ara v4 sau khi sửa; bộ clip vẫn cần kiểm thử trực quan trên iPhone.
+## Pipeline Ara đã xác minh — v4 là baseline, v5 đang chuẩn bị
+- Workflow: `.github/workflows/generate-ara-usdz.yml` trên `main`, chạy thủ công. Upstream `olatunde85/3d-gen` pin tại `e26cdef1464a0babf23bb0235b5f05930301ee25`; USDZ Forge pin tại `d474129ce1f026fa6904c9ac95dd74212a501a9d`.
+- **Luồng thực tế đã được xác minh từ log GitHub Action run #15 / run ID `41266922525`:**
+  1. Job `generate` tạo GLB và upload artifact `ara-avatar-glb`.
+  2. Job `convert` tải đúng artifact GLB đó bằng `actions/download-artifact@v4` (log ghi artifact ID `13067517492`), chạy `split-glb-animations.mjs`, compact GLB rồi chạy `usdzconvert` trên macOS để tạo `Ara-Avatar.usdz`.
+  3. Job `convert` upload bộ đầu ra USDZ/research thành Actions artifact và publish các file tương ứng lên GitHub Release.
+  4. **Codemagic không chuyển GLB sang USDZ.** Codemagic chỉ tải USDZ + timeline đã được Action tạo, sau đó dùng OpenUSD 26.5 để bake Hips sway, validate và đóng gói IPA.
+- Release `ara-avatar-v4` đã phát hành và là baseline bất biến. Release chứa `Athletic_woman.glb` (17,534,748 bytes; SHA256 `5e922c88cb665593ab4c47973b6368df0205996f24290654a83d38cb47dd2e1e`), `Ara-Avatar.usdz` (25,500,329 bytes), timeline, research dataset nén, logs, diagnostics và checksums. Có thể tải GLB/research data từ Release để phân tích lại mà không chạy lại bước sinh GLB.
+- Workflow hiện tại có input thủ công `source_run_id`: khi điền ID của một run còn artifact `ara-avatar-glb`, job `generate` được bỏ qua; job `convert` tải GLB từ run đó rồi tạo lại USDZ/research bundle. Nếu để trống, workflow mới sinh GLB upstream. Đây là cách tái sử dụng GLB đã có thay vì sinh lại; artifact GLB nguồn của run #15 cần còn hạn lưu trữ để tải qua Actions API. Nếu artifact hết hạn, dùng GLB đã lưu trong Release hoặc tạo một luồng tải GLB từ Release có kiểm tra checksum trước khi convert.
+- **Codemagic hiện tại đang trỏ tag `ara-avatar-v5`**, và trước khi tải Release/Actions artifact còn kiểm tra latest successful workflow run cùng changed-file guard. Vì v5 chưa được tạo, Codemagic chưa thể lấy đúng bộ v5. Lỗi gần nhất xảy ra ngay tại changed-file guard, trước khi gọi API tải Release hoặc Actions artifact; không phải lỗi tải GLB hay convert USDZ. Không bỏ guard một cách mù quáng: cần xác định đúng source run, release tag và commit SHA rồi mới cho build tiếp tục.
+- Khi build bằng v4, Codemagic phải pin rõ `ara-avatar-v4` và tải `Ara-Avatar.usdz` + `animation-timeline.json` từ Release v4. Khi build v5, chỉ chuyển sang tag v5 sau khi Action convert thành công và Release v5 được xác minh. Không lấy artifact mới nhất không ràng buộc run ID/tag.
+- Run #15 (`41266922525`) thành công ngày 2026-11-01 tại commit `2af8ccd9385d06c1cdb7296fbcb51c8bf925535c`; Release v4 được publish. Log job convert xác nhận tải GLB artifact rồi convert USDZ. Không dispatch Action/Codemagic tự động.
+- Nguồn có **75 animation clips, 69 joints, 34 morph targets**. Dataset đã kiểm tra: mỗi clip có 71 channels (69 rotation, 1 Hips translation, 1 blendshape weights), cùng target signature/output width, tất cả LINEAR; tổng thời lượng khoảng 138.59 giây.
+- Runtime v4 chọn 11 conversation clips (~32.57 giây): 8 clip nền Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh; thêm Cheer, Laugh, Cry. Các nhóm locomotion/combat/weapons/vehicles/sitting/lying hiện giữ trong research data, không thuộc runtime v4.
+- Workflow v5 đã mở rộng danh mục clip runtime và có `source_run_id` để tái sử dụng GLB; v5 chưa được chạy/xác minh và chưa có Release v5.
 
 ## Trạng thái kỹ thuật đã xác minh
 - Runtime log: Ara USDZ tải từ app bundle thành công (~25.5 MB); RealityKit import 1 global scene animation; app tạo 8 AnimationViews từ timeline.
