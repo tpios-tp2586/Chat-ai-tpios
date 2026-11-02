@@ -33,10 +33,6 @@ struct CompanionChatView: View {
     @State private var isGestureTestMode = false
     @State private var showAraTestMenu = false
     @State private var selectedTestGroup = "Khi trò chuyện"
-    @AppStorage("ara_test_panel_scale") private var testPanelScale = 1.0
-    @AppStorage("ara_test_panel_x") private var testPanelX = 0.0
-    @AppStorage("ara_test_panel_y") private var testPanelY = 0.0
-    @AppStorage("ara_test_panel_collapsed") private var testPanelCollapsed = false
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -98,19 +94,14 @@ struct CompanionChatView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .overlay {
-            if showAraTestMenu {
-                AraTestPanelOverlay(
-                    isCollapsed: $testPanelCollapsed,
-                    scale: $testPanelScale,
-                    xOffset: $testPanelX,
-                    yOffset: $testPanelY,
-                    accent: activeTheme.accent
-                ) { dragGesture, resizeGesture in
-                    araTestMenu(dragGesture: dragGesture, resizeGesture: resizeGesture)
-                }
-                .zIndex(2)
-            }
+        .sheet(isPresented: $showAraTestMenu, onDismiss: {
+            if isGestureTestMode { toggleGestureTestMode() }
+        }) {
+            araTestSheet
+        }
+        .onAppear {
+            ["ara_test_panel_scale", "ara_test_panel_x", "ara_test_panel_y", "ara_test_panel_collapsed"]
+                .forEach { UserDefaults.standard.removeObject(forKey: $0) }
         }
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
         .onChange(of: liveManager.lines.count) { _ in
@@ -218,15 +209,10 @@ struct CompanionChatView: View {
             .accessibilityLabel("Xem và sao chép log")
 
             Button {
-                if showAraTestMenu {
-                    showAraTestMenu = false
-                    toggleGestureTestMode()
-                } else {
-                    if !isGestureTestMode { toggleGestureTestMode() }
-                    showAraTestMenu = true
-                }
+                if !isGestureTestMode { toggleGestureTestMode() }
+                showAraTestMenu = true
             } label: {
-                Image(systemName: showAraTestMenu ? "xmark" : "testtube.2")
+                Image(systemName: "testtube.2")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
@@ -236,7 +222,7 @@ struct CompanionChatView: View {
                             .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
                     }
             }
-            .accessibilityLabel(showAraTestMenu ? "Đóng menu test Ara" : "Mở menu test Ara")
+            .accessibilityLabel("Mở menu test Ara")
 
             Button { nightMode.toggle() } label: {
                 Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
@@ -306,108 +292,59 @@ struct CompanionChatView: View {
         ]
     }
 
-    private func araTestMenu<Drag: Gesture, Resize: Gesture>(dragGesture: Drag, resizeGesture: Resize) -> some View {
-        VStack(spacing: 5) {
-            HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 13, weight: .bold))
-                    .frame(width: 32, height: 28)
-                    .background(activeTheme.surface.opacity(0.8), in: RoundedRectangle(cornerRadius: 7))
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("Kéo để di chuyển bảng Test Ara")
-                Text("TEST ARA")
-                    .font(.system(size: 11, weight: .bold))
-                Spacer(minLength: 2)
-                Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                        testPanelCollapsed = true
+    private var araTestSheet: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                Picker("Nhóm hành động", selection: $selectedTestGroup) {
+                    ForEach(araTestGroups, id: \.0) { group in
+                        Text(group.0).tag(group.0)
                     }
-                } label: {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .font(.system(size: 11, weight: .bold))
-                        .frame(width: 25, height: 25)
-                        .background(activeTheme.surface, in: Circle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Thu bảng Test về icon")
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(activeTheme.accent.opacity(0.9), in: RoundedRectangle(cornerRadius: 9))
-            .contentShape(Rectangle())
-            .simultaneousGesture(dragGesture)
+                .pickerStyle(.segmented)
 
-            HStack(spacing: 6) {
-                ForEach(araTestGroups, id: \.0) { group in
-                    Button {
-                        selectedTestGroup = group.0
-                    } label: {
-                        Label(group.0, systemImage: group.1)
-                            .font(.system(size: 11, weight: .semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
-                            .background(
-                                selectedTestGroup == group.0 ? activeTheme.accent : activeTheme.surface,
-                                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            )
-                    }
-                    .foregroundStyle(selectedTestGroup == group.0 ? .white : .primary)
-                    .buttonStyle(.plain)
-                }
-            }
-
-            if let group = araTestGroups.first(where: { $0.0 == selectedTestGroup }) {
-                ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 4) {
-                        ForEach(group.2, id: \.0) { item in
-                            Button {
-                                if item.1 == .jumpStart { testJumpSequence() }
-                                else { testAraGesture(item.1) }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: avatarClip == item.1 ? "checkmark.circle.fill" : "play.circle")
-                                        .foregroundStyle(avatarClip == item.1 ? activeTheme.accent : .secondary)
-                                    Text(item.0).font(.system(size: 13, weight: .medium))
-                                    Spacer()
-                                    if avatarClip == item.1 {
-                                        Text("Đang test")
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .foregroundStyle(activeTheme.accent)
+                if let group = araTestGroups.first(where: { $0.0 == selectedTestGroup }) {
+                    ScrollView {
+                        LazyVStack(spacing: 6) {
+                            ForEach(group.2, id: \.0) { item in
+                                Button {
+                                    if item.1 == .jumpStart { testJumpSequence() }
+                                    else { testAraGesture(item.1) }
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: avatarClip == item.1 ? "checkmark.circle.fill" : "play.circle")
+                                            .foregroundStyle(avatarClip == item.1 ? activeTheme.accent : .secondary)
+                                        Text(item.0)
+                                            .font(.subheadline.weight(.medium))
+                                        Spacer()
+                                        if avatarClip == item.1 {
+                                            Text("Đang test")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(activeTheme.accent)
+                                        }
                                     }
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 10))
                                 }
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 5)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(activeTheme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 8))
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
-                .frame(maxHeight: 88)
             }
-
-            HStack {
-                Spacer()
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .frame(width: 44, height: 44)
-                    .background(activeTheme.surface, in: Circle())
-                    .contentShape(Circle())
-                    .simultaneousGesture(resizeGesture)
-                    .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test Ara")
+            .padding(16)
+            .navigationTitle("Test hành động Ara")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Đóng") { showAraTestMenu = false }
+                }
             }
-            .foregroundStyle(.white)
         }
-        .padding(7)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
-        .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
     }
 
     private func toggleGestureTestMode() {
@@ -747,83 +684,6 @@ struct CompanionChatView: View {
     }
 }
 
-
-private struct AraTestPanelOverlay<Content: View>: View {
-    @Binding var isCollapsed: Bool
-    @Binding var scale: Double
-    @Binding var xOffset: Double
-    @Binding var yOffset: Double
-    let accent: Color
-    let content: (AnyGesture<DragGesture.Value>, AnyGesture<DragGesture.Value>) -> Content
-
-    @GestureState private var dragOffset = CGSize.zero
-    @GestureState private var resizeDelta: CGFloat = 0
-
-    var body: some View {
-        GeometryReader { proxy in
-            let displayScale = min(1.25, max(0.59, CGFloat(scale) + resizeDelta))
-            let width: CGFloat = isCollapsed ? 60 : 292 * CGFloat(scale)
-            let height: CGFloat = isCollapsed ? 60 : 205 * CGFloat(scale)
-            let defaultX = proxy.size.width / 2
-            let defaultY = proxy.size.height - (205 * CGFloat(scale)) / 2 - 100
-            let minX = width / 2 + 4
-            let maxX = max(minX, proxy.size.width - width / 2 - 4)
-            let minY = height / 2 + proxy.safeAreaInsets.top + 4
-            let maxY = max(minY, proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
-            let x = min(max(defaultX + CGFloat(xOffset) + dragOffset.width, minX), maxX)
-            let y = min(max(defaultY + CGFloat(yOffset) + dragOffset.height, minY), maxY)
-
-            let dragGesture = AnyGesture(
-                DragGesture(minimumDistance: 2)
-                    .updating($dragOffset) { value, state, _ in
-                        state = value.translation
-                    }
-                    .onEnded { value in
-                        let finalX = min(max(defaultX + CGFloat(xOffset) + value.translation.width, minX), maxX)
-                        let finalY = min(max(defaultY + CGFloat(yOffset) + value.translation.height, minY), maxY)
-                        xOffset = Double(finalX - defaultX)
-                        yOffset = Double(finalY - defaultY)
-                    }
-            )
-            let resizeGesture = AnyGesture(
-                DragGesture(minimumDistance: 1)
-                    .updating($resizeDelta) { value, state, _ in
-                        state = value.translation.width / 240
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
-                            scale = min(1.25, max(0.59, scale + Double(value.translation.width / 240)))
-                        }
-                    }
-            )
-
-            ZStack {
-                if isCollapsed {
-                    Button {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                            isCollapsed = false
-                            scale = max(scale, 0.8)
-                        }
-                    } label: {
-                        Image(systemName: "testtube.2")
-                            .font(.system(size: 21, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 60, height: 60)
-                            .background(accent, in: Circle())
-                    }
-                    .accessibilityLabel("Mở bảng Test Ara")
-                    .simultaneousGesture(dragGesture)
-                } else {
-                    content(dragGesture, resizeGesture)
-                        .frame(width: 292, height: 205)
-                        .scaleEffect(displayScale, anchor: .center)
-                        .frame(width: width, height: height)
-                }
-            }
-            .position(x: x, y: y)
-        }
-    }
-}
 
 private enum CompanionEmotion: CaseIterable {
     case idle, listening, thinking, speaking, happy, surprised, confused, sad, angry, sleepy
