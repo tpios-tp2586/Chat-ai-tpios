@@ -191,7 +191,8 @@ struct CompanionChatView: View {
 
             Button { showDiagnosticLog = true } label: {
                 Image(systemName: "doc.text.magnifyingglass")
-                    .font(.system(size: 15, weight: .semibold))                    .foregroundStyle(activeTheme.accent)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
                     .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay {
@@ -356,7 +357,8 @@ struct CompanionChatView: View {
             for clip in [AraAvatarView.Clip.jumpStart, .jumpAir, .jumpLand] {
                 guard !Task.isCancelled, isGestureTestMode else { return }
                 avatarClip = clip
-                let duration = araClipDuration(clip)                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
+                let duration = araClipDuration(clip)
+                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
                 do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
                 catch { return }
             }
@@ -455,7 +457,8 @@ struct CompanionChatView: View {
             addDiagnostic("[ARA] TalkExplain skipped: no explanation cue; chars=\(line.text.count), words=\(wordCount)")
             guard !didTriggerContextGestureForTurn,
                   let cue = contextGestureCue(line.text) else { return }
-            didTriggerContextGestureForTurn = true            if cue.clip == .empathy {
+            didTriggerContextGestureForTurn = true
+            if cue.clip == .empathy {
                 playAraEmpathy(reason: cue.reason)
             } else {
                 playAraLaugh(reason: cue.reason)
@@ -554,7 +557,8 @@ struct CompanionChatView: View {
             Button {
                 if liveManager.state == .idle {
                     startLive()
-                } else {                    liveManager.end()
+                } else {
+                    liveManager.end()
                 }
             } label: {
                 Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
@@ -653,7 +657,8 @@ private enum CompanionEmotion: CaseIterable {
         case .happy: "Vui"
         case .surprised: "Ngạc nhiên"
         case .confused: "Bối rối"
-        case .sad: "Buồn"        case .angry: "Tức giận"
+        case .sad: "Buồn"
+        case .angry: "Tức giận"
         case .sleepy: "Buồn ngủ"
         }
     }
