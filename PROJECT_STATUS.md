@@ -3,7 +3,7 @@
 ## Repository
 - Repo: https://github.com/tpios-tp2586/Chat-ai-tpios
 - Chỉ làm việc trực tiếp trên `main`; tuyệt đối không tạo hoặc chuyển branch.
-- Code mới nhất: `28119e4379c5fa8cf89b82d5fdde60bca82d2d00` — popup Ara bỏ chữ `Test`, chỉ hiện tên nhóm (`T. Chuyện`/`Y. Cầu`), thu gọn hàng tiêu đề và giữ danh sách một cột dọc.
+- Code mới nhất: `61f55bc9636bb879fc5a9708f154dc7f969a4367` — popup Ara bỏ chữ `Test`, chỉ hiện tên nhóm (`T. Chuyện`/`Y. Cầu`), thu gọn hàng tiêu đề và giữ danh sách một cột dọc.
 - Đây là checkpoint hiện tại; lịch sử thay đổi xem trong Git commits/diffs.
 
 ## Quy tắc bắt buộc
