@@ -280,13 +280,6 @@ struct CompanionChatView: View {
                 Text("Test")
                     .font(.system(size: 13, weight: .bold))
                 Spacer(minLength: 2)
-                Button(isGestureTestMode ? "Tắt" : "Bật") {
-                    toggleGestureTestMode()
-                }
-                .font(.system(size: 10, weight: .semibold))
-                .buttonStyle(.bordered)
-                .tint(activeTheme.accent)
-
                 Button {
                     withAnimation(.easeInOut(duration: 0.16)) {
                         showAraTestMenu = false
@@ -319,7 +312,7 @@ struct CompanionChatView: View {
                 }
 
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.fixed(90)), GridItem(.fixed(90))], spacing: 6) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(40)), count: 4), spacing: 6) {
                         ForEach(araTestGroups[group].2, id: \.0) { item in
                             Button {
                                 runAraTest(item.1)
@@ -329,29 +322,29 @@ struct CompanionChatView: View {
                                 }
                             } label: {
                                 Text(item.0)
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(.system(size: 7, weight: .semibold))
                                     .multilineTextAlignment(.center)
                                     .lineLimit(2)
-                                    .minimumScaleFactor(0.75)
+                                    .minimumScaleFactor(0.65)
                                     .foregroundStyle(.white)
-                                    .frame(width: 90, height: 90)
-                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(activeTheme.accent.opacity(0.18), lineWidth: 1))
+                                    .frame(width: 40, height: 40)
+                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(activeTheme.accent.opacity(0.18), lineWidth: 1))
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
-                .frame(maxHeight: 320)
+                .frame(maxHeight: 260)
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     araTestGroupButton(index: 0)
                     araTestGroupButton(index: 1)
                 }
             }
         }
         .padding(8)
-        .frame(width: 202)
+        .frame(width: 194)
         .background(activeTheme.background.opacity(0.98), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 5)
@@ -363,46 +356,46 @@ struct CompanionChatView: View {
                 selectedAraTestGroup = index
             }
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {
                 Image(systemName: araTestGroups[index].1)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                 Text(araTestGroups[index].0)
-                    .font(.system(size: 10, weight: .bold))
-                    .lineLimit(2)
+                    .font(.system(size: 6, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
                     .multilineTextAlignment(.center)
             }
             .foregroundStyle(activeTheme.accent)
-            .frame(width: 90, height: 90)
-            .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(activeTheme.accent.opacity(0.2), lineWidth: 1))
+            .frame(width: 40, height: 40)
+            .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(activeTheme.accent.opacity(0.2), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
 
     private func runAraTest(_ clip: AraAvatarView.Clip) {
-        if !isGestureTestMode { toggleGestureTestMode() }
+        beginGestureTestMode()
         if clip == .jumpStart { testJumpSequence() }
         else { testAraGesture(clip) }
     }
 
-    private func toggleGestureTestMode() {
-        if isGestureTestMode {
-            gestureTestTask?.cancel()
-            gestureTestTask = nil
-            isGestureTestMode = false
-            avatarClip = .idle
-            addDiagnostic("[ARA TEST] Test mode closed")
-            return
-        }
-
-        if liveManager.state != .idle {
-            liveManager.end()        }
+    private func beginGestureTestMode() {
+        guard !isGestureTestMode else { return }
+        if liveManager.state != .idle { liveManager.end() }
         cancelExplainGesture()
         cancelEmotionGesture()
         gestureTestTask?.cancel()
         isGestureTestMode = true
         avatarClip = .idle
-        addDiagnostic("[ARA TEST] Test mode opened; voice session stopped")
+        addDiagnostic("[ARA TEST] Test started; voice session stopped")
+    }
+
+    private func endGestureTestMode() {
+        gestureTestTask?.cancel()
+        gestureTestTask = nil
+        avatarClip = .idle
+        isGestureTestMode = false
+        addDiagnostic("[ARA TEST] Test finished; returned to Idle")
     }
 
     private func testAraGesture(_ clip: AraAvatarView.Clip) {
@@ -413,14 +406,12 @@ struct CompanionChatView: View {
         avatarClip = clip
         let duration = araClipDuration(clip)
         addDiagnostic("[ARA TEST] Started: \(clip.rawValue); duration=\(String(format: "%.2f", duration))s; loops=\(clip.loops)")
-        guard !clip.loops else { gestureTestTask = nil; return }
         gestureTestTask = Task { @MainActor in
             do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
             catch { return }
             guard isGestureTestMode, avatarClip == clip else { return }
-            avatarClip = .idle
-            addDiagnostic("[ARA TEST] Finished: \(clip.rawValue); returned to Idle")
-            gestureTestTask = nil
+            endGestureTestMode()
+            addDiagnostic("[ARA TEST] Finished: \(clip.rawValue)")
         }
     }
 
@@ -439,9 +430,8 @@ struct CompanionChatView: View {
                 catch { return }
             }
             guard !Task.isCancelled, isGestureTestMode else { return }
-            avatarClip = .idle
-            addDiagnostic("[ARA TEST] Jump sequence finished; returned to Idle")
-            gestureTestTask = nil
+            endGestureTestMode()
+            addDiagnostic("[ARA TEST] Jump sequence finished")
         }
     }
 
