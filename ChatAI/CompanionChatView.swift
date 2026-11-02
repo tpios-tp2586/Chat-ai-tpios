@@ -276,40 +276,27 @@ struct CompanionChatView: View {
 
     private var araTestPopup: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Test")
-                    .font(.system(size: 13, weight: .bold))
-                Spacer(minLength: 2)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.16)) {
-                        showAraTestMenu = false
-                        selectedAraTestGroup = nil
-                    }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .frame(width: 24, height: 24)
-                        .background(activeTheme.surface, in: Circle())
-                }
-                .accessibilityLabel("Đóng menu Test")
-            }
-            .foregroundStyle(.white)
-
             if let group = selectedAraTestGroup {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Button {
                         withAnimation(.easeInOut(duration: 0.16)) {
                             selectedAraTestGroup = nil
                         }
                     } label: {
-                        Label("Test", systemImage: "chevron.left")
+                        Image(systemName: "chevron.left")
                             .font(.system(size: 10, weight: .semibold))
+                            .frame(width: 20, height: 24)
                     }
                     .buttonStyle(.plain)
+
                     Text(araTestGroups[group].0)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11, weight: .semibold))
+
+                    Spacer(minLength: 0)
+
+                    closeAraTestPopupButton
                 }
+                .foregroundStyle(.white)
 
                 ScrollView {
                     VStack(spacing: 6) {
@@ -337,6 +324,7 @@ struct CompanionChatView: View {
                 HStack(spacing: 6) {
                     araTestGroupButton(index: 0)
                     araTestGroupButton(index: 1)
+                    closeAraTestPopupButton
                 }
             }
         }
@@ -345,6 +333,22 @@ struct CompanionChatView: View {
         .background(activeTheme.background.opacity(0.98), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 5)
+    }
+
+    private var closeAraTestPopupButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                showAraTestMenu = false
+                selectedAraTestGroup = nil
+            }
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .frame(width: 24, height: 24)
+                .background(activeTheme.surface, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Đóng menu")
     }
 
     private func araTestGroupButton(index: Int) -> some View {
