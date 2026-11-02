@@ -197,8 +197,7 @@ struct CompanionChatView: View {
                     .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
-                    }
+                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)                    }
             }
             .accessibilityLabel("Xem và sao chép log")
 
@@ -397,8 +396,7 @@ struct CompanionChatView: View {
         }
 
         if liveManager.state != .idle {
-            liveManager.end()
-        }
+            liveManager.end()        }
         cancelExplainGesture()
         cancelEmotionGesture()
         gestureTestTask?.cancel()
@@ -435,7 +433,8 @@ struct CompanionChatView: View {
             for clip in [AraAvatarView.Clip.jumpStart, .jumpAir, .jumpLand] {
                 guard !Task.isCancelled, isGestureTestMode else { return }
                 avatarClip = clip
-                let duration = araClipDuration(clip)                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
+                let duration = araClipDuration(clip)
+                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
                 do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
                 catch { return }
             }
@@ -598,7 +597,6 @@ struct CompanionChatView: View {
         }
         return listItems.count >= 2 ? "structured list (\(listItems.count) items)" : nil
     }
-
     private func contextGestureCue(_ text: String) -> (clip: AraAvatarView.Clip, reason: String)? {
         let value = normalizedAraCueText(text)
         let empathyCues = ["hieu roi", "cam thong", "kho qua", "buon", "lo lang", "thong cam", "dung lo"]
@@ -614,7 +612,8 @@ struct CompanionChatView: View {
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
         let value = text.lowercased()
-        let happySignals = ["haha", "😂", "🤣", "😄", "😊", "vui quá", "tuyệt vời", "chúc mừng", "hay quá"]        let surprisedSignals = ["😮", "😲", "bất ngờ", "không ngờ", "thật sao", "wow"]
+        let happySignals = ["haha", "😂", "🤣", "😄", "😊", "vui quá", "tuyệt vời", "chúc mừng", "hay quá"]
+        let surprisedSignals = ["😮", "😲", "bất ngờ", "không ngờ", "thật sao", "wow"]
         let winkSignals = ["😉", "😜", "đùa thôi", "trêu anh"]
         if winkSignals.contains(where: value.contains) { return .happy }
         if surprisedSignals.contains(where: value.contains) { return .surprised }
