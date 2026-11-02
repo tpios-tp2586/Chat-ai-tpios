@@ -314,7 +314,6 @@ struct CompanionChatView: View {
                     .frame(width: 32, height: 28)
                     .background(activeTheme.surface.opacity(0.8), in: RoundedRectangle(cornerRadius: 7))
                     .contentShape(Rectangle())
-                    .gesture(dragGesture)
                     .accessibilityLabel("Kéo để di chuyển bảng Test Ara")
                 Text("TEST ARA")
                     .font(.system(size: 11, weight: .bold))
@@ -337,6 +336,7 @@ struct CompanionChatView: View {
             .padding(.vertical, 5)
             .background(activeTheme.accent.opacity(0.9), in: RoundedRectangle(cornerRadius: 9))
             .contentShape(Rectangle())
+            .simultaneousGesture(dragGesture)
 
             HStack(spacing: 6) {
                 ForEach(araTestGroups, id: \.0) { group in
@@ -398,7 +398,7 @@ struct CompanionChatView: View {
                     .frame(width: 44, height: 44)
                     .background(activeTheme.surface, in: Circle())
                     .contentShape(Circle())
-                    .gesture(resizeGesture)
+                    .simultaneousGesture(resizeGesture)
                     .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test Ara")
             }
             .foregroundStyle(.white)
@@ -762,8 +762,8 @@ private struct AraTestPanelOverlay<Content: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let displayScale = min(1.25, max(0.59, CGFloat(scale) + resizeDelta))
-            let width: CGFloat = isCollapsed ? 60 : 292 * displayScale
-            let height: CGFloat = isCollapsed ? 60 : 205 * displayScale
+            let width: CGFloat = isCollapsed ? 60 : 292 * CGFloat(scale)
+            let height: CGFloat = isCollapsed ? 60 : 205 * CGFloat(scale)
             let defaultX = proxy.size.width / 2
             let defaultY = proxy.size.height - (205 * displayScale) / 2 - 100
             let minX = width / 2 + 4
@@ -791,7 +791,9 @@ private struct AraTestPanelOverlay<Content: View>: View {
                         state = value.translation.width / 240
                     }
                     .onEnded { value in
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
                         scale = min(1.25, max(0.59, scale + Double(value.translation.width / 240)))
+                    }
                     }
             )
 
