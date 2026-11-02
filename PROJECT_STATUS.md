@@ -3,7 +3,7 @@
 ## Repository
 - Repo: https://github.com/tpios-tp2586/Chat-ai-tpios
 - Chỉ làm việc trực tiếp trên `main`; tuyệt đối không tạo hoặc chuyển branch.
-- Code mới nhất: `665258527f3ba6b534c681e376620895465e76a7` — popup TEST tự co theo nội dung, danh sách chức năng một cột dọc và giữ popup mở để test liên tiếp.
+- Code mới nhất: `28119e4379c5fa8cf89b82d5fdde60bca82d2d00` — popup Ara bỏ chữ `Test`, chỉ hiện tên nhóm (`T. Chuyện`/`Y. Cầu`), thu gọn hàng tiêu đề và giữ danh sách một cột dọc.
 - Đây là checkpoint hiện tại; lịch sử thay đổi xem trong Git commits/diffs.
 
 ## Quy tắc bắt buộc
@@ -24,8 +24,8 @@
 - Trên thanh công cụ Chat Voice, giữ nút LOG và thay nút sáng/tối bằng icon TEST cùng kích thước 42×42 pt như LOG.
 - Xóa hoàn toàn chức năng sáng/tối riêng của Chat Voice: state `nightMode`, nút đổi nền và lớp phủ đen. Vẫn giữ Theme chung của ứng dụng qua `activeTheme`.
 - Icon TEST mở popup SwiftUI tự thiết kế; không dùng native Menu hoặc sheet cho phần test.
-- Popup có tiêu đề `Test`, không có nút bật/tắt test mode.
-- Khi chưa chọn nhóm, popup tự co theo nội dung, chỉ đủ chứa hai ô `T. Chuyện` và `Y. Cầu` cùng một hàng; mỗi ô 40×40 pt, không ép chiều rộng cố định.
+- Popup không hiển thị chữ `Test`; màn hình chọn nhóm chỉ có hai ô `T. Chuyện` và `Y. Cầu` cùng nút đóng. Khi vào nhóm, tiêu đề chỉ hiện tên nhóm (ví dụ `Y. Cầu`), nút quay lại chỉ dùng icon mũi tên.
+- Khi chưa chọn nhóm, popup tự co theo nội dung, chỉ đủ chứa hai ô `T. Chuyện` và `Y. Cầu` (40×40 pt) cùng nút đóng; không ép chiều rộng cố định. Khi vào nhóm, hàng tiêu đề gọn và không lặp chữ `Test`.
 - Khi mở nhóm, các hành động xếp thành một cột dọc duy nhất; mỗi ô 40×40 pt, danh sách dài có thể cuộn.
 - Chọn hành động chạy ngay clip tương ứng nhưng giữ popup và nhóm đang chọn mở để tiếp tục chọn/test; test mode chỉ bật nội bộ trong lúc chạy và tự kết thúc về Idle.
 - Giữ nguyên toàn bộ 26 clip/action, callback, thời lượng animation, chuỗi Jump và log chẩn đoán; giữ nút sao chép log.
