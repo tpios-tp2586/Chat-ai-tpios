@@ -765,7 +765,7 @@ private struct AraTestPanelOverlay<Content: View>: View {
             let width: CGFloat = isCollapsed ? 60 : 292 * CGFloat(scale)
             let height: CGFloat = isCollapsed ? 60 : 205 * CGFloat(scale)
             let defaultX = proxy.size.width / 2
-            let defaultY = proxy.size.height - (205 * displayScale) / 2 - 100
+            let defaultY = proxy.size.height - (205 * CGFloat(scale)) / 2 - 100
             let minX = width / 2 + 4
             let maxX = max(minX, proxy.size.width - width / 2 - 4)
             let minY = height / 2 + proxy.safeAreaInsets.top + 4
@@ -792,8 +792,8 @@ private struct AraTestPanelOverlay<Content: View>: View {
                     }
                     .onEnded { value in
                         withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
-                        scale = min(1.25, max(0.59, scale + Double(value.translation.width / 240)))
-                    }
+                            scale = min(1.25, max(0.59, scale + Double(value.translation.width / 240)))
+                        }
                     }
             )
 
