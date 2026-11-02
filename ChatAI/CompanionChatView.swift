@@ -754,7 +754,7 @@ private struct AraTestPanelOverlay<Content: View>: View {
     @Binding var xOffset: Double
     @Binding var yOffset: Double
     let accent: Color
-    let content: (AnyGesture<CGSize>, AnyGesture<CGSize>) -> Content
+    let content: (AnyGesture<DragGesture.Value>, AnyGesture<DragGesture.Value>) -> Content
 
     @GestureState private var dragOffset = CGSize.zero
     @GestureState private var resizeDelta: CGFloat = 0
