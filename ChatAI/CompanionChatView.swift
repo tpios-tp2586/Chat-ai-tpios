@@ -28,7 +28,8 @@ struct CompanionChatView: View {
     @State private var emotionGestureGeneration = UUID()
     @State private var speechStartToken = 0
     @State private var message: String?
-    @State private var nightMode = false
+    @State private var showAraTestMenu = false
+    @State private var selectedAraTestGroup: Int?
     @State private var showDiagnosticLog = false
     @State private var isGestureTestMode = false
     @State private var gestureTestTask: Task<Void, Never>?
@@ -36,10 +37,7 @@ struct CompanionChatView: View {
 
     var body: some View {
         ZStack {
-            ZStack {
-                ChatAIThemeBackground(theme: activeTheme)
-                if nightMode { Color.black.opacity(0.28).ignoresSafeArea() }
-            }
+            ChatAIThemeBackground(theme: activeTheme)
 
             VStack(spacing: 0) {
                 header
@@ -93,9 +91,12 @@ struct CompanionChatView: View {
         }
         .preferredColorScheme(.dark)
         .overlay(alignment: .topTrailing) {
-            araTestControl
-                .padding(.top, 66)
-                .padding(.trailing, 12)
+            if showAraTestMenu {
+                araTestPopup
+                    .padding(.top, 58)
+                    .padding(.trailing, 12)
+                    .zIndex(10)
+            }
         }
         .sheet(isPresented: $showDiagnosticLog) { diagnosticLogSheet }
         .onChange(of: liveManager.lines.count) { _ in
@@ -178,7 +179,6 @@ struct CompanionChatView: View {
                     }
             }
             .accessibilityLabel("Đóng avatar")
-
             VStack(alignment: .leading, spacing: 3) {
                 Text("ChatAI Companion")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -202,8 +202,13 @@ struct CompanionChatView: View {
             }
             .accessibilityLabel("Xem và sao chép log")
 
-            Button { nightMode.toggle() } label: {
-                Image(systemName: nightMode ? "moon.stars.fill" : "sun.max.fill")
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    showAraTestMenu.toggle()
+                    selectedAraTestGroup = nil
+                }
+            } label: {
+                Image(systemName: "testtube.2")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(activeTheme.accent)
                     .frame(width: 42, height: 42)
@@ -213,7 +218,7 @@ struct CompanionChatView: View {
                             .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
                     }
             }
-            .accessibilityLabel("Đổi chế độ nền")
+            .accessibilityLabel("Mở menu Test Ara")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
@@ -251,55 +256,128 @@ struct CompanionChatView: View {
 
     private var araTestGroups: [(String, String, [(String, AraAvatarView.Clip)])] {
         [
-            ("Khi trò chuyện", "face.smiling", [
-                ("Idle", .idle), ("AraListening", .listening), ("AraThinking", .thinking),
-                ("Talk", .talk), ("TalkExplain", .talkExplain),
-                ("AraEmpathy", .empathy), ("AraLaugh", .laugh), ("Laugh", .naturalLaugh)
+            ("T. Chuyện", "face.smiling", [
+                ("Idle", .idle), ("Nghe", .listening), ("Nghĩ", .thinking),
+                ("Nói", .talk), ("Giải thích", .talkExplain),
+                ("Đồng cảm", .empathy), ("Ara cười", .laugh), ("Cười", .naturalLaugh)
             ]),
-            ("Theo yêu cầu", "hand.tap", [
-                ("Wave", .wave), ("Walk", .walk), ("Run", .run),
-                ("Walk backwards", .walkBackwards), ("Strafe left", .strafeLeft),
-                ("Strafe right", .strafeRight), ("Turn left 45°", .turnLeft45),
-                ("Turn left 90°", .turnLeft90), ("Turn right 45°", .turnRight45),
-                ("Turn right 90°", .turnRight90), ("Full turn 360°", .fullTurn),
-                ("Sit down (chair)", .sitDown), ("Sit idle (chair)", .sitIdle),
-                ("Stand up (chair)", .standUp), ("Lie down", .lieDown),
-                ("Sleep", .sleep), ("Jump sequence", .jumpStart),
-                ("Ride horse (trot)", .rideHorse)
+            ("Y. Cầu", "hand.tap", [
+                ("Vẫy tay", .wave), ("Đi", .walk), ("Chạy", .run),
+                ("Lùi", .walkBackwards), ("Sang trái", .strafeLeft),
+                ("Sang phải", .strafeRight), ("Quay trái 45°", .turnLeft45),
+                ("Quay trái 90°", .turnLeft90), ("Quay phải 45°", .turnRight45),
+                ("Quay phải 90°", .turnRight90), ("Quay 360°", .fullTurn),
+                ("Ngồi xuống", .sitDown), ("Ngồi yên", .sitIdle),
+                ("Đứng dậy", .standUp), ("Nằm", .lieDown),
+                ("Ngủ", .sleep), ("Nhảy", .jumpStart),
+                ("Cưỡi ngựa", .rideHorse)
             ])
         ]
     }
 
-    private var araTestControl: some View {
-        Menu {
-            Button(isGestureTestMode ? "Tắt chế độ test" : "Bật chế độ test") {
-                toggleGestureTestMode()
+    private var araTestPopup: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text("Test")
+                    .font(.system(size: 13, weight: .bold))
+                Spacer(minLength: 2)
+                Button(isGestureTestMode ? "Tắt" : "Bật") {
+                    toggleGestureTestMode()
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .buttonStyle(.bordered)
+                .tint(activeTheme.accent)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        showAraTestMenu = false
+                        selectedAraTestGroup = nil
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .frame(width: 24, height: 24)
+                        .background(activeTheme.surface, in: Circle())
+                }
+                .accessibilityLabel("Đóng menu Test")
             }
-            Menu("Khi trò chuyện") {
-                ForEach(araTestGroups[0].2, id: \.0) { item in
-                    Button(item.0) { runAraTest(item.1) }
+            .foregroundStyle(.white)
+
+            if let group = selectedAraTestGroup {
+                HStack(spacing: 6) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            selectedAraTestGroup = nil
+                        }
+                    } label: {
+                        Label("Test", systemImage: "chevron.left")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    Text(araTestGroups[group].0)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.fixed(90)), GridItem(.fixed(90))], spacing: 6) {
+                        ForEach(araTestGroups[group].2, id: \.0) { item in
+                            Button {
+                                runAraTest(item.1)
+                                withAnimation(.easeInOut(duration: 0.16)) {
+                                    showAraTestMenu = false
+                                    selectedAraTestGroup = nil
+                                }
+                            } label: {
+                                Text(item.0)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.75)
+                                    .foregroundStyle(.white)
+                                    .frame(width: 90, height: 90)
+                                    .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(activeTheme.accent.opacity(0.18), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .frame(maxHeight: 320)
+            } else {
+                HStack(spacing: 8) {
+                    araTestGroupButton(index: 0)
+                    araTestGroupButton(index: 1)
                 }
             }
-            Menu("Theo yêu cầu") {
-                ForEach(araTestGroups[1].2, id: \.0) { item in
-                    Button(item.0) { runAraTest(item.1) }
-                }
+        }
+        .padding(8)
+        .frame(width: 202)
+        .background(activeTheme.background.opacity(0.98), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 5)
+    }
+
+    private func araTestGroupButton(index: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                selectedAraTestGroup = index
             }
         } label: {
-            VStack(spacing: 1) {
-                Image(systemName: "testtube.2")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("TEST")
-                    .font(.system(size: 8, weight: .bold))
+            VStack(spacing: 6) {
+                Image(systemName: araTestGroups[index].1)
+                    .font(.system(size: 17, weight: .semibold))
+                Text(araTestGroups[index].0)
+                    .font(.system(size: 10, weight: .bold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
             }
             .foregroundStyle(activeTheme.accent)
-            .frame(width: 60, height: 60)
-            .background(activeTheme.surface.opacity(0.96), in: Circle())
-            .overlay(Circle().stroke(activeTheme.accent.opacity(0.28), lineWidth: 1))
-            .contentShape(Circle())
+            .frame(width: 90, height: 90)
+            .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(activeTheme.accent.opacity(0.2), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Mở menu test Ara")
     }
 
     private func runAraTest(_ clip: AraAvatarView.Clip) {
@@ -357,8 +435,7 @@ struct CompanionChatView: View {
             for clip in [AraAvatarView.Clip.jumpStart, .jumpAir, .jumpLand] {
                 guard !Task.isCancelled, isGestureTestMode else { return }
                 avatarClip = clip
-                let duration = araClipDuration(clip)
-                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
+                let duration = araClipDuration(clip)                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
                 do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
                 catch { return }
             }
@@ -537,8 +614,7 @@ struct CompanionChatView: View {
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
         let value = text.lowercased()
-        let happySignals = ["haha", "😂", "🤣", "😄", "😊", "vui quá", "tuyệt vời", "chúc mừng", "hay quá"]
-        let surprisedSignals = ["😮", "😲", "bất ngờ", "không ngờ", "thật sao", "wow"]
+        let happySignals = ["haha", "😂", "🤣", "😄", "😊", "vui quá", "tuyệt vời", "chúc mừng", "hay quá"]        let surprisedSignals = ["😮", "😲", "bất ngờ", "không ngờ", "thật sao", "wow"]
         let winkSignals = ["😉", "😜", "đùa thôi", "trêu anh"]
         if winkSignals.contains(where: value.contains) { return .happy }
         if surprisedSignals.contains(where: value.contains) { return .surprised }
