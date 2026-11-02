@@ -312,14 +312,10 @@ struct CompanionChatView: View {
                 }
 
                 ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(40)), count: 4), spacing: 6) {
+                    VStack(spacing: 6) {
                         ForEach(araTestGroups[group].2, id: \.0) { item in
                             Button {
                                 runAraTest(item.1)
-                                withAnimation(.easeInOut(duration: 0.16)) {
-                                    showAraTestMenu = false
-                                    selectedAraTestGroup = nil
-                                }
                             } label: {
                                 Text(item.0)
                                     .font(.system(size: 7, weight: .semibold))
@@ -334,6 +330,7 @@ struct CompanionChatView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .frame(width: 40)
                 }
                 .frame(maxHeight: 260)
             } else {
@@ -344,7 +341,7 @@ struct CompanionChatView: View {
             }
         }
         .padding(8)
-        .frame(width: 194)
+        .fixedSize(horizontal: true, vertical: true)
         .background(activeTheme.background.opacity(0.98), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 5)
