@@ -3,7 +3,7 @@
 ## Repository
 - Repo: https://github.com/tpios-tp2586/Chat-ai-tpios
 - Chỉ làm việc trên `main`; tuyệt đối không tự tạo/chuyển branch.
-- HEAD trước lần cập nhật checkpoint này: `e09b99bb0b74b3941023bd103b2da1584a3ccb7b` — `Record Ara resize state compile fix`.
+- HEAD trước lần cập nhật checkpoint này: `2b2674f8837c45350981259adb917cf45207eda0` — `Simplify Ara test panel drag and resize gestures`.
 - Checkpoint này là trạng thái hiện tại, không phải nhật ký; lịch sử nằm trong Git commits/diffs.
 
 ## Quy tắc bắt buộc
@@ -20,21 +20,19 @@
 - Ara đã load và phát animation trên iPhone ở các lần build trước; cần đánh giá bằng quan sát thực tế, không chỉ dựa vào log.
 - Không thay đổi chatbot hoặc voice pipeline để xử lý animation/UI test.
 
-## Ara test panel — trạng thái đã xác nhận
-- Người dùng đã chạy Codemagic và xác nhận **build thành công** với các thay đổi gần nhất.
-- Tuy nhiên **UI chưa đạt yêu cầu sử dụng**:
-  - Di chuyển/kéo khung vẫn bị lag, không mượt.
-  - Thu phóng khung vẫn lag và khó thao tác.
-- Vì vậy không được đánh dấu panel hoàn tất chỉ vì build thành công.
-- Các commit trước đã đặt thao tác kéo ở header, đưa nút resize/thu gọn vào header và thêm state cho resize. Những thay đổi đó chưa giải quyết được trải nghiệm thực tế.
-- Chưa có sửa code mới sau phản hồi này.
+## Ara test panel — implementation hiện tại
+- Đã sửa trực tiếp trên `main` trong commit `2b2674f8837c45350981259adb917cf45207eda0` (`Simplify Ara test panel drag and resize gestures`).
+- Drag: dùng vùng tay nắm riêng 32×28 pt ở đầu panel; vị trí kéo dùng `@GestureState`, clamp trong vùng màn hình và chỉ lưu X/Y khi kết thúc gesture. Nút thu gọn 60×60 pt cũng nhận drag để di chuyển.
+- Resize: chuyển nút zoom xuống góc dưới bên phải bên trong panel, vùng chạm 44×44 pt; kéo một ngón tay. Delta dùng `@GestureState`, chỉ ghi `@AppStorage` một lần ở `.onEnded`, không ghi persistent state theo từng frame.
+- Toàn bộ nội dung panel được scale cùng kích thước bằng `scaleEffect`; giới hạn scale 0.59–1.25. Mức nhỏ nhất cho chiều cao panel khoảng 121 pt (xấp xỉ gấp đôi nút Home ảo 60 pt).
+- Thu gọn vẫn là nút 60×60 pt; vị trí tâm được giữ tương ứng khi đóng/mở. Hai nhóm animation và logic test hiện có được giữ nguyên.
+- Đây mới là thay đổi code; **chưa có xác nhận build Codemagic hoặc kiểm thử thao tác trên iPhone cho commit mới**. Không đánh dấu hoàn tất trước khi người dùng xác nhận.
 
 ## Việc tiếp theo
-1. Kiểm tra HEAD mới nhất trên `main`, sau đó đọc đúng Swift view/state/gesture đang điều khiển Ara test panel.
-2. Xác định nguyên nhân gây giật ở drag và resize từ code thực tế; tránh tiếp tục chồng thêm gesture/state hoặc sửa mò.
-3. Ưu tiên đơn giản hóa tương tác và giảm cập nhật layout/state không cần thiết; giữ thao tác kéo và resize dễ dùng, ổn định trên iPhone.
-4. Chỉ sửa tối thiểu trong phạm vi panel. Không đụng chatbot, voice pipeline, Text Chat, Chibi Chat hay backup/workflow.
-5. Người dùng chạy Codemagic và kiểm tra lại trên iPhone; chỉ kết luận đạt khi cả drag và resize đều mượt, dễ thao tác.
+1. Người dùng chạy Codemagic thủ công với HEAD hiện tại trên `main`.
+2. Kiểm tra trên iPhone: kéo panel bằng tay nắm; kéo nút zoom ở góc dưới phải; kiểm tra chữ/nút/list cùng scale; thu gọn thành nút ảo rồi kéo nút đi nơi khác và mở lại.
+3. Nếu build lỗi hoặc thao tác còn giật, lấy log/kết quả thực tế rồi mới sửa tiếp; không sửa mò.
+4. Chỉ sửa phạm vi Ara test panel. Không đụng chatbot/API, chat history, voice pipeline, Text Chat, Chibi Chat hoặc backup/workflow.
 
 ## Tiếp tục ở khung chat mới
-Đọc file này trước, kiểm tra HEAD trên `main`, rồi kiểm tra code panel liên quan. Không cần đọc lại toàn bộ lịch sử hội thoại. Không tạo branch.
+Đọc checkpoint này, kiểm tra HEAD trên `main`, rồi đối chiếu đúng code panel. Chờ kết quả build/test thực tế trước khi tuyên bố hoàn tất. Không tạo branch.
