@@ -38,8 +38,7 @@ struct CompanionChatView: View {
     @AppStorage("ara_test_panel_y") private var testPanelY = 0.0
     @AppStorage("ara_test_panel_collapsed") private var testPanelCollapsed = false
     @GestureState private var testPanelDragOffset = CGSize.zero
-    @State private var testPanelResizeStart = 1.0
-    @State private var isResizingTestPanel = false
+    @GestureState private var testPanelResizeDelta: CGFloat = 0
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -104,12 +103,34 @@ struct CompanionChatView: View {
         .overlay {
             if showAraTestMenu {
                 GeometryReader { proxy in
-                    let width: CGFloat = testPanelCollapsed ? 60 : 292 * CGFloat(testPanelScale)
-                    let height: CGFloat = testPanelCollapsed ? 60 : 205 * CGFloat(testPanelScale)
+                    let displayScale = min(1.25, max(0.59, CGFloat(testPanelScale) + testPanelResizeDelta))
+                    let width: CGFloat = testPanelCollapsed ? 60 : 292 * displayScale
+                    let height: CGFloat = testPanelCollapsed ? 60 : 205 * displayScale
                     let defaultX = proxy.size.width / 2
-                    let defaultY = proxy.size.height - height / 2 - 100
-                    let x = min(max(defaultX + CGFloat(testPanelX), width / 2 + 4), proxy.size.width - width / 2 - 4)
-                    let y = min(max(defaultY + CGFloat(testPanelY), height / 2 + proxy.safeAreaInsets.top + 4), proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
+                    let defaultY = proxy.size.height - (205 * displayScale) / 2 - 100
+                    let minX = width / 2 + 4
+                    let maxX = max(minX, proxy.size.width - width / 2 - 4)
+                    let minY = height / 2 + proxy.safeAreaInsets.top + 4
+                    let maxY = max(minY, proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
+                    let x = min(max(defaultX + CGFloat(testPanelX) + testPanelDragOffset.width, minX), maxX)
+                    let y = min(max(defaultY + CGFloat(testPanelY) + testPanelDragOffset.height, minY), maxY)
+                    let panelDragGesture = DragGesture(minimumDistance: 2)
+                        .updating($testPanelDragOffset) { value, state, _ in
+                            state = value.translation
+                        }
+                        .onEnded { value in
+                            let finalX = min(max(defaultX + CGFloat(testPanelX) + value.translation.width, minX), maxX)
+                            let finalY = min(max(defaultY + CGFloat(testPanelY) + value.translation.height, minY), maxY)
+                            testPanelX = Double(finalX - defaultX)
+                            testPanelY = Double(finalY - defaultY)
+                        }
+                    let panelResizeGesture = DragGesture(minimumDistance: 1)
+                        .updating($testPanelResizeDelta) { value, state, _ in
+                            state = value.translation.width / 240
+                        }
+                        .onEnded { value in
+                            testPanelScale = min(1.25, max(0.59, testPanelScale + Double(value.translation.width / 240)))
+                        }
 
                     Group {
                         if testPanelCollapsed {
@@ -126,14 +147,15 @@ struct CompanionChatView: View {
                                     .background(activeTheme.accent, in: Circle())
                             }
                             .accessibilityLabel("Mở bảng Test Ara")
+                            .simultaneousGesture(panelDragGesture)
                         } else {
-                            araTestMenu
+                            araTestMenu(dragGesture: panelDragGesture, resizeGesture: panelResizeGesture)
                                 .frame(width: 292, height: 205)
-                                .scaleEffect(testPanelScale, anchor: .center)
+                                .scaleEffect(displayScale, anchor: .center)
                                 .frame(width: width, height: height)
                         }
                     }
-                    .position(x: x + testPanelDragOffset.width, y: y + testPanelDragOffset.height)
+                    .position(x: x, y: y)
                 }
                 .zIndex(2)
             }
@@ -332,35 +354,19 @@ struct CompanionChatView: View {
         ]
     }
 
-    private var araTestMenu: some View {
+    private func araTestMenu<Drag: Gesture, Resize: Gesture>(dragGesture: Drag, resizeGesture: Resize) -> some View {
         VStack(spacing: 5) {
             HStack(spacing: 8) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 13, weight: .bold))
+                    .frame(width: 32, height: 28)
+                    .background(activeTheme.surface.opacity(0.8), in: RoundedRectangle(cornerRadius: 7))
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture)
+                    .accessibilityLabel("Kéo để di chuyển bảng Test Ara")
                 Text("TEST ARA")
                     .font(.system(size: 11, weight: .bold))
                 Spacer(minLength: 2)
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .frame(width: 25, height: 25)
-                    .background(activeTheme.surface, in: Circle())
-                    .contentShape(Circle())
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                if !isResizingTestPanel {
-                                    testPanelResizeStart = testPanelScale
-                                    isResizingTestPanel = true
-                                }
-                                testPanelScale = min(1.25, max(0.55, testPanelResizeStart + Double(value.translation.width / 240)))
-                            }
-                            .onEnded { _ in
-                                testPanelResizeStart = testPanelScale
-                                isResizingTestPanel = false
-                            }
-                    )
-                    .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test")
-
                 Button {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                         testPanelCollapsed = true
@@ -379,16 +385,6 @@ struct CompanionChatView: View {
             .padding(.vertical, 5)
             .background(activeTheme.accent.opacity(0.9), in: RoundedRectangle(cornerRadius: 9))
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 2)
-                    .updating($testPanelDragOffset) { value, state, _ in
-                        state = value.translation
-                    }
-                    .onEnded { value in
-                        testPanelX += Double(value.translation.width)
-                        testPanelY += Double(value.translation.height)
-                    }
-            )
 
             HStack(spacing: 6) {
                 ForEach(araTestGroups, id: \.0) { group in
@@ -440,18 +436,26 @@ struct CompanionChatView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 116)
+                .frame(maxHeight: 88)
             }
 
+            HStack {
+                Spacer()
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 44, height: 44)
+                    .background(activeTheme.surface, in: Circle())
+                    .contentShape(Circle())
+                    .gesture(resizeGesture)
+                    .accessibilityLabel("Kéo để phóng to hoặc thu nhỏ bảng Test Ara")
+            }
+            .foregroundStyle(.white)
         }
         .padding(7)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(activeTheme.accent.opacity(0.3), lineWidth: 1))
         .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
-        .onAppear {
-            testPanelResizeStart = testPanelScale
-        }
     }
 
     private func toggleGestureTestMode() {
