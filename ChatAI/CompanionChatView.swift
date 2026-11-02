@@ -321,10 +321,14 @@ struct CompanionChatView: View {
                 }
                 .frame(maxHeight: 260)
             } else {
+                HStack {
+                    Spacer(minLength: 0)
+                    closeAraTestPopupButton
+                }
+
                 HStack(spacing: 6) {
                     araTestGroupButton(index: 0)
                     araTestGroupButton(index: 1)
-                    closeAraTestPopupButton
                 }
             }
         }
