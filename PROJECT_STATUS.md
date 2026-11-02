@@ -3,7 +3,7 @@
 ## Repository
 - Repo: https://github.com/tpios-tp2586/Chat-ai-tpios
 - Chỉ làm việc trực tiếp trên `main`; tuyệt đối không tạo hoặc chuyển branch.
-- Code mới nhất: `088c89f72bb32c03252a341ccfbcd13188a9ffcf` — thu gọn UI test Ara, bỏ hoàn toàn chức năng sáng/tối riêng của Chat Voice.
+- Code mới nhất: `2ccdf7755655e6d24f8da536929c79d0059d7e1b` — sửa hai câu lệnh Swift bị dính dòng trong CompanionChatView; giữ nguyên UI test Ara và loại bỏ Night Mode riêng.
 - Đây là checkpoint hiện tại; lịch sử thay đổi xem trong Git commits/diffs.
 
 ## Quy tắc bắt buộc
