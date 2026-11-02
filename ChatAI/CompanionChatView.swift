@@ -37,8 +37,6 @@ struct CompanionChatView: View {
     @AppStorage("ara_test_panel_x") private var testPanelX = 0.0
     @AppStorage("ara_test_panel_y") private var testPanelY = 0.0
     @AppStorage("ara_test_panel_collapsed") private var testPanelCollapsed = false
-    @GestureState private var testPanelDragOffset = CGSize.zero
-    @GestureState private var testPanelResizeDelta: CGFloat = 0
     @State private var gestureTestTask: Task<Void, Never>?
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -102,60 +100,14 @@ struct CompanionChatView: View {
         .preferredColorScheme(.dark)
         .overlay {
             if showAraTestMenu {
-                GeometryReader { proxy in
-                    let displayScale = min(1.25, max(0.59, CGFloat(testPanelScale) + testPanelResizeDelta))
-                    let width: CGFloat = testPanelCollapsed ? 60 : 292 * displayScale
-                    let height: CGFloat = testPanelCollapsed ? 60 : 205 * displayScale
-                    let defaultX = proxy.size.width / 2
-                    let defaultY = proxy.size.height - (205 * displayScale) / 2 - 100
-                    let minX = width / 2 + 4
-                    let maxX = max(minX, proxy.size.width - width / 2 - 4)
-                    let minY = height / 2 + proxy.safeAreaInsets.top + 4
-                    let maxY = max(minY, proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
-                    let x = min(max(defaultX + CGFloat(testPanelX) + testPanelDragOffset.width, minX), maxX)
-                    let y = min(max(defaultY + CGFloat(testPanelY) + testPanelDragOffset.height, minY), maxY)
-                    let panelDragGesture = DragGesture(minimumDistance: 2)
-                        .updating($testPanelDragOffset) { value, state, _ in
-                            state = value.translation
-                        }
-                        .onEnded { value in
-                            let finalX = min(max(defaultX + CGFloat(testPanelX) + value.translation.width, minX), maxX)
-                            let finalY = min(max(defaultY + CGFloat(testPanelY) + value.translation.height, minY), maxY)
-                            testPanelX = Double(finalX - defaultX)
-                            testPanelY = Double(finalY - defaultY)
-                        }
-                    let panelResizeGesture = DragGesture(minimumDistance: 1)
-                        .updating($testPanelResizeDelta) { value, state, _ in
-                            state = value.translation.width / 240
-                        }
-                        .onEnded { value in
-                            testPanelScale = min(1.25, max(0.59, testPanelScale + Double(value.translation.width / 240)))
-                        }
-
-                    Group {
-                        if testPanelCollapsed {
-                            Button {
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                                    testPanelCollapsed = false
-                                    testPanelScale = max(testPanelScale, 0.8)
-                                }
-                            } label: {
-                                Image(systemName: "testtube.2")
-                                    .font(.system(size: 21, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 60, height: 60)
-                                    .background(activeTheme.accent, in: Circle())
-                            }
-                            .accessibilityLabel("Mở bảng Test Ara")
-                            .simultaneousGesture(panelDragGesture)
-                        } else {
-                            araTestMenu(dragGesture: panelDragGesture, resizeGesture: panelResizeGesture)
-                                .frame(width: 292, height: 205)
-                                .scaleEffect(displayScale, anchor: .center)
-                                .frame(width: width, height: height)
-                        }
-                    }
-                    .position(x: x, y: y)
+                AraTestPanelOverlay(
+                    isCollapsed: $testPanelCollapsed,
+                    scale: $testPanelScale,
+                    xOffset: $testPanelX,
+                    yOffset: $testPanelY,
+                    accent: activeTheme.accent
+                ) { dragGesture, resizeGesture in
+                    araTestMenu(dragGesture: dragGesture, resizeGesture: resizeGesture)
                 }
                 .zIndex(2)
             }
@@ -791,6 +743,82 @@ struct CompanionChatView: View {
         case .sad: "cloud.rain"
         case .angry: "flame"
         case .sleepy: "moon.zzz"
+        }
+    }
+}
+
+
+private struct AraTestPanelOverlay<Content: View>: View {
+    @Binding var isCollapsed: Bool
+    @Binding var scale: Double
+    @Binding var xOffset: Double
+    @Binding var yOffset: Double
+    let accent: Color
+    let content: (AnyGesture<CGSize>, AnyGesture<CGSize>) -> Content
+
+    @GestureState private var dragOffset = CGSize.zero
+    @GestureState private var resizeDelta: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { proxy in
+            let displayScale = min(1.25, max(0.59, CGFloat(scale) + resizeDelta))
+            let width: CGFloat = isCollapsed ? 60 : 292 * displayScale
+            let height: CGFloat = isCollapsed ? 60 : 205 * displayScale
+            let defaultX = proxy.size.width / 2
+            let defaultY = proxy.size.height - (205 * displayScale) / 2 - 100
+            let minX = width / 2 + 4
+            let maxX = max(minX, proxy.size.width - width / 2 - 4)
+            let minY = height / 2 + proxy.safeAreaInsets.top + 4
+            let maxY = max(minY, proxy.size.height - height / 2 - proxy.safeAreaInsets.bottom - 8)
+            let x = min(max(defaultX + CGFloat(xOffset) + dragOffset.width, minX), maxX)
+            let y = min(max(defaultY + CGFloat(yOffset) + dragOffset.height, minY), maxY)
+
+            let dragGesture = AnyGesture(
+                DragGesture(minimumDistance: 2)
+                    .updating($dragOffset) { value, state, _ in
+                        state = value.translation
+                    }
+                    .onEnded { value in
+                        let finalX = min(max(defaultX + CGFloat(xOffset) + value.translation.width, minX), maxX)
+                        let finalY = min(max(defaultY + CGFloat(yOffset) + value.translation.height, minY), maxY)
+                        xOffset = Double(finalX - defaultX)
+                        yOffset = Double(finalY - defaultY)
+                    }
+            )
+            let resizeGesture = AnyGesture(
+                DragGesture(minimumDistance: 1)
+                    .updating($resizeDelta) { value, state, _ in
+                        state = value.translation.width / 240
+                    }
+                    .onEnded { value in
+                        scale = min(1.25, max(0.59, scale + Double(value.translation.width / 240)))
+                    }
+            )
+
+            Group {
+                if isCollapsed {
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                            isCollapsed = false
+                            scale = max(scale, 0.8)
+                        }
+                    } label: {
+                        Image(systemName: "testtube.2")
+                            .font(.system(size: 21, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 60, height: 60)
+                            .background(accent, in: Circle())
+                    }
+                    .accessibilityLabel("Mở bảng Test Ara")
+                    .simultaneousGesture(dragGesture)
+                } else {
+                    content(dragGesture, resizeGesture)
+                        .frame(width: 292, height: 205)
+                        .scaleEffect(displayScale, anchor: .center)
+                        .frame(width: width, height: height)
+                }
+            }
+            .position(x: x, y: y)
         }
     }
 }
