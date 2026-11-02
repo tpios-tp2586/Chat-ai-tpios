@@ -795,7 +795,7 @@ private struct AraTestPanelOverlay<Content: View>: View {
                     }
             )
 
-            Group {
+            ZStack {
                 if isCollapsed {
                     Button {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
