@@ -124,10 +124,10 @@ struct CompanionChatView: View {
                 speechStartToken &+= 1
                 avatarClip = .talk
                 handleLatestTranscript()
-            } else {
-                cancelExplainGesture()
-                cancelEmotionGesture()
+            } else if explainGestureTask == nil && emotionGestureTask == nil {
                 avatarClip = liveManager.state == .live ? .listening : .idle
+            } else {
+                addDiagnostic("[ARA] Giữ cử chỉ hiện tại đến hết clip; không cắt khi audio turnComplete")
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
@@ -452,7 +452,10 @@ struct CompanionChatView: View {
     }
 
     private func applyAraEmotion(_ expression: RobotFaceExpression) {
-        guard !isGestureTestMode, avatarClip != .wave && avatarClip != .talkExplain else { return }
+        guard !isGestureTestMode,
+              explainGestureTask == nil,
+              emotionGestureTask == nil,
+              avatarClip != .wave && avatarClip != .talkExplain else { return }
         switch expression {
         case .listening:
             avatarClip = .listening
@@ -550,10 +553,11 @@ struct CompanionChatView: View {
                 return
             }
             guard explainGestureGeneration == generation,
-                  liveManager.aiSpeaking,
                   avatarClip == .talkExplain else { return }
-            avatarClip = .talk
-            addDiagnostic("[ARA] TalkExplain finished; returned to Talk")
+            avatarClip = liveManager.state == .live
+                ? (liveManager.aiSpeaking ? .talk : .listening)
+                : .idle
+            addDiagnostic("[ARA] TalkExplain finished; returned to conversation state")
             explainGestureTask = nil
         }
     }
