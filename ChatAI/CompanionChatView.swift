@@ -367,19 +367,18 @@ struct CompanionChatView: View {
 
     private func beginGestureTestMode() {
         guard !isGestureTestMode else { return }
-        if liveManager.state != .idle { liveManager.end() }
         gestureTestTask?.cancel()
         isGestureTestMode = true
         avatarClip = .idle
-        addDiagnostic("[ARA TEST] Test started; voice session stopped")
+        addDiagnostic("[ARA TEST] Test started independently; voice session preserved (state=\(liveManager.state))")
     }
 
     private func endGestureTestMode() {
         gestureTestTask?.cancel()
         gestureTestTask = nil
-        avatarClip = .idle
         isGestureTestMode = false
-        addDiagnostic("[ARA TEST] Test finished; returned to Idle")
+        avatarClip = liveManager.aiSpeaking ? .talk : (liveManager.state == .live ? .listening : .idle)
+        addDiagnostic("[ARA TEST] Test finished; live avatar state restored")
     }
 
     private func testAraGesture(_ clip: AraAvatarView.Clip) {
