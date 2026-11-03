@@ -38,7 +38,8 @@
 - Đã xác nhận lộ trình Ara toàn thân: giai đoạn 1 thử nghiệm khung hình/chuyển động thân trên (đầu, vai, ngực, hai tay); khi đạt yêu cầu mới mở rộng giai đoạn 2 xuống hông, chân, bàn chân; giai đoạn 3 hoàn thiện chuyển động toàn thân. Thân trên chỉ là bước kiểm chứng, không phải phạm vi sản phẩm cuối.
 - Không loại bỏ rig hoặc animation chân khỏi asset trong giai đoạn 1; giữ nguyên một model Ara hiện tại để tiếp tục mở rộng.
 - Giữ iOS 16.0, không sửa Gemini Live/voice pipeline, chatbot/API, Text Chat hoặc Chibi Chat. Giữ nguyên giao diện TEST và LOG/Copy Log.
-- Bước kỹ thuật tiếp theo: xác định khung hình thử nghiệm thân trên dựa trên rig/bounds thực tế, không dùng offset camera phỏng đoán; sau khi người dùng kiểm tra build và xác nhận chuyển động thân trên, mới triển khai khung hình/chuyển động thân dưới.
+- Đã cập nhật `AraAvatarView.swift`: khung hình thử nghiệm căn tâm theo vùng thân trên (dịch tâm lên 0,27 chiều cao toàn model, tương ứng vùng tâm khoảng 77% chiều cao theo phân tích skin-weight GLB). Giữ nguyên tỷ lệ scale hiện tại, toàn bộ mesh/skeleton và animation thân dưới; không cắt model. Thay đổi mới ở mức mã nguồn, chưa được build hoặc kiểm tra trên iPhone.
+- Bước tiếp theo: người dùng chạy Codemagic và kiểm tra khung hình + chuyển động thân trên; nếu đạt mới mở rộng khung hình xuống thân dưới. Nếu lệch, dùng log/ảnh thực tế để hiệu chỉnh, không đoán thêm offset.
 - Trạng thái build Codemagic mới nhất chưa được xác nhận trong checkpoint này; không tự chạy build.
 - Nếu người dùng báo lỗi build/UI, yêu cầu log hoặc ảnh thực tế phù hợp rồi mới điều tra và sửa.
 
