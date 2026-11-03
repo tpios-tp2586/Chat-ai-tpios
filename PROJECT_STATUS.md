@@ -141,3 +141,22 @@
 - Kết luận chẩn đoán: khả năng phát clip/action riêng lẻ đã được xác nhận bằng TEST; vấn đề cần xử lý nằm ở **logic điều phối/chọn animation trong chế độ trò chuyện trực tiếp** (các state/trigger/clip được chọn và thời điểm ghi đè), không phải tiếp tục kiểm tra lại từng nút TEST.
 - Khi điều tra tiếp, tập trung truy vết các luồng ghi `avatarClip` trong `CompanionChatView.swift`, thứ tự ưu tiên giữa Talk/Idle/Listening và gesture, thời lượng/loop/transition của clip trong hội thoại. So sánh clip được gọi khi TEST với clip thực tế được gọi trong live chat.
 - Không hỏi người dùng lặp lại các quan sát trên. Không sửa giao diện TEST hoặc làm thay đổi voice pipeline; kiểm tra code và log thực tế trước, rồi đề xuất thay đổi tối thiểu cho animation orchestration.
+
+
+## Ara — phân tích luồng animation trò chuyện trực tiếp (2026-11-03)
+
+### Đã đối chiếu code trên main sau khi nhận phản hồi thực tế
+- HEAD tại thời điểm kiểm tra: `1bea853066eeda249e6ed8d4aaf3a7d553f6fcae`.
+- Đã đọc lại `CompanionChatView.swift`, `AraAvatarView.swift` và `LiveVoice.swift`; không sửa voice pipeline.
+- TEST thủ công gọi thẳng `testAraGesture(_:) -> avatarClip = clip`, hủy các task gesture cũ và giữ clip chạy đủ duration đọc từ timeline. Điều này phù hợp với xác nhận của người dùng rằng các hành động TEST đều chạy đúng.
+- Trong live chat, khi `aiSpeaking` bắt đầu, code luôn đặt `avatarClip = .talk`; khi kết thúc, code hủy gesture task và đặt về `.listening` hoặc `.idle`.
+- Cử chỉ hội thoại hiện không chạy theo lịch/chu kỳ. Chúng chỉ được kích hoạt khi heuristic tìm thấy từ khóa trong transcript:
+  - `explainCueReason` mới kích hoạt `.talkExplain`, tối đa một lần mỗi lượt assistant, chạy 2.8 giây rồi trở về `.talk`.
+  - `contextGestureCue` mới kích hoạt empathy/laugh theo một nhóm từ khóa; task hiện tại giữ 2.4 giây rồi trở về Talk/Listening/Idle.
+  - Vì vậy câu trả lời không chứa cue phù hợp thường chỉ phát clip Talk; Talk đã được phân tích là có chuyển động tay rất nhỏ.
+- Có nhiều nguồn cùng ghi `avatarClip`: `aiSpeaking`, `state`, `faceExpression`, transcript explain/context cues và task hoàn tất gesture. Ví dụ `applyAraEmotion(.speaking/.listening/.happy/.sad)` cũng trực tiếp đổi clip; các sự kiện này có thể ghi đè clip mà không có một bộ ưu tiên trung tâm.
+- Khi `aiSpeaking` chuyển false, code gọi `cancelExplainGesture()` và `cancelEmotionGesture()` ngay lập tức; đây là hành vi có thể cắt ngắn gesture nếu trạng thái speaking kết thúc sớm.
+- `AraAvatarView.swift` có một sway procedural riêng chỉ khi `currentClip == .idle`: góc sin ±3° quanh trục Z, tần số 0.3 Hz. Nó giải thích chính xác biên độ 3° nếu clip live bị trả về Idle; không phải cử chỉ tay của animation asset.
+- `LiveVoice.swift` đặt `aiSpeaking = true` khi nhận audio chunk và false ở `turnComplete`/interrupted/teardown; `faceExpression` cũng được cập nhật độc lập từ audio/transcript. Không thay đổi file này trong bước điều tra.
+- Kết luận: clip asset và playback đã được TEST xác nhận. Điểm yếu live-chat đã xác định là thiếu lịch cử chỉ hội thoại liên tục, heuristic cue thưa, và nhiều state writers có thể tranh quyền ghi clip. Không phải thiếu animation clip.
+- Chưa sửa code. Trước triển khai cần thống nhất cách Ara cử chỉ khi nói: chỉ theo ngữ nghĩa câu trả lời hay kết hợp cử chỉ nền định kỳ có giới hạn; không nên tự chọn nhịp/tần suất gây vung tay liên tục. Khi triển khai, tập trung vào orchestration ở `CompanionChatView.swift`, giữ TEST UI, Ara loader/model và Gemini Live pipeline nguyên vẹn.
