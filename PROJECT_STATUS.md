@@ -126,3 +126,18 @@
 - Việc nghiên cứu kỹ thuật tiếp theo nếu được yêu cầu: kiểm tra chính xác runtime entity hierarchy/component trong `AraAvatarView.swift`, deployment target iOS, và cách cắt/điều khiển skeletal-only animation mà không xung đột BlendShape. Đây là bước xác minh trước triển khai, không phải lý do để nghiên cứu lại model/GLB→USDZ.
 - Khi tiếp tục ở chat mới: đọc mục này trước; không lặp lại phân tích GLB/USDZ và clip đã xác minh. Chỉ kiểm tra lại nếu asset hoặc commit model thay đổi.
 
+
+
+## Ara — hành vi đã test thực tế trên iPhone (2026-11-03)
+
+### TEST thủ công và trò chuyện trực tiếp là hai kết quả khác nhau
+- Người dùng đã xác nhận: trong popup TEST, khi tự chọn từng hành động cho Ara thực hiện, **Ara đều thực hiện đúng hành động được chọn**. Các clip/action test thủ công đang hoạt động; không được coi đây là lỗi thiếu animation asset hoặc lỗi không phát được clip.
+- Khi vào trò chuyện trực tiếp, hành vi thực tế hiện tại chỉ lặp lại các chuyển động nhỏ:
+  1. Toàn thân lắc qua lắc lại khoảng 3°.
+  2. Đầu gật/lắc nhẹ qua lại.
+  3. Khi mới vào trò chuyện, Ara giơ một tay chào.
+  4. Trong lúc AI nói, thỉnh thoảng Ara giơ một tay lên rồi hạ xuống rất nhanh.
+- Đây là mô tả hành vi thực tế do người dùng quan sát, không phải suy luận từ asset hoặc log.
+- Kết luận chẩn đoán: khả năng phát clip/action riêng lẻ đã được xác nhận bằng TEST; vấn đề cần xử lý nằm ở **logic điều phối/chọn animation trong chế độ trò chuyện trực tiếp** (các state/trigger/clip được chọn và thời điểm ghi đè), không phải tiếp tục kiểm tra lại từng nút TEST.
+- Khi điều tra tiếp, tập trung truy vết các luồng ghi `avatarClip` trong `CompanionChatView.swift`, thứ tự ưu tiên giữa Talk/Idle/Listening và gesture, thời lượng/loop/transition của clip trong hội thoại. So sánh clip được gọi khi TEST với clip thực tế được gọi trong live chat.
+- Không hỏi người dùng lặp lại các quan sát trên. Không sửa giao diện TEST hoặc làm thay đổi voice pipeline; kiểm tra code và log thực tế trước, rồi đề xuất thay đổi tối thiểu cho animation orchestration.
