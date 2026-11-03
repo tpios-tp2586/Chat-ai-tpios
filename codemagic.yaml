@@ -57,11 +57,16 @@ workflows:
             exit 1
           }
 
-          # Use the checked-out commit for the ancestry and changed-file guard.
-          # The matching Actions artifact fallback only needs Actions: Read.
+          # Codemagic may use a shallow checkout. Fetch full main history before
+          # checking ancestry; fetching RUN_SHA alone leaves it as a shallow root.
           MAIN_SHA="$(git rev-parse HEAD)"
           if ! git cat-file -e "$RUN_SHA^{commit}" 2>/dev/null; then
             git fetch --no-tags origin "$RUN_SHA"
+          fi
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            git fetch --no-tags --unshallow origin main
+          else
+            git fetch --no-tags origin main
           fi
           git merge-base --is-ancestor "$RUN_SHA" "$MAIN_SHA" || {
             echo "Ara asset run SHA is not an ancestor of the checked-out commit."
