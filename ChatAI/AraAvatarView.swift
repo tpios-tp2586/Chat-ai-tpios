@@ -258,13 +258,22 @@ private final class AraAvatarLoader: ObservableObject {
                     for (index, rig) in skinnedModels.enumerated() {
                         let joints = rig.jointNames
                         let transforms = rig.jointTransforms
-                        let relevant = joints.filter {
-                            ["Head", "Neck", "Spine", "Spine1", "Spine2",
-                             "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
-                             "RightShoulder", "RightArm", "RightForeArm", "RightHand"].contains($0)
+                        let relevantNames: Set<String> = [
+                            "Head", "Neck", "Spine", "Spine1", "Spine2",
+                            "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+                            "RightShoulder", "RightArm", "RightForeArm", "RightHand"
+                        ]
+                        let indexedRelevant = joints.enumerated().compactMap { jointIndex, jointPath -> String? in
+                            let jointName = jointPath.split(separator: "/").last.map(String.init) ?? jointPath
+                            guard relevantNames.contains(jointName) else { return nil }
+                            return "\(jointIndex)=\(jointName)"
                         }
                         self.onLog?("[ARA RIG TEST] model=\(index) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
-                        self.onLog?("[ARA RIG TEST] upper-body joints: \(relevant.joined(separator: ", "))")
+                        self.onLog?("[ARA RIG TEST] upper-body index=name: \(indexedRelevant.joined(separator: ", "))")
+                        if indexedRelevant.isEmpty {
+                            let sample = joints.prefix(8).joined(separator: " | ")
+                            self.onLog?("[ARA RIG TEST] joint-name sample: \(sample.isEmpty ? "<empty>" : sample)")
+                        }
                     }
                 }
 
