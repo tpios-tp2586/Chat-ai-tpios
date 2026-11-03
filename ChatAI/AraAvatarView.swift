@@ -244,6 +244,30 @@ private final class AraAvatarLoader: ObservableObject {
 
                 self.animations = clips
 
+                var skinnedModels: [ModelEntity] = []
+                func collectSkinnedModels(_ entity: Entity) {
+                    if let modelEntity = entity as? ModelEntity, !modelEntity.jointNames.isEmpty {
+                        skinnedModels.append(modelEntity)
+                    }
+                    entity.children.forEach(collectSkinnedModels)
+                }
+                collectSkinnedModels(model)
+                if skinnedModels.isEmpty {
+                    self.onLog?("[ARA RIG TEST] No imported ModelEntity exposes jointNames")
+                } else {
+                    for (index, rig) in skinnedModels.enumerated() {
+                        let joints = rig.jointNames
+                        let transforms = rig.jointTransforms
+                        let relevant = joints.filter {
+                            ["Head", "Neck", "Spine", "Spine1", "Spine2",
+                             "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+                             "RightShoulder", "RightArm", "RightForeArm", "RightHand"].contains($0)
+                        }
+                        self.onLog?("[ARA RIG TEST] model=\(index) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
+                        self.onLog?("[ARA RIG TEST] upper-body joints: \(relevant.joined(separator: ", "))")
+                    }
+                }
+
                 self.entity = model
                 let clipSummary = timeline.clips.map {
                     "\($0.name)(\(String(format: "%.2f", $0.start))-\(String(format: "%.2f", $0.end))s)"
