@@ -169,3 +169,11 @@
 - `applyAraEmotion` không được ghi đè clip khi gesture task đang hoạt động.
 - Không sửa `LiveVoice.swift`, `AraAvatarView.swift`, TEST UI, asset, model, hay voice pipeline.
 - Chưa build/chưa chạy trên iPhone. Cần Codemagic build và kiểm tra thực tế xem cử chỉ có giữ đủ thời lượng không; sau đó mới đánh giá tiếp lịch cử chỉ nền và cử chỉ theo ngữ nghĩa. Không tự thêm nhịp lặp định kỳ.
+
+
+### Ara live-chat — sửa lần 2: không để tín hiệu bắt đầu nói ghi đè gesture
+- Commit: `feb7f0a68d511746594a874617d2cee875c45a3b`.
+- Phát hiện sau phản hồi người dùng: nhánh `aiSpeaking == true` vẫn gọi `cancelExplainGesture()` và luôn gán `avatarClip = .talk`. Điều này ghi đè TalkExplain và có thể làm tay hạ xuống sớm; lần sửa trước chỉ bảo vệ nhánh `aiSpeaking == false`.
+- Đã bỏ lệnh hủy Explain khi bắt đầu nói. Chỉ chuyển sang Talk nếu không có Explain/Emotion gesture task đang chạy; nếu có thì giữ clip và ghi log chẩn đoán.
+- Không thay đổi TEST UI, asset, Ara loader, LiveVoice/Gemini pipeline hoặc các tính năng chat khác.
+- Chưa build/chưa kiểm chứng trên thiết bị. Người dùng cần chạy Codemagic và thử hội thoại để xác nhận.
