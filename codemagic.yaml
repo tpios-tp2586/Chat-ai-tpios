@@ -143,9 +143,8 @@ workflows:
 
           mkdir -p ChatAI/Resources
           cp "$TIMELINE" ChatAI/Resources/animation-timeline.json
-          "$USD_PY" scripts/apply-ara-hip-sway.py "$SOURCE_USDZ" ChatAI/Resources/Ara-Avatar.usdz "$TIMELINE" | tee "$USD_TMP/hip-sway-diagnostics.txt"
-          grep -q '^Talk:' "$USD_TMP/hip-sway-diagnostics.txt"
-          grep -q '^AraListening:' "$USD_TMP/hip-sway-diagnostics.txt"
+          # Keep the source USDZ animation samples unchanged. Do not bake procedural Hips sway.
+          cp "$SOURCE_USDZ" ChatAI/Resources/Ara-Avatar.usdz
           unzip -tq ChatAI/Resources/Ara-Avatar.usdz
 
           mkdir -p output-usdz
