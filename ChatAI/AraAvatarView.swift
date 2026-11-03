@@ -351,13 +351,6 @@ private struct AraRealityView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
         applyZoom(zoomScale, to: model, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
-        coordinator.idleSwaySubscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak coordinator] event in
-            guard let coordinator, coordinator.currentClip == .idle,
-                  let motionRoot = coordinator.motionRoot else { return }
-            coordinator.idleSwayPhase += event.deltaTime
-            let angle = sin(coordinator.idleSwayPhase * 2 * .pi * 0.3) * (3 * .pi / 180)
-            motionRoot.orientation = simd_quatf(angle: Float(angle), axis: SIMD3<Float>(0, 0, 1))
-        }
     }
 
     private func applyZoom(_ zoom: Float, to model: Entity, coordinator: Coordinator) {
@@ -376,8 +369,6 @@ private struct AraRealityView: UIViewRepresentable {
         var currentEntity: Entity?
         var rotationPivot: AnchorEntity?
         var motionRoot: Entity?
-        var idleSwaySubscription: Cancellable?
-        var idleSwayPhase: TimeInterval = 0
         var baseScale = SIMD3<Float>(repeating: 1)
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentZoom: Float = 1
