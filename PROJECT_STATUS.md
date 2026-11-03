@@ -35,7 +35,10 @@
 
 ## Trạng thái và việc tiếp theo
 - Phần TEST tạm chốt; không tự ý chỉnh thêm.
-- Chưa xác định đầu việc phát triển tiếp theo. Không suy diễn từ ghi chú cũ hoặc tự đề xuất lại các chức năng kéo/zoom đã bị loại bỏ. Chờ người dùng xác nhận mục tiêu tiếp theo.
+- Đã xác nhận lộ trình Ara toàn thân: giai đoạn 1 thử nghiệm khung hình/chuyển động thân trên (đầu, vai, ngực, hai tay); khi đạt yêu cầu mới mở rộng giai đoạn 2 xuống hông, chân, bàn chân; giai đoạn 3 hoàn thiện chuyển động toàn thân. Thân trên chỉ là bước kiểm chứng, không phải phạm vi sản phẩm cuối.
+- Không loại bỏ rig hoặc animation chân khỏi asset trong giai đoạn 1; giữ nguyên một model Ara hiện tại để tiếp tục mở rộng.
+- Giữ iOS 16.0, không sửa Gemini Live/voice pipeline, chatbot/API, Text Chat hoặc Chibi Chat. Giữ nguyên giao diện TEST và LOG/Copy Log.
+- Bước kỹ thuật tiếp theo: xác định khung hình thử nghiệm thân trên dựa trên rig/bounds thực tế, không dùng offset camera phỏng đoán; sau khi người dùng kiểm tra build và xác nhận chuyển động thân trên, mới triển khai khung hình/chuyển động thân dưới.
 - Trạng thái build Codemagic mới nhất chưa được xác nhận trong checkpoint này; không tự chạy build.
 - Nếu người dùng báo lỗi build/UI, yêu cầu log hoặc ảnh thực tế phù hợp rồi mới điều tra và sửa.
 
