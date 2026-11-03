@@ -270,6 +270,14 @@ private final class AraAvatarLoader: ObservableObject {
                         }
                         self.onLog?("[ARA RIG TEST] model=\(index) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
                         self.onLog?("[ARA RIG TEST] upper-body index=name: \(indexedRelevant.joined(separator: ", "))")
+                        for jointIndex in [1, 2, 3, 4, 5, 10, 11, 12, 13, 34, 35, 36, 37] where transforms.indices.contains(jointIndex) {
+                            let transform = transforms[jointIndex]
+                            let translation = transform.translation
+                            let rotation = transform.rotation
+                            self.onLog?(
+                                "[ARA RIG TEST] pose[\(jointIndex)] t=(\(String(format: "%.3f", translation.x)),\(String(format: "%.3f", translation.y)),\(String(format: "%.3f", translation.z))) q=(\(String(format: "%.3f", rotation.x)),\(String(format: "%.3f", rotation.y)),\(String(format: "%.3f", rotation.z)),\(String(format: "%.3f", rotation.w)))"
+                            )
+                        }
                         if indexedRelevant.isEmpty {
                             let sample = joints.prefix(8).joined(separator: " | ")
                             self.onLog?("[ARA RIG TEST] joint-name sample: \(sample.isEmpty ? "<empty>" : sample)")
