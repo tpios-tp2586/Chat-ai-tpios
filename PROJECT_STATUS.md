@@ -186,3 +186,11 @@
 - Live chat chỉ còn chuyển trạng thái cơ bản: Talk khi AI phát tiếng, Listening khi đang nghe, Thinking khi kết nối, Idle khi phiên kết thúc. Các animation/action trong popup TEST vẫn giữ nguyên để người dùng chủ động kiểm tra.
 - Không sửa asset Ara, loader/playback, Gemini Live/voice pipeline, Text Chat, Chibi Chat hoặc giao diện TEST/LOG.
 - Chưa build/chưa kiểm chứng trên iPhone; người dùng tự chạy Codemagic. Mục tiêu là loại bỏ chuyển động tự động lặp/không cần thiết, không tuyên bố đã đạt độ tự nhiên cuối cùng.
+
+## Ara — runtime rig TEST và tách Gemini Live (2026-11-03)
+- HEAD sau thay đổi: `5dfc9431f11fc3be3aba1720c8c8d8abd881287f` trên `main`.
+- `AraAvatarView.swift`: sau khi USDZ được nạp, duyệt hierarchy tìm các `ModelEntity` có `jointNames`; ghi log số model rig, số joint, số jointTransforms và danh sách joint thân trên (Head/Neck/Spine/Shoulders/Arms/ForeArms/Hands). Nếu RealityKit không expose rig, log rõ `No imported ModelEntity exposes jointNames`.
+- `CompanionChatView.swift`: bỏ lệnh `liveManager.end()` khỏi lúc bắt đầu TEST. TEST không còn chủ động ngắt phiên Gemini Live; khi kết thúc TEST, avatar trở về Talk/Listening/Idle theo trạng thái Live hiện tại.
+- Hai thay đổi đã commit trực tiếp lên `main`; không tạo branch, không chạy Codemagic/GitHub Actions.
+- Đây mới là bước kiểm chứng runtime import joint, **chưa triển khai procedural upper-body movement và chưa build/test trên iPhone**. Không được tuyên bố joint import đã thành công chỉ từ code; cần đọc log thực tế sau build.
+- Bước tiếp theo: dựa trên log jointNames/jointTransforms thực tế để thêm các chuyển động thử từng joint (đầu, vai, cánh tay, khuỷu, cổ tay), với baseline/reset rõ ràng và không đụng voice pipeline. Nếu không tìm thấy ModelEntity có rig hoặc transforms không khớp joint count, dừng và điều tra import thay vì dựng rig giả.
