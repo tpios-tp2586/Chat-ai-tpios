@@ -329,7 +329,15 @@ private struct AraRealityView: UIViewRepresentable {
         let height = bounds.extents.y
         let baseScale: Float = height.isFinite && height > 0 ? 1.35 / height : 1
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
-        coordinator.basePosition = -bounds.center * baseScale
+
+        // GLB skin-weight analysis places the head, torso and both arms around 77% of full height.
+        // Recenter the view for the upper-body test without removing or modifying the lower-body rig.
+        let upperBodyCenter = SIMD3<Float>(
+            bounds.center.x,
+            bounds.center.y + height * 0.27,
+            bounds.center.z
+        )
+        coordinator.basePosition = -upperBodyCenter * baseScale
         coordinator.currentEntity = model
         coordinator.currentClip = clip
 
