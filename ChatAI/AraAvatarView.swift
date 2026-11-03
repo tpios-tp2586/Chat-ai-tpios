@@ -275,7 +275,7 @@ private final class AraAvatarLoader: ObservableObject {
                             let translation = transform.translation
                             let rotation = transform.rotation
                             self.onLog?(
-                                "[ARA RIG TEST] pose[\(jointIndex)] t=(\(String(format: "%.3f", translation.x)),\(String(format: "%.3f", translation.y)),\(String(format: "%.3f", translation.z))) q=(\(String(format: "%.3f", rotation.x)),\(String(format: "%.3f", rotation.y)),\(String(format: "%.3f", rotation.z)),\(String(format: "%.3f", rotation.w)))"
+                                "[ARA RIG TEST] pose[\(jointIndex)] t=(\(String(format: "%.3f", translation.x)),\(String(format: "%.3f", translation.y)),\(String(format: "%.3f", translation.z))) q=(\(String(format: "%.3f", rotation.vector.x)),\(String(format: "%.3f", rotation.vector.y)),\(String(format: "%.3f", rotation.vector.z)),\(String(format: "%.3f", rotation.vector.w)))"
                             )
                         }
                         if indexedRelevant.isEmpty {
