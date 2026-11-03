@@ -177,3 +177,12 @@
 - Đã bỏ lệnh hủy Explain khi bắt đầu nói. Chỉ chuyển sang Talk nếu không có Explain/Emotion gesture task đang chạy; nếu có thì giữ clip và ghi log chẩn đoán.
 - Không thay đổi TEST UI, asset, Ara loader, LiveVoice/Gemini pipeline hoặc các tính năng chat khác.
 - Chưa build/chưa kiểm chứng trên thiết bị. Người dùng cần chạy Codemagic và thử hội thoại để xác nhận.
+
+
+## Ara — loại bỏ chuyển động lặp tự động trong live chat (2026-11-03)
+- Theo yêu cầu người dùng, đã loại bỏ hoàn toàn procedural idle sway ±3° trong `AraAvatarView.swift`; xóa cả subscription cập nhật SceneEvents và state phase không còn dùng.
+- Trong live chat, bỏ Wave tự động khi vừa kết nối; trạng thái live vào thẳng Listening.
+- Bỏ các trigger gesture tự động từ transcript/emotion (TalkExplain, AraEmpathy, AraLaugh) cùng các task/generation/cue helper liên quan. Không còn các nguồn tự động giơ tay ngắn hoặc thay clip do faceExpression.
+- Live chat chỉ còn chuyển trạng thái cơ bản: Talk khi AI phát tiếng, Listening khi đang nghe, Thinking khi kết nối, Idle khi phiên kết thúc. Các animation/action trong popup TEST vẫn giữ nguyên để người dùng chủ động kiểm tra.
+- Không sửa asset Ara, loader/playback, Gemini Live/voice pipeline, Text Chat, Chibi Chat hoặc giao diện TEST/LOG.
+- Chưa build/chưa kiểm chứng trên iPhone; người dùng tự chạy Codemagic. Mục tiêu là loại bỏ chuyển động tự động lặp/không cần thiết, không tuyên bố đã đạt độ tự nhiên cuối cùng.
