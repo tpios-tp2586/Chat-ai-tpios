@@ -120,9 +120,12 @@ struct CompanionChatView: View {
             guard !isGestureTestMode else { return }
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
-                cancelExplainGesture()
                 speechStartToken &+= 1
-                avatarClip = .talk
+                if explainGestureTask == nil && emotionGestureTask == nil {
+                    avatarClip = .talk
+                } else {
+                    addDiagnostic("[ARA] Giữ gesture đang chạy; bỏ qua lệnh chuyển sang Talk")
+                }
                 handleLatestTranscript()
             } else if explainGestureTask == nil && emotionGestureTask == nil {
                 avatarClip = liveManager.state == .live ? .listening : .idle
