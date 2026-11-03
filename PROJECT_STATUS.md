@@ -160,3 +160,12 @@
 - `LiveVoice.swift` đặt `aiSpeaking = true` khi nhận audio chunk và false ở `turnComplete`/interrupted/teardown; `faceExpression` cũng được cập nhật độc lập từ audio/transcript. Không thay đổi file này trong bước điều tra.
 - Kết luận: clip asset và playback đã được TEST xác nhận. Điểm yếu live-chat đã xác định là thiếu lịch cử chỉ hội thoại liên tục, heuristic cue thưa, và nhiều state writers có thể tranh quyền ghi clip. Không phải thiếu animation clip.
 - Chưa sửa code. Trước triển khai cần thống nhất cách Ara cử chỉ khi nói: chỉ theo ngữ nghĩa câu trả lời hay kết hợp cử chỉ nền định kỳ có giới hạn; không nên tự chọn nhịp/tần suất gây vung tay liên tục. Khi triển khai, tập trung vào orchestration ở `CompanionChatView.swift`, giữ TEST UI, Ara loader/model và Gemini Live pipeline nguyên vẹn.
+
+
+### Ara live-chat — sửa nhỏ lần 1: không cắt cử chỉ khi Gemini báo hết lượt
+- Commit code: `9c5ed49246c1f204654a03dcec5fbbe5b4d46942`.
+- Trước đây `onChange(aiSpeaking: false)` lập tức hủy `explainGestureTask` và `emotionGestureTask`, sau đó đặt clip về Listening/Idle. Điều này có thể cắt TalkExplain/Empathy/Laugh giữa chừng khi Gemini gửi `turnComplete`, dù animation clip riêng lẻ chạy đúng trong TEST.
+- Sửa tối thiểu trong `CompanionChatView.swift`: nếu gesture task đang chạy, giữ clip hiện tại đến hết duration; khi TalkExplain hoàn tất, trả về Talk nếu AI còn nói, Listening nếu phiên vẫn live, hoặc Idle nếu phiên đã kết thúc.
+- `applyAraEmotion` không được ghi đè clip khi gesture task đang hoạt động.
+- Không sửa `LiveVoice.swift`, `AraAvatarView.swift`, TEST UI, asset, model, hay voice pipeline.
+- Chưa build/chưa chạy trên iPhone. Cần Codemagic build và kiểm tra thực tế xem cử chỉ có giữ đủ thời lượng không; sau đó mới đánh giá tiếp lịch cử chỉ nền và cử chỉ theo ngữ nghĩa. Không tự thêm nhịp lặp định kỳ.
