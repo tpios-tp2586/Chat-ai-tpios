@@ -111,6 +111,30 @@ private final class AraAvatarLoader: ObservableObject {
                     self.onLog?("[ARA STATIC] Asset animation names (not played): \(names)")
                 }
 
+                var rigCount = 0
+                let inspectedJointNames: Set<String> = [
+                    "Spine", "Spine1", "Spine2", "Neck",
+                    "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+                    "RightShoulder", "RightArm", "RightForeArm", "RightHand"
+                ]
+                func inspectRig(_ candidate: Entity) {
+                    if let rig = candidate as? ModelEntity, !rig.jointNames.isEmpty {
+                        rigCount += 1
+                        let joints = rig.jointNames
+                        let transforms = rig.jointTransforms
+                        let upperBody = joints.enumerated().compactMap { index, name in
+                            inspectedJointNames.contains(name) ? "\(index):\(name)" : nil
+                        }
+                        self.onLog?("[ARA RIG] model=\(rigCount - 1) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
+                        self.onLog?("[ARA RIG] upper-body joint indices: \(upperBody.joined(separator: ", "))")
+                    }
+                    candidate.children.forEach(inspectRig)
+                }
+                inspectRig(model)
+                if rigCount == 0 {
+                    self.onLog?("[ARA RIG] No imported ModelEntity exposes jointNames; stop before adding movement")
+                }
+
                 self.entity = model
                 self.status = "Ara đã tải — chế độ đứng yên"
                 self.onLog?("[ARA STATIC] Model mounted in its imported pose; animation generation and playback are not present in the app")
