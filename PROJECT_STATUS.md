@@ -201,3 +201,13 @@
 - Fix commit: `4806ce1bcc493e3859ee0e25a62d5e73e41ee42e`.
 - Not yet compiled or built; user must rerun Codemagic from `main` to verify.
 - Follow-up correction: Swift string interpolation in the restored timestamped log line was verified and fixed in commit `633cb589737b4181a758092a50cbfc0d8e9829cd`.
+
+## Ara — giai đoạn 2: chuẩn bị điều khiển hành động thân trên (2026-11-04)
+- Người dùng đã duyệt phạm vi: cử chỉ thân trên trong hội thoại thật; không thử mặt/đầu/cổ/BlendShape; chuyển động phải mềm, tự nhiên; không tạo TEST UI riêng.
+- Main trước bước này: `5ba3a2cdef404f0d33aa823e66b1d4a184200b9e`.
+- Commit `0f35268c0659d7d2b897d4918065d95da7030990`: chỉ bổ sung chẩn đoán runtime rig trong `AraAvatarView.swift`. Khi USDZ nạp, tìm `ModelEntity` có `jointNames`, ghi số joint/transforms và index của 12 khớp thân trên (Spine, Spine1, Spine2, vai/cánh tay/cẳng tay/bàn tay trái/phải). Không phát animation, không thay đổi tư thế và không sửa voice pipeline.
+- Project deployment target iOS 16.0. RealityKit `jointTransforms` có setter từ iOS 13 và `JointTransforms`/FromToByAnimation có từ iOS 15; có thể dùng API sẵn có để tạo chuyển động giới hạn theo danh sách joint mà không thêm dependency. Active animation có thể ghi đè jointTransforms, do đó không phát clip toàn thân song song với điều khiển khớp.
+- Rig asset đã được phân tích trước đây có 69 joints; các index dự kiến: Spine 1, Spine1 2, Spine2 3; LeftShoulder/Arm/ForeArm/Hand 10–13; RightShoulder/Arm/ForeArm/Hand 34–37. Tuy nhiên runtime import chưa được xác minh trong IPA hiện tại.
+- **Bước bắt buộc tiếp theo:** người dùng build IPA từ `main`, mở Chat Voice và gửi log có prefix `[ARA RIG]`. Nếu không có ModelEntity rig hoặc joint count không khớp, dừng để điều tra import; không đoán khớp/axis.
+- Sau khi runtime rig xác nhận: triển khai thử cử chỉ thân trên đầu tiên (Wave) bằng các joint tay được xác nhận; sau đó mới thêm cử chỉ giải thích/mở tay và mapping vào sự kiện hội thoại. Listening giữ tư thế nghỉ. Không điều khiển Head/Neck/face/BlendShape; không sửa `LiveVoice.swift`, Gemini Live, chatbot/API, Text Chat hoặc Chibi Chat.
+- Chưa có chuyển động mới trong commit này; chưa build/chưa kiểm chứng trên iPhone. Người dùng tự chạy Codemagic.
