@@ -120,7 +120,11 @@ struct CompanionChatView: View {
                         emotion = .speaking
                     }
                 } else if emotion == .speaking {
-                    emotion = liveManager.state == .live ? .listening : .idle
+                    switch liveManager.state {
+                    case .idle: emotion = .idle
+                    case .connecting: emotion = .thinking
+                    case .live: emotion = .listening
+                    }
                 }
             }
         }
