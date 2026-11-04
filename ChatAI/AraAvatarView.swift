@@ -2,48 +2,14 @@ import Combine
 import RealityKit
 import SwiftUI
 
-private struct AraPlaybackRequest: Equatable {
-    let clip: AraAvatarView.Clip
-    let repeatForTesting: Bool
-}
-
 struct AraAvatarView: View {
-    enum Clip: String, CaseIterable {
-        case idle = "Idle"
-        case wave = "Wave"
-        case talk = "Talk"
-        case talkExplain = "TalkExplain"
-        case listening = "AraListening"
-        case thinking = "AraThinking"
-        case empathy = "AraEmpathy"
-        case laugh = "AraLaugh"
-        case cheer = "Cheer"
-        case naturalLaugh = "Laugh"
-        case cry = "Cry"
-
-        var loops: Bool {
-            switch self {
-            case .idle, .talk, .listening, .thinking, .empathy:
-                return true
-            default:
-                return false
-            }
-        }
-    }
-
-    let clip: Clip
-    let resetToFrontToken: Int
-    let repeatForTesting: Bool
     let onLog: (String) -> Void
+
     @StateObject private var loader = AraAvatarLoader()
     @AppStorage("ara_avatar_zoom_scale_v3") private var savedZoomScale = 2.5
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
-
-    private var playbackRequest: AraPlaybackRequest {
-        AraPlaybackRequest(clip: clip, repeatForTesting: repeatForTesting)
-    }
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
@@ -52,7 +18,7 @@ struct AraAvatarView: View {
             }
             .onEnded { _ in
                 pinchStartScale = savedZoomScale
-                onLog("[ARA] Zoom saved: \(String(format: "%.2f", savedZoomScale))x")
+                onLog("[ARA VIEW] Zoom saved: \(String(format: "%.2f", savedZoomScale))x")
             }
     }
 
@@ -65,7 +31,7 @@ struct AraAvatarView: View {
             .onEnded { _ in
                 dragStartRotation = rotationY
                 let degrees = rotationY * 180 / Float.pi
-                onLog("[ARA] User rotation: \(String(format: "%.0f", degrees))°")
+                onLog("[ARA VIEW] Camera rotation: \(String(format: "%.0f", degrees))°")
             }
     }
 
@@ -75,8 +41,7 @@ struct AraAvatarView: View {
                 AraRealityView(
                     entity: entity,
                     zoomScale: Float(savedZoomScale),
-                    rotationY: rotationY,
-                    clip: clip
+                    rotationY: rotationY
                 )
             } else {
                 VStack(spacing: 10) {
@@ -97,31 +62,12 @@ struct AraAvatarView: View {
             let sourceCommit = info?["ChatAISourceCommit"] as? String ?? "unknown"
             let buildNumber = info?["ChatAIBuildNumber"] as? String ?? "unknown"
             onLog("[BUILD] source=\(sourceCommit.prefix(12)) build=\(buildNumber)")
-            loader.show(clip, repeatForTesting: repeatForTesting)
-        }
-        .onChange(of: playbackRequest) { request in
-            loader.show(request.clip, repeatForTesting: request.repeatForTesting)
-        }
-        .onChange(of: resetToFrontToken) { _ in
-            guard abs(rotationY) > 0.001 else { return }
-            rotationY = 0
-            dragStartRotation = 0
-            onLog("[ARA] Reset to front at AI speech start")
+            loader.load()
         }
         .onReceive(loader.$status.dropFirst()) { status in
             onLog("[ARA] \(status)")
         }
     }
-}
-
-private struct AraAnimationTimeline: Decodable {
-    let clips: [AraAnimationClipRange]
-}
-
-private struct AraAnimationClipRange: Decodable {
-    let name: String
-    let start: TimeInterval
-    let end: TimeInterval
 }
 
 @MainActor
@@ -130,35 +76,20 @@ private final class AraAvatarLoader: ObservableObject {
     @Published var status = "Đang nạp avatar Ara…"
     var onLog: ((String) -> Void)?
 
-    private var requestedClip: AraAvatarView.Clip?
-    private var requestedRepeatForTesting = false
-    private var activeClip: AraAvatarView.Clip?
-    private var activeRepeatForTesting = false
-    private var animations: [String: AnimationResource] = [:]
     private var loadSubscription: AnyCancellable?
-    private var playback: AnimationPlaybackController?
 
-    func show(_ clip: AraAvatarView.Clip, repeatForTesting: Bool = false) {
-        requestedClip = clip
-        requestedRepeatForTesting = repeatForTesting
-        guard let entity else {
-            guard loadSubscription == nil else { return }
-            load()
-            return
-        }
-        guard activeClip != clip || activeRepeatForTesting != repeatForTesting else { return }
-        play(clip, on: entity, repeatForTesting: repeatForTesting)
-    }
-
-    private func load() {
+    func load() {
+        guard entity == nil, loadSubscription == nil else { return }
         status = "Đang nạp Ara-Avatar.usdz từ app bundle…"
+
         guard let url = Bundle.main.url(forResource: "Ara-Avatar", withExtension: "usdz") else {
             status = "Không tìm thấy Ara-Avatar.usdz trong app bundle"
-            onLog?("[ARA] Bundle lookup failed: Ara-Avatar.usdz")
+            onLog?("[ARA STATIC] Bundle lookup failed: Ara-Avatar.usdz")
             return
         }
+
         let assetBytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        onLog?("[ARA] Found bundled asset: \(url.lastPathComponent), size=\(assetBytes) bytes")
+        onLog?("[ARA STATIC] Found bundled asset: \(url.lastPathComponent), size=\(assetBytes) bytes")
 
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
@@ -167,148 +98,23 @@ private final class AraAvatarLoader: ObservableObject {
                 self.loadSubscription = nil
                 if case .failure(let error) = completion {
                     self.status = "Lỗi nạp Ara-Avatar.usdz: \(error.localizedDescription)"
-                    self.onLog?("[ARA] USDZ load failed: \(error.localizedDescription)")
+                    self.onLog?("[ARA STATIC] USDZ load failed: \(error.localizedDescription)")
                 }
             }, receiveValue: { [weak self] model in
                 guard let self else { return }
                 self.loadSubscription = nil
 
-                let imported = model.availableAnimations
-                let importedNames = imported.compactMap(\.name).joined(separator: ", ")
-                self.onLog?("[ARA] Imported source animations (\(imported.count)): \(importedNames)")
-
-                guard let source = imported.first else {
-                    self.status = "USDZ không có animation nguồn"
-                    self.onLog?("[ARA] No AnimationResource found on the imported model")
-                    return
-                }
-
-                guard
-                    let timelineURL = Bundle.main.url(forResource: "animation-timeline", withExtension: "json"),
-                    let timelineData = try? Data(contentsOf: timelineURL),
-                    let timeline = try? JSONDecoder().decode(AraAnimationTimeline.self, from: timelineData)
-                else {
-                    self.status = "Không tìm thấy animation-timeline.json trong app bundle"
-                    self.onLog?("[ARA] Timeline manifest missing or invalid")
-                    return
-                }
-
-                let requiredDuration = timeline.clips.map(\.end).max() ?? 0
-                let sourceDuration = source.definition.duration
-                let ranges = timeline.clips.map { "\($0.name)(\(String(format: "%.2f", $0.start))-\(String(format: "%.2f", $0.end))s)" }.joined(separator: ", ")
-                self.onLog?("[ARA] Manifest: \(timeline.clips.count) clips [\(ranges)]; duration=\(String(format: "%.2f", requiredDuration))s; USDZ=\(String(format: "%.2f", sourceDuration))s; JSON=\(timelineData.count) bytes")
-                guard sourceDuration + 0.01 >= requiredDuration else {
-                    self.status = "Timeline USDZ ngắn hơn manifest"
-                    self.onLog?("[ARA] Timeline duration mismatch: USDZ \(sourceDuration)s; manifest \(requiredDuration)s")
-                    return
-                }
-
-                var clips: [String: AnimationResource] = [:]
-                do {
-                    let supportedNames = Set(AraAvatarView.Clip.allCases.map { $0.rawValue.lowercased() })
-                    for range in timeline.clips where supportedNames.contains(range.name.lowercased()) {
-                        let view = AnimationView(
-                            source: source.definition,
-                            name: range.name,
-                            trimStart: range.start,
-                            trimEnd: range.end
-                        )
-                        clips[range.name.lowercased()] = try AnimationResource.generate(with: view)
-                    }
-                } catch {
-                    self.status = "Không tạo được các clip animation Ara"
-                    self.onLog?("[ARA] AnimationView generation failed: \(error.localizedDescription)")
-                    return
-                }
-
-                let requiredNames = AraAvatarView.Clip.allCases.map { $0.rawValue.lowercased() }
-                let missing = requiredNames.filter { clips[$0] == nil }
-                guard missing.isEmpty else {
-                    self.status = "Thiếu clip animation: \(missing.joined(separator: ", "))"
-                    self.onLog?("[ARA] Timeline manifest missing clips: \(missing.joined(separator: ", "))")
-                    return
-                }
-
-                self.animations = clips
-
-                var skinnedModels: [ModelEntity] = []
-                func collectSkinnedModels(_ entity: Entity) {
-                    if let modelEntity = entity as? ModelEntity, !modelEntity.jointNames.isEmpty {
-                        skinnedModels.append(modelEntity)
-                    }
-                    entity.children.forEach(collectSkinnedModels)
-                }
-                collectSkinnedModels(model)
-                if skinnedModels.isEmpty {
-                    self.onLog?("[ARA RIG TEST] No imported ModelEntity exposes jointNames")
-                } else {
-                    for (index, rig) in skinnedModels.enumerated() {
-                        let joints = rig.jointNames
-                        let transforms = rig.jointTransforms
-                        let relevantNames: Set<String> = [
-                            "Head", "Neck", "Spine", "Spine1", "Spine2",
-                            "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
-                            "RightShoulder", "RightArm", "RightForeArm", "RightHand"
-                        ]
-                        let indexedRelevant = joints.enumerated().compactMap { jointIndex, jointPath -> String? in
-                            let jointName = jointPath.split(separator: "/").last.map(String.init) ?? jointPath
-                            guard relevantNames.contains(jointName) else { return nil }
-                            return "\(jointIndex)=\(jointName)"
-                        }
-                        self.onLog?("[ARA RIG TEST] model=\(index) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
-                        self.onLog?("[ARA RIG TEST] upper-body index=name: \(indexedRelevant.joined(separator: ", "))")
-                        for jointIndex in [1, 2, 3, 4, 5, 10, 11, 12, 13, 34, 35, 36, 37] where transforms.indices.contains(jointIndex) {
-                            let transform = transforms[jointIndex]
-                            let translation = transform.translation
-                            let rotation = transform.rotation
-                            self.onLog?(
-                                "[ARA RIG TEST] pose[\(jointIndex)] t=(\(String(format: "%.3f", translation.x)),\(String(format: "%.3f", translation.y)),\(String(format: "%.3f", translation.z))) q=(\(String(format: "%.3f", rotation.vector.x)),\(String(format: "%.3f", rotation.vector.y)),\(String(format: "%.3f", rotation.vector.z)),\(String(format: "%.3f", rotation.vector.w)))"
-                            )
-                        }
-                        if indexedRelevant.isEmpty {
-                            let sample = joints.prefix(8).joined(separator: " | ")
-                            self.onLog?("[ARA RIG TEST] joint-name sample: \(sample.isEmpty ? "<empty>" : sample)")
-                        }
-                    }
+                let embeddedAnimations = model.availableAnimations
+                let names = embeddedAnimations.compactMap(\.name).joined(separator: ", ")
+                self.onLog?("[ARA STATIC] Embedded animation resources=\(embeddedAnimations.count); playback is disabled")
+                if !names.isEmpty {
+                    self.onLog?("[ARA STATIC] Asset animation names (not played): \(names)")
                 }
 
                 self.entity = model
-                let clipSummary = timeline.clips.map {
-                    "\($0.name)(\(String(format: "%.2f", $0.start))-\(String(format: "%.2f", $0.end))s)"
-                }.joined(separator: ", ")
-                self.onLog?("[ARA] Built \(clips.count) AnimationViews from \(source.name ?? "unnamed source"); source duration \(String(format: "%.2f", sourceDuration))s; \(clipSummary)")
-
-                guard let clip = self.requestedClip else { return }
-                self.play(clip, on: model, repeatForTesting: self.requestedRepeatForTesting)
+                self.status = "Ara đã tải — chế độ đứng yên"
+                self.onLog?("[ARA STATIC] Model mounted in its imported pose; no AnimationView generation, no playAnimation, no playback controller")
             })
-    }
-
-    private func play(_ clip: AraAvatarView.Clip, on model: Entity, repeatForTesting: Bool) {
-        guard let animation = animations[clip.rawValue.lowercased()] else {
-            status = "Không tìm thấy animation \(clip.rawValue) trong timeline Ara"
-            onLog?("[ARA] Missing generated clip: \(clip.rawValue); available: \(animations.keys.sorted().joined(separator: ", "))")
-            return
-        }
-
-        if let previousPlayback = playback {
-            if previousPlayback.isValid {
-                onLog?("[ARA] Replacing playback: clip=\(activeClip?.rawValue ?? "unknown"), playing=\(previousPlayback.isPlaying), time=\(String(format: "%.2f", previousPlayback.time))/\(String(format: "%.2f", previousPlayback.duration))s")
-                previousPlayback.stop()
-                onLog?("[ARA] Previous playback stopped: stopped=\(previousPlayback.isStopped), playing=\(previousPlayback.isPlaying)")
-            } else {
-                onLog?("[ARA] Previous playback already inactive: clip=\(activeClip?.rawValue ?? "unknown")")
-            }
-        }
-
-        let nextPlayback = model.playAnimation(
-            clip.loops ? animation.repeat() : animation,
-            transitionDuration: 0.25
-        )
-        playback = nextPlayback
-        activeClip = clip
-        activeRepeatForTesting = repeatForTesting
-        status = "Đang phát animation \(clip.rawValue)"
-        onLog?("[ARA] Playback started: clip=\(clip.rawValue), playing=\(nextPlayback.isPlaying), valid=\(nextPlayback.isValid), duration=\(String(format: "%.2f", nextPlayback.duration))s")
     }
 }
 
@@ -316,7 +122,6 @@ private struct AraRealityView: UIViewRepresentable {
     let entity: Entity
     let zoomScale: Float
     let rotationY: Float
-    let clip: AraAvatarView.Clip
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
@@ -335,12 +140,6 @@ private struct AraRealityView: UIViewRepresentable {
             if context.coordinator.currentRotationY != rotationY {
                 applyRotation(rotationY, coordinator: context.coordinator)
             }
-            if context.coordinator.currentClip != clip {
-                context.coordinator.currentClip = clip
-                if clip != .idle {
-                    context.coordinator.motionRoot?.orientation = simd_quatf()
-                }
-            }
         }
     }
 
@@ -358,8 +157,7 @@ private struct AraRealityView: UIViewRepresentable {
         let baseScale: Float = height.isFinite && height > 0 ? 1.35 / height : 1
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
 
-        // GLB skin-weight analysis places the head, torso and both arms around 77% of full height.
-        // Recenter the view for the upper-body test without removing or modifying the lower-body rig.
+        // Keep the existing upper-body framing while the model itself stays in its imported static pose.
         let upperBodyCenter = SIMD3<Float>(
             bounds.center.x,
             bounds.center.y + height * 0.27,
@@ -367,14 +165,10 @@ private struct AraRealityView: UIViewRepresentable {
         )
         coordinator.basePosition = -upperBodyCenter * baseScale
         coordinator.currentEntity = model
-        coordinator.currentClip = clip
 
         let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.4))
-        let motionRoot = Entity()
-        anchor.addChild(motionRoot)
-        motionRoot.addChild(model)
+        anchor.addChild(model)
         coordinator.rotationPivot = anchor
-        coordinator.motionRoot = motionRoot
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
         applyZoom(zoomScale, to: model, coordinator: coordinator)
@@ -396,11 +190,9 @@ private struct AraRealityView: UIViewRepresentable {
     final class Coordinator {
         var currentEntity: Entity?
         var rotationPivot: AnchorEntity?
-        var motionRoot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentZoom: Float = 1
         var currentRotationY: Float = 0
-        var currentClip: AraAvatarView.Clip = .idle
     }
 }
