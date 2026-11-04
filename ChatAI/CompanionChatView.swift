@@ -239,18 +239,8 @@ struct CompanionChatView: View {
             ("T. Chuyện", "face.smiling", [
                 ("Idle", .idle), ("Nghe", .listening), ("Nghĩ", .thinking),
                 ("Nói", .talk), ("Giải thích", .talkExplain),
-                ("Đồng cảm", .empathy), ("Ara cười", .laugh), ("Cười", .naturalLaugh)
-            ]),
-            ("Y. Cầu", "hand.tap", [
-                ("Vẫy tay", .wave), ("Đi", .walk), ("Chạy", .run),
-                ("Lùi", .walkBackwards), ("Sang trái", .strafeLeft),
-                ("Sang phải", .strafeRight), ("Quay trái 45°", .turnLeft45),
-                ("Quay trái 90°", .turnLeft90), ("Quay phải 45°", .turnRight45),
-                ("Quay phải 90°", .turnRight90), ("Quay 360°", .fullTurn),
-                ("Ngồi xuống", .sitDown), ("Ngồi yên", .sitIdle),
-                ("Đứng dậy", .standUp), ("Nằm", .lieDown),
-                ("Ngủ", .sleep), ("Nhảy", .jumpStart),
-                ("Cưỡi ngựa", .rideHorse)
+                ("Đồng cảm", .empathy), ("Ara cười", .laugh), ("Cười", .naturalLaugh),
+                ("Vẫy tay", .wave), ("Hoan hô", .cheer), ("Khóc", .cry)
             ])
         ]
     }
@@ -376,19 +366,15 @@ struct CompanionChatView: View {
 
     private func runAraTest(_ clip: AraAvatarView.Clip) {
         beginGestureTestMode()
-        if clip == .jumpStart { testJumpSequence() }
-        else { testAraGesture(clip) }
+        testAraGesture(clip)
     }
 
     private func runAraBatchTest() {
         guard !isGestureTestMode else { return }
         beginGestureTestMode()
         let clips: [AraAvatarView.Clip] = [
-            .idle, .wave, .talk, .talkExplain, .listening, .thinking, .empathy,
-            .laugh, .naturalLaugh, .walk, .run, .walkBackwards, .strafeLeft,
-            .strafeRight, .jumpStart, .jumpAir, .jumpLand, .sitDown, .sitIdle,
-            .standUp, .lieDown, .sleep, .turnLeft45, .turnLeft90, .turnRight45,
-            .turnRight90, .fullTurn, .rideHorse, .cheer, .cry
+            .idle, .wave, .talk, .talkExplain, .listening, .thinking,
+            .empathy, .laugh, .naturalLaugh, .cheer, .cry
         ]
         addDiagnostic("[ARA TEST] Batch started: \(clips.count) clips; automatic sequence")
 
@@ -437,24 +423,6 @@ struct CompanionChatView: View {
             guard isGestureTestMode, avatarClip == clip else { return }
             endGestureTestMode()
             addDiagnostic("[ARA TEST] Finished: \(clip.rawValue)")
-        }
-    }
-
-    private func testJumpSequence() {
-        guard isGestureTestMode else { return }
-        gestureTestTask?.cancel()
-        gestureTestTask = Task { @MainActor in
-            for clip in [AraAvatarView.Clip.jumpStart, .jumpAir, .jumpLand] {
-                guard !Task.isCancelled, isGestureTestMode else { return }
-                avatarClip = clip
-                let duration = araClipDuration(clip)
-                addDiagnostic("[ARA TEST] Jump: \(clip.rawValue), \(String(format: "%.2f", duration))s")
-                do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
-                catch { return }
-            }
-            guard !Task.isCancelled, isGestureTestMode else { return }
-            endGestureTestMode()
-            addDiagnostic("[ARA TEST] Jump sequence finished")
         }
     }
 
