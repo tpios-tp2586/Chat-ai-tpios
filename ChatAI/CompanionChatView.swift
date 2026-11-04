@@ -214,7 +214,7 @@ struct CompanionChatView: View {
 
     private func addDiagnostic(_ line: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        diagnosticLogs.append("[\\(timestamp)] \\(line)")
+        diagnosticLogs.append("[\(timestamp)] \(line)")
         if diagnosticLogs.count > 150 {
             diagnosticLogs.removeFirst(diagnosticLogs.count - 150)
         }
