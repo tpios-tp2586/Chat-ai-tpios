@@ -213,6 +213,15 @@
 - Chưa có chuyển động mới trong commit này; chưa build/chưa kiểm chứng trên iPhone. Người dùng tự chạy Codemagic.
 
 
+
+
+## Ara — dump đầy đủ runtime skeleton cho đợt test tổng hợp (2026-11-04)
+- Main source commit: \`4fa69969227acf8f09222c6216e76e3624f9ad45\`.
+- \`ChatAI/AraAvatarView.swift\`: sau khi tìm thấy rig, log tên khớp kèm index cho toàn bộ jointNames, chia nhóm tối đa 12 khớp mỗi dòng; vẫn ghi số joint/transforms và kết quả exact-name match.
+- Chỉ bổ sung diagnostic; không thay đổi pose, không điều khiển joint, không phát animation, không thêm TEST UI, không sửa CompanionChatView hoặc LiveVoice/Gemini Live.
+- Mục đích: lấy naming convention runtime chính xác trước khi thiết kế một lượt kiểm tra hành động thân trên. Chưa triển khai hành động vì cần xác nhận index/tên khớp từ IPA.
+- Chưa build/chưa kiểm chứng trên iPhone. Người dùng build IPA từ main và gửi toàn bộ các dòng \`[ARA RIG]\`.
+
 ## Ara — fix Swift actor isolation trong rig diagnostics (2026-11-04)
 - Codemagic báo lỗi tại hai dòng `self.onLog` bên trong nested function `inspectRig`: nested function bị xem là nonisolated nên không được truy cập trực tiếp thuộc tính MainActor-isolated.
 - Fix tối thiểu trong `ChatAI/AraAvatarView.swift`: chụp closure `onLog` `let rigLog = self.onLog` trước khi khai báo/duyệt rig; nested function chỉ gọi closure đã capture, không truy cập `self.onLog`.
