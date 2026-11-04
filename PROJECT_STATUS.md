@@ -1,50 +1,35 @@
 # ChatAI — Project Checkpoint
 
-## Repository
+## Repository và quy tắc
 - Repo: https://github.com/tpios-tp2586/Chat-ai-tpios
-- Chỉ làm việc trực tiếp trên `main`; tuyệt đối không tạo hoặc chuyển branch.
-- Code giao diện Ara gần nhất: `61f55bc9636bb879fc5a9708f154dc7f969a4367` — popup TEST bỏ chữ `Test`, chỉ hiện tên nhóm (`T. Chuyện`/`Y. Cầu`), thu gọn hàng tiêu đề và giữ danh sách một cột dọc.
-- Checkpoint trước lần cập nhật này: `db9591b1678918b80ba082dc78f0cb84f10831f1`.
-- Lịch sử thay đổi xem trong Git commits/diffs.
+- Chỉ làm việc trực tiếp trên `main`; không tạo/chuyển branch.
+- Trước khi sửa: kiểm tra HEAD, đọc checkpoint và source thực tế.
+- Ưu tiên diff nhỏ, Ponytail; không thêm dependency.
+- Không sửa chatbot/API, chat history, `LiveVoice.swift`, Gemini Live/voice pipeline, Text Chat hoặc Chibi Chat khi làm Ara.
+- Không tự chạy Codemagic hoặc GitHub Actions. Người dùng tự build IPA.
+- `PROJECT_STATUS.md` là checkpoint duy nhất.
 
-## Quy tắc bắt buộc
-- Trước khi sửa code: kiểm tra HEAD và đọc code thực tế đúng phạm vi; không đoán.
-- Ưu tiên thay đổi tối thiểu, không thêm dependency nếu không cần (Ponytail).
-- Bảo vệ chatbot/API, chat history, voice pipeline, Text Chat và Chibi Chat. Không sửa các phần này khi làm Ara.
-- Không tạo branch; không tự chạy/dispatch GitHub Actions hoặc Codemagic. Người dùng tự chạy build thủ công.
-- Codemagic chỉ xuất IPA; không thêm ZIP artifact ngoài yêu cầu.
-- Người dùng thao tác chủ yếu trên iPhone; hướng dẫn ngắn gọn, rõ ràng.
-- Không sửa đi sửa lại từng chi tiết nhỏ. Phải hiểu và chốt yêu cầu, kiểm tra toàn bộ code liên quan, gom thay đổi thành một lần hợp lý, rà diff trước khi commit.
+## Trạng thái hiện tại — Ara đứng yên, xóa code hành động và TEST (2026-11-04)
+- **Mục tiêu hiện tại:** Ara chỉ nạp model USDZ và giữ nguyên tư thế nhập vào; không có chuyển động tự động, animation theo trạng thái thoại, clip hành động, popup TEST hoặc TEST tổng hợp.
+- `ChatAI/AraAvatarView.swift`: đã bỏ enum Clip, timeline parser, AnimationView/AnimationResource generation, AnimationPlaybackController và mọi lệnh phát animation. Loader chỉ nạp model; log số/tên animation nhúng trong asset nhưng không kích hoạt chúng.
+- `ChatAI/CompanionChatView.swift`: đã bỏ nút TEST, popup, danh sách clip, batch, task test, thời lượng clip và toàn bộ logic chuyển trạng thái voice thành clip Ara. Các trạng thái cảm xúc còn lại chỉ cập nhật nhãn/trạng thái chữ của giao diện, không điều khiển avatar.
+- Nút LOG và Sao chép log được giữ. Log có prefix `[ARA STATIC]` để ghi nhận asset được nạp, số/tên animation nhúng (nếu có), và xác nhận app không tạo hoặc phát animation.
+- Zoom và xoay bằng thao tác người dùng chỉ thay đổi góc nhìn camera/model root; không phải animation hay hành động tự động của Ara.
+- USDZ gốc vẫn chứa animation data. Đây là dữ liệu nguồn bất hoạt trong app hiện tại, không phải code phát hành động. Không chỉnh/xóa dữ liệu USDZ hoặc pipeline tạo asset trong bước này.
+- Source commits: `d9e2c7fbb9d99a7c50a50d4224b715e997b9e62d` (static loader và bỏ playback); `f52991ce79ddf19deca25041c7c8d90c42bf6e58` (xóa TEST/action orchestration khỏi Chat Voice); `0177f6686367177ff3a93d596fa3995f9c5705f0` (log xác nhận chế độ tĩnh).
+- Chưa build/chưa kiểm chứng trên iPhone. Không tuyên bố đã xác nhận đứng im hoàn toàn cho đến khi người dùng build IPA và quan sát trực tiếp.
 
-## Hướng hiện tại
-- Tiếp tục Ara avatar 3D trong màn hình Chat Voice bằng RealityKit.
-- Không quay lại phương án 8 ảnh biểu cảm thay cho avatar 3D.
-- Ara đã load và phát animation trên iPhone ở các lần build trước; cần đánh giá bằng quan sát thực tế, không chỉ dựa vào log.
-- Không thay đổi chatbot hoặc voice pipeline để xử lý animation/UI test.
+## Lịch sử kiểm thử hành động Ara — đã hoàn tất, không tái sử dụng
+- Đợt kiểm thử trước dùng batch 30 clip, theo timeline: Idle; Wave; Talk; TalkExplain; AraListening; AraThinking; AraEmpathy; AraLaugh; Walk; Run; Walk backwards; Strafe left; Strafe right; Jump start; Jump (in air); Jump land; Sit down (chair); Sit idle (chair); Stand up (chair); Lie down; Sleep; Turn left 45°; Turn left 90°; Turn right 45°; Turn right 90°; Full turn 360°; Ride horse (trot); Cheer; Laugh; Cry.
+- Log trước đây xác nhận các clip được gọi và bắt đầu phát theo thứ tự; người dùng đã quan sát thực tế và xác định một số hành động không hoạt động/không phù hợp. Đợt test hành động này được đóng lại theo yêu cầu người dùng; không giữ lại popup, nút, batch hoặc logic test.
+- Các lần rút xuống 11 clip và điều phối Talk/Listening/Thinking/Idle sau đó chỉ là bước trung gian. Toàn bộ test và điều phối animation đó đã bị thay thế bởi chế độ Ara đứng yên hiện tại.
 
-## Ara — giao diện TEST (tạm chốt)
-- Trên thanh công cụ Chat Voice, giữ nút LOG và nút TEST cùng kích thước 42×42 pt.
-- Chức năng sáng/tối riêng của Chat Voice đã được xóa: state `nightMode`, nút đổi nền và lớp phủ đen. Vẫn giữ Theme chung của ứng dụng qua `activeTheme`.
-- Icon TEST mở popup SwiftUI tự thiết kế; không dùng native Menu hoặc sheet cho phần test.
-- Popup không hiển thị chữ `Test`; màn hình chọn nhóm chỉ có hai ô `T. Chuyện` và `Y. Cầu` cùng nút đóng. Khi vào nhóm, tiêu đề chỉ hiện tên nhóm, nút quay lại chỉ dùng icon mũi tên.
-- Popup tự co theo nội dung; hàng tiêu đề gọn. Khi mở nhóm, các hành động xếp thành một cột dọc; mỗi ô 40×40 pt, danh sách dài có thể cuộn.
-- Chọn hành động chạy clip tương ứng nhưng giữ popup và nhóm đang chọn mở để tiếp tục test; test mode chỉ bật nội bộ trong lúc chạy và tự kết thúc về Idle.
-- Popup TEST chỉ giữ 11 clip phục vụ hội thoại/biểu cảm: Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh, Laugh, Cheer, Cry. Nhóm hành động nền/di chuyển đã được loại khỏi giao diện, batch TEST và enum runtime; không xoá animation gốc khỏi USDZ/timeline.
-- Người dùng đánh giá phần TEST hiện tại là tạm ổn. Không tiếp tục chỉnh sửa giao diện/chức năng TEST nếu chưa có yêu cầu mới.
-- **Đã loại bỏ hoàn toàn khỏi tool** chức năng kéo di chuyển, zoom/thu phóng và thu gọn/resize khung test vì hoạt động không ổn. Không khôi phục, không tối ưu lại, không đưa các chức năng này thành đầu việc tiếp theo.
-
-## Trạng thái và việc tiếp theo
-- Phần TEST tạm chốt; không tự ý chỉnh thêm.
-- Đã xác nhận lộ trình Ara toàn thân: giai đoạn 1 thử nghiệm khung hình/chuyển động thân trên (đầu, vai, ngực, hai tay); khi đạt yêu cầu mới mở rộng giai đoạn 2 xuống hông, chân, bàn chân; giai đoạn 3 hoàn thiện chuyển động toàn thân. Thân trên chỉ là bước kiểm chứng, không phải phạm vi sản phẩm cuối.
-- Không loại bỏ rig hoặc animation chân khỏi asset trong giai đoạn 1; giữ nguyên một model Ara hiện tại để tiếp tục mở rộng.
-- Giữ iOS 16.0, không sửa Gemini Live/voice pipeline, chatbot/API, Text Chat hoặc Chibi Chat. Giữ nguyên giao diện TEST và LOG/Copy Log.
-- Đã cập nhật `AraAvatarView.swift`: khung hình thử nghiệm căn tâm theo vùng thân trên (dịch tâm lên 0,27 chiều cao toàn model, tương ứng vùng tâm khoảng 77% chiều cao theo phân tích skin-weight GLB). Giữ nguyên tỷ lệ scale hiện tại, toàn bộ mesh/skeleton và animation thân dưới; không cắt model. Thay đổi mới ở mức mã nguồn, chưa được build hoặc kiểm tra trên iPhone.
-- Bước tiếp theo: người dùng chạy Codemagic và kiểm tra khung hình + chuyển động thân trên; nếu đạt mới mở rộng khung hình xuống thân dưới. Nếu lệch, dùng log/ảnh thực tế để hiệu chỉnh, không đoán thêm offset.
-- Trạng thái build Codemagic mới nhất chưa được xác nhận trong checkpoint này; không tự chạy build.
-- Nếu người dùng báo lỗi build/UI, yêu cầu log hoặc ảnh thực tế phù hợp rồi mới điều tra và sửa.
-
-## Tiếp tục ở khung chat mới
-Đọc checkpoint này và kiểm tra HEAD trên `main` trước khi làm việc. Phần TEST Ara đang tạm chốt. Tuyệt đối không khôi phục chức năng kéo di chuyển, zoom/thu phóng hoặc thu gọn/resize khung test đã bị loại bỏ. Chưa có đầu việc tiếp theo được xác nhận; hỏi người dùng trước khi bắt đầu. Không tạo branch và không tự chạy Codemagic/GitHub Actions.
+## Quy trình xác minh mới
+1. Người dùng build IPA từ `main`.
+2. Mở Chat Voice, quan sát Ara trong trạng thái ban đầu, khi kết nối, khi AI nói, khi nghe và sau khi kết thúc phiên. Ara phải giữ nguyên tư thế, không cử động theo bất kỳ trạng thái nào.
+3. Mở LOG và sao chép. Kiểm tra có `[ARA STATIC]` ghi asset nạp thành công và playback bị vô hiệu hóa; không còn log `[ARA TEST]` hoặc `[ARA] Playback started`.
+4. Nếu avatar vẫn tự chuyển động dù source không còn code phát animation, điều tra khả năng animation tự chạy từ asset/import/runtime trước khi sửa tiếp. Không thêm test UI mới.
+5. Chỉ sau khi xác nhận Ara đứng yên hoàn toàn mới thiết kế bộ hành động phục vụ hội thoại thực tế. Khi đó hành động được tích hợp trực tiếp vào luồng trò chuyện và đánh giá qua hội thoại thật, không tạo một hệ thống test hành động riêng.
 
 ## Ara — kết quả nghiên cứu kỹ thuật đã xác minh (2026-11-02)
 
@@ -203,23 +188,8 @@
 - Chưa build/chưa kiểm chứng trên iPhone. Người dùng tự chạy Codemagic và thử lại TalkExplain → kết thúc TEST; log cần xác nhận không còn phát lại TalkExplain sau khi đã khôi phục Idle/Listening/Talk.
 
 
-## Ara — TEST tổng hợp một lần bấm (2026-11-04)
-- Theo yêu cầu người dùng, thêm nút `TEST tổng hợp` ngay màn hình gốc của popup TEST Ara. Sau lần dọn code ngày 2026-11-04, batch chỉ chạy 11 clip hội thoại/biểu cảm còn được giữ lại; không còn chuỗi Jump hoặc các hành động nền/di chuyển.
-- Mỗi clip chạy theo thời lượng lấy từ `animation-timeline.json`; các clip có cờ loop vẫn được giới hạn trong đúng một khoảng thời lượng clip để lượt test tự kết thúc. Sau clip cuối, test mode khôi phục trạng thái live hiện tại (Talk / Listening / Idle).
-- Popup hiện chỉ còn một nhóm `T. Chuyện` và các nút test thủ công còn lại; không thay đổi AraAvatarView playback, chatbot, Gemini Live hoặc voice pipeline. Nút TEST tổng hợp bị vô hiệu hóa khi một test khác đang chạy.
-- Source commit: `6b4b3c74fc412a3177403f50b63f9fd10d5ef8f8` (`Add one-tap Ara batch test`). Chưa chạy build hoặc xác minh trên iPhone; người dùng cần build IPA thủ công qua Codemagic.
-
-
-## Ara — dọn hành động nền khỏi TEST (2026-11-04)
-- Code commit `e75659b83551a9a63a00ef7f792159532e7fc1ed`: `AraAvatarView.swift` loại 19 clip nền/di chuyển khỏi enum runtime và chỉ tạo AnimationResource cho 11 clip được hỗ trợ qua `Clip.allCases`. Không xoá dữ liệu animation gốc khỏi USDZ hoặc `animation-timeline.json`.
-- Code commit `63a55e74bb686b3aac6ebdec45ac80374740ae66`: `CompanionChatView.swift` bỏ nhóm `Y. Cầu` và nút nhóm thứ hai còn sót trong layout, chuyển Wave vào nhóm hội thoại, giữ 11 nút gồm Idle, Nghe, Nghĩ, Nói, Giải thích, Đồng cảm, Ara cười, Cười, Vẫy tay, Hoan hô, Khóc. Batch TEST cũng chỉ còn 11 clip; đã xoá nhánh/sequence Jump và các tham chiếu tới hành động nền.
-- Không sửa USDZ, timeline gốc, Gemini Live/LiveVoice, chatbot/API, Text Chat hoặc Chibi Chat. LOG/Copy Log và nút TEST tổng hợp vẫn giữ.
-- Chưa chạy build hoặc test IPA sau hai commit này. Người dùng chạy Codemagic thủ công; cần xác nhận popup chỉ hiện một nhóm và batch chạy đủ 11 clip, kết thúc khôi phục trạng thái live.
-- Bước code tiếp theo sau xác nhận: tập trung cải thiện điều phối chuyển động hội thoại trực tiếp (Talk/Listening/Thinking/Idle và cử chỉ phù hợp), không đưa lại hành động nền/di chuyển vào tool.
-
-
-## Ara — điều phối trạng thái live tập trung (2026-11-04)
-- Commit `1f53c2e47ef1e1581362a737288f4e1062586c94` và `52e91fc39543c1a818e13fe4975ab466307dba42` trong `CompanionChatView.swift`: gom quyết định clip live vào `syncAraLiveState()`. Cả sự kiện `aiSpeaking` và thay đổi trạng thái phiên đều gọi cùng một điểm chọn clip.
-- Thứ tự ưu tiên: Talk khi AI đang phát tiếng; nếu không thì Thinking khi kết nối, Listening khi phiên live, Idle khi phiên kết thúc. TEST mode được bỏ qua hoàn toàn để không ghi đè clip đang test.
-- Khi AI ngừng nói, emotion trở về trạng thái tương ứng Idle/Thinking/Listening. Không sửa `LiveVoice.swift`, Gemini Live, luồng audio/transcript, model hoặc asset.
-- Đây là bước dọn logic state writer, chưa bổ sung cử chỉ nền hay lịch chuyển động tự động. Chưa build/chưa xác minh trên iPhone; cần build IPA và kiểm tra các chuyển trạng thái Connecting → Live → AI Talk → Listening → Idle, đồng thời kiểm tra TEST không bị state live ghi đè.
+## Ara — chuyển sang chế độ tĩnh và xóa toàn bộ TEST (2026-11-04)
+- Các mục kiểm thử 30 clip, 11 clip và điều phối animation ở phần lịch sử phía trên đã được đóng. Không khôi phục chúng.
+- App hiện chỉ load USDZ, không parse timeline, không tạo AnimationView/AnimationResource, không gọi playAnimation và không giữ playback controller.
+- LOG/Copy Log vẫn là công cụ chẩn đoán; nó không phải TEST animation. Các log [ARA STATIC] chỉ xác nhận trạng thái nạp model và việc không phát animation.
+- Giai đoạn tiếp theo bị khóa cho đến khi người dùng xác nhận bằng mắt rằng Ara đứng yên trong IPA mới. Sau đó mới thiết kế hành động dùng trong hội thoại thực tế, không có test riêng.
