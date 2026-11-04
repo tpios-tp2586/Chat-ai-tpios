@@ -127,7 +127,12 @@ private final class AraAvatarLoader: ObservableObject {
                             inspectedJointNames.contains(name) ? "\(index):\(name)" : nil
                         }
                         rigLog?("[ARA RIG] model=\(rigCount - 1) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
-                        rigLog?("[ARA RIG] upper-body joint indices: \(upperBody.joined(separator: ", "))")
+                        rigLog?("[ARA RIG] upper-body exact-name matches: \(upperBody.isEmpty ? "none" : upperBody.joined(separator: ", "))")
+                        let indexedJointNames = joints.enumerated().map { "\($0.offset):\($0.element)" }
+                        for start in stride(from: 0, to: indexedJointNames.count, by: 12) {
+                            let end = min(start + 12, indexedJointNames.count)
+                            rigLog?("[ARA RIG] joints[\(start)-\(end - 1)]: \(indexedJointNames[start..<end].joined(separator: " | "))")
+                        }
                     }
                     candidate.children.forEach(inspectRig)
                 }
