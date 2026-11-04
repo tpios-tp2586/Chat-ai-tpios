@@ -211,3 +211,11 @@
 - **Bước bắt buộc tiếp theo:** người dùng build IPA từ `main`, mở Chat Voice và gửi log có prefix `[ARA RIG]`. Nếu không có ModelEntity rig hoặc joint count không khớp, dừng để điều tra import; không đoán khớp/axis.
 - Sau khi runtime rig xác nhận: triển khai thử cử chỉ thân trên đầu tiên (Wave) bằng các joint tay được xác nhận; sau đó mới thêm cử chỉ giải thích/mở tay và mapping vào sự kiện hội thoại. Listening giữ tư thế nghỉ. Không điều khiển Head/Neck/face/BlendShape; không sửa `LiveVoice.swift`, Gemini Live, chatbot/API, Text Chat hoặc Chibi Chat.
 - Chưa có chuyển động mới trong commit này; chưa build/chưa kiểm chứng trên iPhone. Người dùng tự chạy Codemagic.
+
+
+## Ara — fix Swift actor isolation trong rig diagnostics (2026-11-04)
+- Codemagic báo lỗi tại hai dòng `self.onLog` bên trong nested function `inspectRig`: nested function bị xem là nonisolated nên không được truy cập trực tiếp thuộc tính MainActor-isolated.
+- Fix tối thiểu trong `ChatAI/AraAvatarView.swift`: chụp closure `onLog` `let rigLog = self.onLog` trước khi khai báo/duyệt rig; nested function chỉ gọi closure đã capture, không truy cập `self.onLog`.
+- Không đổi logic duyệt joint, nạp USDZ, chuyển động, UI, Gemini Live hoặc voice pipeline.
+- Fix commit: `dcaa4151f3160fb6a29690c4c40ab4c49cc14b8d` trên `main`.
+- Chưa chạy Xcode/Codemagic; cần build IPA lại để xác minh compiler. Nếu còn lỗi, xử lý theo lỗi đầu tiên trong log mới.
