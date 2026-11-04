@@ -110,11 +110,9 @@ struct CompanionChatView: View {
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
                 speechStartToken &+= 1
-                avatarClip = .talk
                 handleLatestTranscript()
-            } else {
-                avatarClip = liveManager.state == .live ? .listening : .idle
             }
+            syncAraLiveState()
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
                     // Speech is a mouth animation, not a facial emotion.
@@ -128,17 +126,18 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.state) { state in
             addDiagnostic("[VOICE] Trạng thái: \(String(describing: state))")
-            guard !isGestureTestMode, !liveManager.aiSpeaking else { return }
-            switch state {
-            case .idle:
-                emotion = .idle
-            case .connecting:
-                emotion = .thinking
-                avatarClip = .thinking
-            case .live:
-                emotion = .listening
-                avatarClip = .listening
+            guard !isGestureTestMode else { return }
+            if !liveManager.aiSpeaking {
+                switch state {
+                case .idle:
+                    emotion = .idle
+                case .connecting:
+                    emotion = .thinking
+                case .live:
+                    emotion = .listening
+                }
             }
+            syncAraLiveState()
         }
         .onDisappear {
             gestureTestTask?.cancel()
@@ -432,6 +431,25 @@ struct CompanionChatView: View {
               let start = item["start"] as? Double,
               let end = item["end"] as? Double else { return 1.0 }
         return max(0.1, end - start)
+    }
+
+    private func syncAraLiveState() {
+        guard !isGestureTestMode else { return }
+
+        let nextClip: AraAvatarView.Clip
+        if liveManager.aiSpeaking {
+            nextClip = .talk
+        } else {
+            switch liveManager.state {
+            case .idle: nextClip = .idle
+            case .connecting: nextClip = .thinking
+            case .live: nextClip = .listening
+            }
+        }
+
+        guard avatarClip != nextClip else { return }
+        avatarClip = nextClip
+        addDiagnostic("[ARA STATE] Live animation: \(nextClip.rawValue)")
     }
 
     private func handleLatestTranscript() {
