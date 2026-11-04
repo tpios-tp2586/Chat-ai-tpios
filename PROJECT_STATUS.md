@@ -193,3 +193,10 @@
 - App hiện chỉ load USDZ, không parse timeline, không tạo AnimationView/AnimationResource, không gọi playAnimation và không giữ playback controller.
 - LOG/Copy Log vẫn là công cụ chẩn đoán; nó không phải TEST animation. Các log [ARA STATIC] chỉ xác nhận trạng thái nạp model và việc không phát animation.
 - Giai đoạn tiếp theo bị khóa cho đến khi người dùng xác nhận bằng mắt rằng Ara đứng yên trong IPA mới. Sau đó mới thiết kế hành động dùng trong hội thoại thực tế, không có test riêng.
+
+## Build fix — Chat Voice helper methods (2026-11-04)
+- Codemagic compile error: `addDiagnostic` and `handleLatestTranscript` were referenced by `CompanionChatView` but their definitions had been removed during Ara TEST cleanup.
+- Restored `addDiagnostic` (timestamped, capped at 150 entries), `handleLatestTranscript`, and its text-only emotion classifier. These helpers update LOG/transcript/status labels only; they do not trigger Ara animation or actions.
+- `AraAvatarView` remains a static loader; no TEST UI, clip playback, or action orchestration was restored.
+- Fix commit: `4806ce1bcc493e3859ee0e25a62d5e73e41ee42e`.
+- Not yet compiled or built; user must rerun Codemagic from `main` to verify.
