@@ -298,10 +298,7 @@ struct CompanionChatView: View {
                 }
 
                 VStack(spacing: 7) {
-                    HStack(spacing: 6) {
-                        araTestGroupButton(index: 0)
-                        araTestGroupButton(index: 1)
-                    }
+                    araTestGroupButton(index: 0)
 
                     Button {
                         runAraBatchTest()
