@@ -12,11 +12,11 @@
 ## Trạng thái hiện tại — Ara đứng yên, xóa code hành động và TEST (2026-11-04)
 - **Mục tiêu hiện tại:** Ara chỉ nạp model USDZ và giữ nguyên tư thế nhập vào; không có chuyển động tự động, animation theo trạng thái thoại, clip hành động, popup TEST hoặc TEST tổng hợp.
 - `ChatAI/AraAvatarView.swift`: đã bỏ enum Clip, timeline parser, AnimationView/AnimationResource generation, AnimationPlaybackController và mọi lệnh phát animation. Loader chỉ nạp model; log số/tên animation nhúng trong asset nhưng không kích hoạt chúng.
-- `ChatAI/CompanionChatView.swift`: đã bỏ nút TEST, popup, danh sách clip, batch, task test, thời lượng clip và toàn bộ logic chuyển trạng thái voice thành clip Ara. Các trạng thái cảm xúc còn lại chỉ cập nhật nhãn/trạng thái chữ của giao diện, không điều khiển avatar.
+- `ChatAI/CompanionChatView.swift`: đã bỏ nút TEST, popup, danh sách clip, batch, task test, thời lượng clip và toàn bộ logic chuyển trạng thái voice thành clip Ara. Các trạng thái cảm xúc còn lại chỉ cập nhật nhãn/trạng thái chữ của giao diện, không điều khiển avatar; đã bỏ cả thuộc tính label cũ không còn dùng.
 - Nút LOG và Sao chép log được giữ. Log có prefix `[ARA STATIC]` để ghi nhận asset được nạp, số/tên animation nhúng (nếu có), và xác nhận app không tạo hoặc phát animation.
 - Zoom và xoay bằng thao tác người dùng chỉ thay đổi góc nhìn camera/model root; không phải animation hay hành động tự động của Ara.
 - USDZ gốc vẫn chứa animation data. Đây là dữ liệu nguồn bất hoạt trong app hiện tại, không phải code phát hành động. Không chỉnh/xóa dữ liệu USDZ hoặc pipeline tạo asset trong bước này.
-- Source commits: `d9e2c7fbb9d99a7c50a50d4224b715e997b9e62d` (static loader và bỏ playback); `f52991ce79ddf19deca25041c7c8d90c42bf6e58` (xóa TEST/action orchestration khỏi Chat Voice); `0177f6686367177ff3a93d596fa3995f9c5705f0` (log xác nhận chế độ tĩnh).
+- Source commits: `d9e2c7fbb9d99a7c50a50d4224b715e997b9e62d` (static loader và bỏ playback); `f52991ce79ddf19deca25041c7c8d90c42bf6e58` (xóa TEST/action orchestration khỏi Chat Voice); `0177f6686367177ff3a93d596fa3995f9c5705f0` (log xác nhận chế độ tĩnh); `4d77bbff62a26246ad9346e354bcbd5d65423c9a` (dọn trạng thái cảm xúc chỉ còn phục vụ nhãn giao diện).
 - Chưa build/chưa kiểm chứng trên iPhone. Không tuyên bố đã xác nhận đứng im hoàn toàn cho đến khi người dùng build IPA và quan sát trực tiếp.
 
 ## Lịch sử kiểm thử hành động Ara — đã hoàn tất, không tái sử dụng
