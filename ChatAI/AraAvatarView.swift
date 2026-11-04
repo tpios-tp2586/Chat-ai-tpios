@@ -2,6 +2,11 @@ import Combine
 import RealityKit
 import SwiftUI
 
+private struct AraPlaybackRequest: Equatable {
+    let clip: AraAvatarView.Clip
+    let repeatForTesting: Bool
+}
+
 struct AraAvatarView: View {
     enum Clip: String {
         case idle = "Idle"
@@ -55,6 +60,10 @@ struct AraAvatarView: View {
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
+
+    private var playbackRequest: AraPlaybackRequest {
+        AraPlaybackRequest(clip: clip, repeatForTesting: repeatForTesting)
+    }
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
@@ -110,11 +119,8 @@ struct AraAvatarView: View {
             onLog("[BUILD] source=\(sourceCommit.prefix(12)) build=\(buildNumber)")
             loader.show(clip, repeatForTesting: repeatForTesting)
         }
-        .onChange(of: clip) { newClip in
-            loader.show(newClip, repeatForTesting: repeatForTesting)
-        }
-        .onChange(of: repeatForTesting) { isTesting in
-            loader.show(clip, repeatForTesting: isTesting)
+        .onChange(of: playbackRequest) { request in
+            loader.show(request.clip, repeatForTesting: request.repeatForTesting)
         }
         .onChange(of: resetToFrontToken) { _ in
             guard abs(rotationY) > 0.001 else { return }
