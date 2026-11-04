@@ -117,6 +117,7 @@ private final class AraAvatarLoader: ObservableObject {
                     "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
                     "RightShoulder", "RightArm", "RightForeArm", "RightHand"
                 ]
+                let rigLog = self.onLog
                 func inspectRig(_ candidate: Entity) {
                     if let rig = candidate as? ModelEntity, !rig.jointNames.isEmpty {
                         rigCount += 1
@@ -125,8 +126,8 @@ private final class AraAvatarLoader: ObservableObject {
                         let upperBody = joints.enumerated().compactMap { index, name in
                             inspectedJointNames.contains(name) ? "\(index):\(name)" : nil
                         }
-                        self.onLog?("[ARA RIG] model=\(rigCount - 1) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
-                        self.onLog?("[ARA RIG] upper-body joint indices: \(upperBody.joined(separator: ", "))")
+                        rigLog?("[ARA RIG] model=\(rigCount - 1) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
+                        rigLog?("[ARA RIG] upper-body joint indices: \(upperBody.joined(separator: ", "))")
                     }
                     candidate.children.forEach(inspectRig)
                 }
