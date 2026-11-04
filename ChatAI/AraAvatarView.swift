@@ -113,7 +113,7 @@ private final class AraAvatarLoader: ObservableObject {
 
                 self.entity = model
                 self.status = "Ara đã tải — chế độ đứng yên"
-                self.onLog?("[ARA STATIC] Model mounted in its imported pose; no AnimationView generation, no playAnimation, no playback controller")
+                self.onLog?("[ARA STATIC] Model mounted in its imported pose; animation generation and playback are not present in the app")
             })
     }
 }
