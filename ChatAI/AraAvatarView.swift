@@ -8,7 +8,7 @@ private struct AraPlaybackRequest: Equatable {
 }
 
 struct AraAvatarView: View {
-    enum Clip: String {
+    enum Clip: String, CaseIterable {
         case idle = "Idle"
         case wave = "Wave"
         case talk = "Talk"
@@ -20,30 +20,10 @@ struct AraAvatarView: View {
         case cheer = "Cheer"
         case naturalLaugh = "Laugh"
         case cry = "Cry"
-        case walk = "Walk"
-        case run = "Run"
-        case walkBackwards = "Walk backwards"
-        case strafeLeft = "Strafe left"
-        case strafeRight = "Strafe right"
-        case jumpStart = "Jump start"
-        case jumpAir = "Jump (in air)"
-        case jumpLand = "Jump land"
-        case sitDown = "Sit down (chair)"
-        case sitIdle = "Sit idle (chair)"
-        case standUp = "Stand up (chair)"
-        case lieDown = "Lie down"
-        case sleep = "Sleep"
-        case turnLeft45 = "Turn left 45°"
-        case turnLeft90 = "Turn left 90°"
-        case turnRight45 = "Turn right 45°"
-        case turnRight90 = "Turn right 90°"
-        case fullTurn = "Full turn 360°"
-        case rideHorse = "Ride horse (trot)"
 
         var loops: Bool {
             switch self {
-            case .idle, .talk, .listening, .thinking, .empathy, .walk, .run,
-                 .walkBackwards, .strafeLeft, .strafeRight, .sitIdle, .sleep, .rideHorse:
+            case .idle, .talk, .listening, .thinking, .empathy:
                 return true
             default:
                 return false
@@ -225,7 +205,8 @@ private final class AraAvatarLoader: ObservableObject {
 
                 var clips: [String: AnimationResource] = [:]
                 do {
-                    for range in timeline.clips {
+                    let supportedNames = Set(AraAvatarView.Clip.allCases.map { $0.rawValue.lowercased() })
+                    for range in timeline.clips where supportedNames.contains(range.name.lowercased()) {
                         let view = AnimationView(
                             source: source.definition,
                             name: range.name,
@@ -240,7 +221,7 @@ private final class AraAvatarLoader: ObservableObject {
                     return
                 }
 
-                let requiredNames = ["idle", "wave", "talk", "talkexplain", "aralistening", "arathinking", "araempathy", "aralaugh"]
+                let requiredNames = AraAvatarView.Clip.allCases.map { $0.rawValue.lowercased() }
                 let missing = requiredNames.filter { clips[$0] == nil }
                 guard missing.isEmpty else {
                     self.status = "Thiếu clip animation: \(missing.joined(separator: ", "))"
