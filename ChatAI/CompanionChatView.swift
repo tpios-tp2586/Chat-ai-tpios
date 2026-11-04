@@ -90,7 +90,7 @@ struct CompanionChatView: View {
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
-                    // Speech is a mouth animation, not a facial emotion.
+                    // Speech updates this status label only; Ara remains static.
                     if emotion == .idle || emotion == .listening || emotion == .thinking {
                         emotion = .speaking
                     }
@@ -153,7 +153,8 @@ struct CompanionChatView: View {
                     .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)                    }
+                            .stroke(activeTheme.accent.opacity(0.22), lineWidth: 1)
+                    }
             }
             .accessibilityLabel("Xem và sao chép log")
 
@@ -284,21 +285,7 @@ struct CompanionChatView: View {
 }
 
 
-private enum CompanionEmotion: CaseIterable {
+private enum CompanionEmotion {
     case idle, listening, thinking, speaking, happy, surprised, confused, sad, angry, sleepy
 
-    var label: String {
-        switch self {
-        case .idle: "Bình thường"
-        case .listening: "Đang nghe"
-        case .thinking: "Đang suy nghĩ"
-        case .speaking: "Đang nói"
-        case .happy: "Vui"
-        case .surprised: "Ngạc nhiên"
-        case .confused: "Bối rối"
-        case .sad: "Buồn"
-        case .angry: "Tức giận"
-        case .sleepy: "Buồn ngủ"
-        }
-    }
 }
