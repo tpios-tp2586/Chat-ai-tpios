@@ -201,3 +201,10 @@
 - Trong `AraAvatarView.swift`, thay hai `.onChange` độc lập của `clip` và `repeatForTesting` bằng một `onChange` theo cặp trạng thái `AraPlaybackRequest` (Equatable). Mỗi lần cập nhật, loader nhận một cặp clip/repeat nhất quán, tránh gọi lại clip cũ khi hai state đổi cùng transaction lúc kết thúc TEST.
 - Chỉ sửa `ChatAI/AraAvatarView.swift`; không đụng TEST UI, `CompanionChatView.swift`, Gemini Live, voice pipeline hoặc các phần chat khác.
 - Chưa build/chưa kiểm chứng trên iPhone. Người dùng tự chạy Codemagic và thử lại TalkExplain → kết thúc TEST; log cần xác nhận không còn phát lại TalkExplain sau khi đã khôi phục Idle/Listening/Talk.
+
+
+## Ara — TEST tổng hợp một lần bấm (2026-11-04)
+- Theo yêu cầu người dùng, thêm nút `TEST tổng hợp` ngay màn hình gốc của popup TEST Ara; một lần bấm sẽ tự chạy tuần tự đủ 30 clip từ manifest, gồm cả chuỗi Jump (Jump start / in air / land), không cần chọn từng clip.
+- Mỗi clip chạy theo thời lượng lấy từ `animation-timeline.json`; các clip có cờ loop vẫn được giới hạn trong đúng một khoảng thời lượng clip để lượt test tự kết thúc. Sau clip cuối, test mode khôi phục trạng thái live hiện tại (Talk / Listening / Idle).
+- Giữ nguyên popup hai nhóm và các nút test thủ công hiện có; không thay đổi AraAvatarView playback, chatbot, Gemini Live hoặc voice pipeline. Nút TEST tổng hợp bị vô hiệu hóa khi một test khác đang chạy.
+- Source commit: `6b4b3c74fc412a3177403f50b63f9fd10d5ef8f8` (`Add one-tap Ara batch test`). Chưa chạy build hoặc xác minh trên iPhone; người dùng cần build IPA thủ công qua Codemagic.
