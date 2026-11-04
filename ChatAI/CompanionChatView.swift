@@ -307,9 +307,24 @@ struct CompanionChatView: View {
                     closeAraTestPopupButton
                 }
 
-                HStack(spacing: 6) {
-                    araTestGroupButton(index: 0)
-                    araTestGroupButton(index: 1)
+                VStack(spacing: 7) {
+                    HStack(spacing: 6) {
+                        araTestGroupButton(index: 0)
+                        araTestGroupButton(index: 1)
+                    }
+
+                    Button {
+                        runAraBatchTest()
+                    } label: {
+                        Label("TEST tổng hợp", systemImage: "play.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 86, height: 32)
+                            .background(activeTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isGestureTestMode)
+                    .opacity(isGestureTestMode ? 0.5 : 1)
                 }
             }
         }
@@ -363,6 +378,35 @@ struct CompanionChatView: View {
         beginGestureTestMode()
         if clip == .jumpStart { testJumpSequence() }
         else { testAraGesture(clip) }
+    }
+
+    private func runAraBatchTest() {
+        guard !isGestureTestMode else { return }
+        beginGestureTestMode()
+        let clips: [AraAvatarView.Clip] = [
+            .idle, .wave, .talk, .talkExplain, .listening, .thinking, .empathy,
+            .laugh, .naturalLaugh, .walk, .run, .walkBackwards, .strafeLeft,
+            .strafeRight, .jumpStart, .jumpAir, .jumpLand, .sitDown, .sitIdle,
+            .standUp, .lieDown, .sleep, .turnLeft45, .turnLeft90, .turnRight45,
+            .turnRight90, .fullTurn, .rideHorse, .cheer, .cry
+        ]
+        addDiagnostic("[ARA TEST] Batch started: \(clips.count) clips; automatic sequence")
+
+        gestureTestTask = Task { @MainActor in
+            for (index, clip) in clips.enumerated() {
+                guard !Task.isCancelled, isGestureTestMode else { return }
+                avatarClip = clip
+                let duration = araClipDuration(clip)
+                addDiagnostic(
+                    "[ARA TEST] Batch \(index + 1)/\(clips.count): \(clip.rawValue); duration=\(String(format: "%.2f", duration))s; loops=\(clip.loops)"
+                )
+                do { try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000)) }
+                catch { return }
+            }
+            guard !Task.isCancelled, isGestureTestMode else { return }
+            endGestureTestMode()
+            addDiagnostic("[ARA TEST] Batch finished: \(clips.count)/\(clips.count); live state restored")
+        }
     }
 
     private func beginGestureTestMode() {
