@@ -193,6 +193,33 @@ struct CompanionChatView: View {
         }
     }
 
+    private func handleLatestTranscript() {
+        guard let line = liveManager.lines.last else { return }
+        message = line.text
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
+            emotion = line.role == .user ? .listening : emotionForAssistantText(line.text)
+        }
+    }
+
+    private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
+        let value = text.lowercased()
+        let happySignals = ["haha", "😂", "🤣", "😄", "😊", "vui quá", "tuyệt vời", "chúc mừng", "hay quá"]
+        let surprisedSignals = ["😮", "😲", "bất ngờ", "không ngờ", "thật sao", "wow"]
+        let winkSignals = ["😉", "😜", "đùa thôi", "trêu anh"]
+        if winkSignals.contains(where: value.contains) { return .happy }
+        if surprisedSignals.contains(where: value.contains) { return .surprised }
+        if happySignals.contains(where: value.contains) { return .happy }
+        return liveManager.aiSpeaking ? .speaking : .idle
+    }
+
+    private func addDiagnostic(_ line: String) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        diagnosticLogs.append("[\\(timestamp)] \\(line)")
+        if diagnosticLogs.count > 150 {
+            diagnosticLogs.removeFirst(diagnosticLogs.count - 150)
+        }
+    }
+
     private var controls: some View {
         HStack(spacing: 12) {
             Button {
