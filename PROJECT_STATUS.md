@@ -194,3 +194,10 @@
 - Hai thay đổi đã commit trực tiếp lên `main`; không tạo branch, không chạy Codemagic/GitHub Actions.
 - Đây mới là bước kiểm chứng runtime import joint, **chưa triển khai procedural upper-body movement và chưa build/test trên iPhone**. Không được tuyên bố joint import đã thành công chỉ từ code; cần đọc log thực tế sau build.
 - Bước tiếp theo: dựa trên log jointNames/jointTransforms thực tế để thêm các chuyển động thử từng joint (đầu, vai, cánh tay, khuỷu, cổ tay), với baseline/reset rõ ràng và không đụng voice pipeline. Nếu không tìm thấy ModelEntity có rig hoặc transforms không khớp joint count, dừng và điều tra import thay vì dựng rig giả.
+
+
+## Ara — sửa race khi khôi phục animation sau TEST (2026-11-04)
+- Commit: `f926c832bc464f03d8ca8e2bb8b36cc197e2fa88` trên `main`.
+- Trong `AraAvatarView.swift`, thay hai `.onChange` độc lập của `clip` và `repeatForTesting` bằng một `onChange` theo cặp trạng thái `AraPlaybackRequest` (Equatable). Mỗi lần cập nhật, loader nhận một cặp clip/repeat nhất quán, tránh gọi lại clip cũ khi hai state đổi cùng transaction lúc kết thúc TEST.
+- Chỉ sửa `ChatAI/AraAvatarView.swift`; không đụng TEST UI, `CompanionChatView.swift`, Gemini Live, voice pipeline hoặc các phần chat khác.
+- Chưa build/chưa kiểm chứng trên iPhone. Người dùng tự chạy Codemagic và thử lại TalkExplain → kết thúc TEST; log cần xác nhận không còn phát lại TalkExplain sau khi đã khôi phục Idle/Listening/Talk.
