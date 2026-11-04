@@ -206,13 +206,13 @@
 ## Ara — TEST tổng hợp một lần bấm (2026-11-04)
 - Theo yêu cầu người dùng, thêm nút `TEST tổng hợp` ngay màn hình gốc của popup TEST Ara. Sau lần dọn code ngày 2026-11-04, batch chỉ chạy 11 clip hội thoại/biểu cảm còn được giữ lại; không còn chuỗi Jump hoặc các hành động nền/di chuyển.
 - Mỗi clip chạy theo thời lượng lấy từ `animation-timeline.json`; các clip có cờ loop vẫn được giới hạn trong đúng một khoảng thời lượng clip để lượt test tự kết thúc. Sau clip cuối, test mode khôi phục trạng thái live hiện tại (Talk / Listening / Idle).
-- Giữ nguyên popup hai nhóm và các nút test thủ công hiện có; không thay đổi AraAvatarView playback, chatbot, Gemini Live hoặc voice pipeline. Nút TEST tổng hợp bị vô hiệu hóa khi một test khác đang chạy.
+- Popup hiện chỉ còn một nhóm `T. Chuyện` và các nút test thủ công còn lại; không thay đổi AraAvatarView playback, chatbot, Gemini Live hoặc voice pipeline. Nút TEST tổng hợp bị vô hiệu hóa khi một test khác đang chạy.
 - Source commit: `6b4b3c74fc412a3177403f50b63f9fd10d5ef8f8` (`Add one-tap Ara batch test`). Chưa chạy build hoặc xác minh trên iPhone; người dùng cần build IPA thủ công qua Codemagic.
 
 
 ## Ara — dọn hành động nền khỏi TEST (2026-11-04)
-- Code commit `e75659b83551a9a63a00ef7f792159532e7fc1ed`: `AraAvatarView.swift` loại 18 clip nền/di chuyển khỏi enum runtime và chỉ tạo AnimationResource cho 11 clip được hỗ trợ qua `Clip.allCases`. Không xoá dữ liệu animation gốc khỏi USDZ hoặc `animation-timeline.json`.
-- Code commit `63a55e74bb686b3aac6ebdec45ac80374740ae66`: `CompanionChatView.swift` bỏ nhóm `Y. Cầu`, chuyển Wave vào nhóm hội thoại, giữ 11 nút gồm Idle, Nghe, Nghĩ, Nói, Giải thích, Đồng cảm, Ara cười, Cười, Vẫy tay, Hoan hô, Khóc. Batch TEST cũng chỉ còn 11 clip; đã xoá nhánh/sequence Jump và các tham chiếu tới hành động nền.
+- Code commit `e75659b83551a9a63a00ef7f792159532e7fc1ed`: `AraAvatarView.swift` loại 19 clip nền/di chuyển khỏi enum runtime và chỉ tạo AnimationResource cho 11 clip được hỗ trợ qua `Clip.allCases`. Không xoá dữ liệu animation gốc khỏi USDZ hoặc `animation-timeline.json`.
+- Code commit `63a55e74bb686b3aac6ebdec45ac80374740ae66`: `CompanionChatView.swift` bỏ nhóm `Y. Cầu` và nút nhóm thứ hai còn sót trong layout, chuyển Wave vào nhóm hội thoại, giữ 11 nút gồm Idle, Nghe, Nghĩ, Nói, Giải thích, Đồng cảm, Ara cười, Cười, Vẫy tay, Hoan hô, Khóc. Batch TEST cũng chỉ còn 11 clip; đã xoá nhánh/sequence Jump và các tham chiếu tới hành động nền.
 - Không sửa USDZ, timeline gốc, Gemini Live/LiveVoice, chatbot/API, Text Chat hoặc Chibi Chat. LOG/Copy Log và nút TEST tổng hợp vẫn giữ.
-- Chưa chạy build hoặc test IPA sau hai commit này. Người dùng chạy Codemagic thủ công; cần xác nhận popup chỉ còn một nhóm và batch chạy đủ 11 clip, kết thúc khôi phục trạng thái live.
+- Chưa chạy build hoặc test IPA sau hai commit này. Người dùng chạy Codemagic thủ công; cần xác nhận popup chỉ hiện một nhóm và batch chạy đủ 11 clip, kết thúc khôi phục trạng thái live.
 - Bước code tiếp theo sau xác nhận: tập trung cải thiện điều phối chuyển động hội thoại trực tiếp (Talk/Listening/Thinking/Idle và cử chỉ phù hợp), không đưa lại hành động nền/di chuyển vào tool.
