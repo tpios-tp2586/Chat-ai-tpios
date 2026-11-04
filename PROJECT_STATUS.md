@@ -216,3 +216,10 @@
 - Không sửa USDZ, timeline gốc, Gemini Live/LiveVoice, chatbot/API, Text Chat hoặc Chibi Chat. LOG/Copy Log và nút TEST tổng hợp vẫn giữ.
 - Chưa chạy build hoặc test IPA sau hai commit này. Người dùng chạy Codemagic thủ công; cần xác nhận popup chỉ hiện một nhóm và batch chạy đủ 11 clip, kết thúc khôi phục trạng thái live.
 - Bước code tiếp theo sau xác nhận: tập trung cải thiện điều phối chuyển động hội thoại trực tiếp (Talk/Listening/Thinking/Idle và cử chỉ phù hợp), không đưa lại hành động nền/di chuyển vào tool.
+
+
+## Ara — điều phối trạng thái live tập trung (2026-11-04)
+- Commit `1f53c2e47ef1e1581362a737288f4e1062586c94` và `52e91fc39543c1a818e13fe4975ab466307dba42` trong `CompanionChatView.swift`: gom quyết định clip live vào `syncAraLiveState()`. Cả sự kiện `aiSpeaking` và thay đổi trạng thái phiên đều gọi cùng một điểm chọn clip.
+- Thứ tự ưu tiên: Talk khi AI đang phát tiếng; nếu không thì Thinking khi kết nối, Listening khi phiên live, Idle khi phiên kết thúc. TEST mode được bỏ qua hoàn toàn để không ghi đè clip đang test.
+- Khi AI ngừng nói, emotion trở về trạng thái tương ứng Idle/Thinking/Listening. Không sửa `LiveVoice.swift`, Gemini Live, luồng audio/transcript, model hoặc asset.
+- Đây là bước dọn logic state writer, chưa bổ sung cử chỉ nền hay lịch chuyển động tự động. Chưa build/chưa xác minh trên iPhone; cần build IPA và kiểm tra các chuyển trạng thái Connecting → Live → AI Talk → Listening → Idle, đồng thời kiểm tra TEST không bị state live ghi đè.
