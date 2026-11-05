@@ -68,6 +68,9 @@ struct AraAvatarView: View {
         .onReceive(loader.$status.dropFirst()) { status in
             onLog("[ARA] \(status)")
         }
+        .onChange(of: isSpeaking) { speaking in
+            loader.setSpeaking(speaking)
+        }
     }
 }
 
