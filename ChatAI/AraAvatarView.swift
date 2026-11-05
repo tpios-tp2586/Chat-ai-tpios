@@ -219,7 +219,7 @@ private final class AraAvatarLoader: ObservableObject {
 
                 let embeddedAnimations = model.availableAnimations
                 let names = embeddedAnimations.compactMap(\.name).joined(separator: ", ")
-                self.onLog?("[ARA MODEL] Embedded animation resources=\(embeddedAnimations.count); playback is disabled")
+                self.onLog?("[ARA MODEL] Embedded animation resources=\(embeddedAnimations.count); embedded playback is disabled")
                 if !names.isEmpty {
                     self.onLog?("[ARA MODEL] Embedded animation names (not used by gesture review): \(names)")
                 }
@@ -268,9 +268,9 @@ private final class AraAvatarLoader: ObservableObject {
                 self.entity = model
                 self.status = "Ara đã tải — đang kiểm tra 3 cử chỉ thân trên"
                 if let rig = actionRig {
-                    playGestureReview(on: rig)
+                    self.playGestureReview(on: rig)
                 }
-                self.onLog?("[ARA ACTION] Model mounted; one-time upper-body gesture review requested")
+                if actionRig == nil {\n                    self.onLog?("[ARA ACTION] No valid rig found; gesture review skipped")\n                }
             })
     }
 }
