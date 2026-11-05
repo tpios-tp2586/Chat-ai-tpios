@@ -32,7 +32,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AraAvatarView { log in
+                            AraAvatarView(isSpeaking: liveManager.aiSpeaking) { log in
                                 addDiagnostic(log)
                             }
 
