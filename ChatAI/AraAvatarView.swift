@@ -82,7 +82,7 @@ private final class AraAvatarLoader: ObservableObject {
 
     private var loadSubscription: AnyCancellable?
     private var activeRig: ModelEntity?
-    private var restTransforms: JointTransforms?
+    private var restTransforms: [Transform]?
     private var speakingController: AnimationPlaybackController?
     private var isSpeaking = false
 
@@ -120,7 +120,7 @@ private final class AraAvatarLoader: ObservableObject {
         }
     }
 
-    private func playSpeakingGesture(on rig: ModelEntity, baseline: JointTransforms) {
+    private func playSpeakingGesture(on rig: ModelEntity, baseline: [Transform]) {
         let indices = [34, 35, 36, 37]
         guard indices.allSatisfy({ $0 < baseline.count && $0 < rig.jointNames.count }) else { return }
 
@@ -325,7 +325,7 @@ private final class AraAvatarLoader: ObservableObject {
                     "RightShoulder", "RightArm", "RightForeArm", "RightHand"
                 ]
                 let rigLog = self.onLog
-                func inspectRig(_ candidate: Entity) {
+                @MainActor func inspectRig(_ candidate: Entity) {
                     if let rig = candidate as? ModelEntity, !rig.jointNames.isEmpty {
                         rigCount += 1
                         if actionRig == nil { actionRig = rig }
