@@ -3,6 +3,7 @@ import RealityKit
 import SwiftUI
 
 struct AraAvatarView: View {
+    let isSpeaking: Bool
     let onLog: (String) -> Void
 
     @StateObject private var loader = AraAvatarLoader()
