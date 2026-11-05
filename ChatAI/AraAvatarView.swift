@@ -270,7 +270,9 @@ private final class AraAvatarLoader: ObservableObject {
                 if let rig = actionRig {
                     self.playGestureReview(on: rig)
                 }
-                if actionRig == nil {\n                    self.onLog?("[ARA ACTION] No valid rig found; gesture review skipped")\n                }
+                if actionRig == nil {
+                    self.onLog?("[ARA ACTION] No valid rig found; gesture review skipped")
+                }
             })
     }
 }
