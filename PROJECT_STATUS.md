@@ -16,6 +16,8 @@
 - Khi AI dừng nói, vòng lặp dừng và tay chuyển về rest transforms đã lưu. Nếu model tải xong sau khi AI đã bắt đầu nói, cử chỉ nói được khởi chạy ngay khi rig sẵn sàng.
 - Chỉ sửa AraAvatarView.swift và CompanionChatView.swift. Không sửa LiveVoice.swift, Gemini Live, audio, chatbot/API, history, Text Chat hoặc Chibi Chat. Không thêm dependency, TEST UI hoặc branch.
 - Source: 6fa52b86e938f281207afad843136176d5054f44; 58914901b7998c71352d23e32b0e03ec61c9e86c; 8be3af232fcb64641947408bf3e4d8d2cc7d2ff4; 33864f08c319d55ebd0d6cb50dcfa3b88624fe57; 3ee0ecdba06e9b3f67c32f9dce1e2573d5950f56.
+
+- **Build fix sau lỗi Codemagic:** `restTransforms` và tham số baseline dùng `[Transform]` đúng với kiểu `ModelEntity.jointTransforms`; chỉ bọc thành `JointTransforms` tại các animation clip. Hàm `inspectRig` được đánh dấu `@MainActor` để truy cập `jointNames` đúng actor isolation. Source fix: `ce4c789b1cb0ef518342e62e0c363f1277b9f96d`. Chưa có build xác nhận sau fix.
 - Chưa build hoặc kiểm chứng trên iPhone. Người dùng build IPA từ main; kiểm tra log [ARA ACTION] khi AI bắt đầu và kết thúc nói.
 
 ## Lịch sử — Ara: lượt kiểm tra 3 cử chỉ thân trên (2026-11-05)
