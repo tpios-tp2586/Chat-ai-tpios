@@ -123,11 +123,20 @@ private final class AraAvatarLoader: ObservableObject {
                         rigCount += 1
                         let joints = rig.jointNames
                         let transforms = rig.jointTransforms
-                        let upperBody = joints.enumerated().compactMap { index, name in
-                            inspectedJointNames.contains(name) ? "\(index):\(name)" : nil
+                        let upperBody = joints.enumerated().compactMap { index, path in
+                            let name = path.split(separator: "/").last.map(String.init) ?? path
+                            return inspectedJointNames.contains(name) ? "\(index):\(name)" : nil
                         }
                         rigLog?("[ARA RIG] model=\(rigCount - 1) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
-                        rigLog?("[ARA RIG] upper-body exact-name matches: \(upperBody.isEmpty ? "none" : upperBody.joined(separator: ", "))")
+                        rigLog?("[ARA RIG] upper-body matches: \(upperBody.isEmpty ? "none" : upperBody.joined(separator: ", "))")
+                        for index in [1, 2, 3, 10, 11, 12, 13, 34, 35, 36, 37] where index < joints.count && index < transforms.count {
+                            let transform = transforms[index]
+                            let position = transform.translation
+                            let rotation = transform.rotation.vector
+                            let scale = transform.scale
+                            let name = joints[index].split(separator: "/").last.map(String.init) ?? joints[index]
+                            rigLog?("[ARA RIG] rest[\(index)] \(name) t=(\(position.x),\(position.y),\(position.z)) q=(\(rotation.x),\(rotation.y),\(rotation.z),\(rotation.w)) s=(\(scale.x),\(scale.y),\(scale.z))")
+                        }
                         let indexedJointNames = joints.enumerated().map { "\($0.offset):\($0.element)" }
                         for start in stride(from: 0, to: indexedJointNames.count, by: 12) {
                             let end = min(start + 12, indexedJointNames.count)
