@@ -114,7 +114,7 @@ private final class AraAvatarLoader: ObservableObject {
             animation.toValue = JointTransforms(to)
             animation.duration = duration
             animation.timing = .easeInOut
-            animation.bindTarget = .transform
+            animation.bindTarget = .jointTransforms
             animation.fillMode = .forwards
             resources.append(try AnimationResource.generate(with: animation))
         }
@@ -132,7 +132,7 @@ private final class AraAvatarLoader: ObservableObject {
             animation.toValue = JointTransforms(to)
             animation.duration = duration
             animation.timing = .easeInOut
-            animation.bindTarget = .transform
+            animation.bindTarget = .jointTransforms
             animation.fillMode = .forwards
             resources.append(try AnimationResource.generate(with: animation))
             for index in indices { current[index] = baseline[index] }
