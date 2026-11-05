@@ -78,18 +78,131 @@ private final class AraAvatarLoader: ObservableObject {
 
     private var loadSubscription: AnyCancellable?
 
+    private func playGestureReview(on rig: ModelEntity) {
+        let requiredIndices = [10, 11, 12, 13, 34, 35, 36, 37]
+        let baseline = rig.jointTransforms
+        guard baseline.count == rig.jointNames.count,
+              requiredIndices.allSatisfy({ $0 < baseline.count }) else {
+            onLog?("[ARA ACTION] Invalid rig transform mapping; gestures skipped")
+            return
+        }
+
+        var current = baseline
+        var resources: [AnimationResource] = []
+
+        func appendStep(
+            name: String,
+            rotations: [Int: simd_quatf],
+            duration: TimeInterval
+        ) throws {
+            let indices = rotations.keys.sorted()
+            let from = indices.map { current[$0] }
+            let to = indices.map { index -> Transform in
+                var transform = current[index]
+                transform.rotation = transform.rotation * rotations[index]!
+                current[index] = transform
+                return transform
+            }
+
+            var animation = FromToByAnimation<JointTransforms>()
+            animation.name = name
+            animation.jointNames = indices.map { rig.jointNames[$0] }
+            animation.isScaleAnimated = false
+            animation.isRotationAnimated = true
+            animation.isTranslationAnimated = false
+            animation.fromValue = JointTransforms(from)
+            animation.toValue = JointTransforms(to)
+            animation.duration = duration
+            animation.timing = .easeInOut
+            animation.bindTarget = .transform
+            animation.fillMode = .forwards
+            resources.append(try AnimationResource.generate(with: animation))
+        }
+
+        func appendRest(name: String, indices: [Int], duration: TimeInterval) throws {
+            let from = indices.map { current[$0] }
+            let to = indices.map { baseline[$0] }
+            var animation = FromToByAnimation<JointTransforms>()
+            animation.name = name
+            animation.jointNames = indices.map { rig.jointNames[$0] }
+            animation.isScaleAnimated = false
+            animation.isRotationAnimated = true
+            animation.isTranslationAnimated = false
+            animation.fromValue = JointTransforms(from)
+            animation.toValue = JointTransforms(to)
+            animation.duration = duration
+            animation.timing = .easeInOut
+            animation.bindTarget = .transform
+            animation.fillMode = .forwards
+            resources.append(try AnimationResource.generate(with: animation))
+            for index in indices { current[index] = baseline[index] }
+        }
+
+        func rotation(_ degrees: Float, axis: SIMD3<Float>) -> simd_quatf {
+            simd_quatf(angle: degrees * .pi / 180, axis: axis)
+        }
+
+        do {
+            let rightArm = [34, 35, 36, 37]
+            let bothArms = [10, 11, 12, 13, 34, 35, 36, 37]
+
+            // 1. Wave: lift the right arm, move the wrist, then restore the imported pose.
+            try appendStep(name: "wave-lift", rotations: [
+                34: rotation(-32, axis: [0, 0, 1]),
+                35: rotation(-24, axis: [0, 0, 1]),
+                36: rotation(18, axis: [0, 0, 1])
+            ], duration: 0.85)
+            try appendStep(name: "wave-wrist-out", rotations: [
+                37: rotation(16, axis: [1, 0, 0])
+            ], duration: 0.24)
+            try appendStep(name: "wave-wrist-back", rotations: [
+                37: rotation(-32, axis: [1, 0, 0])
+            ], duration: 0.28)
+            try appendStep(name: "wave-wrist-center", rotations: [
+                37: rotation(16, axis: [1, 0, 0])
+            ], duration: 0.24)
+            try appendRest(name: "wave-return", indices: rightArm, duration: 0.75)
+
+            // 2. Explain: one arm comes forward with a clear elbow bend.
+            try appendStep(name: "explain-gesture", rotations: [
+                34: rotation(-22, axis: [0, 0, 1]),
+                35: rotation(-16, axis: [0, 0, 1]),
+                36: rotation(38, axis: [0, 0, 1]),
+                37: rotation(9, axis: [1, 0, 0])
+            ], duration: 0.9)
+            try appendRest(name: "explain-return", indices: rightArm, duration: 0.75)
+
+            // 3. Open both arms gently, then return both sides to the exact baseline.
+            try appendStep(name: "open-both-arms", rotations: [
+                10: rotation(20, axis: [0, 0, 1]),
+                11: rotation(18, axis: [0, 0, 1]),
+                12: rotation(-12, axis: [0, 0, 1]),
+                34: rotation(-20, axis: [0, 0, 1]),
+                35: rotation(-18, axis: [0, 0, 1]),
+                36: rotation(12, axis: [0, 0, 1])
+            ], duration: 1.0)
+            try appendRest(name: "open-arms-return", indices: bothArms, duration: 0.85)
+
+            let sequence = try AnimationResource.sequence(with: resources)
+            rig.playAnimation(sequence, transitionDuration: 0.2)
+            onLog?("[ARA ACTION] Started 3 gestures: wave → explain → open both arms → exact rest pose")
+        } catch {
+            onLog?("[ARA ACTION] Could not create gesture sequence: \(error.localizedDescription)")
+        }
+    }
+
     func load() {
         guard entity == nil, loadSubscription == nil else { return }
         status = "Đang nạp Ara-Avatar.usdz từ app bundle…"
 
         guard let url = Bundle.main.url(forResource: "Ara-Avatar", withExtension: "usdz") else {
             status = "Không tìm thấy Ara-Avatar.usdz trong app bundle"
-            onLog?("[ARA STATIC] Bundle lookup failed: Ara-Avatar.usdz")
+            onLog?("[ARA MODEL] Bundle lookup failed: Ara-Avatar.usdz")
             return
         }
 
         let assetBytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        onLog?("[ARA STATIC] Found bundled asset: \(url.lastPathComponent), size=\(assetBytes) bytes")
+        onLog?("[ARA MODEL] Found bundled asset: \(url.lastPathComponent), size=\(assetBytes) bytes")
 
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
@@ -98,7 +211,7 @@ private final class AraAvatarLoader: ObservableObject {
                 self.loadSubscription = nil
                 if case .failure(let error) = completion {
                     self.status = "Lỗi nạp Ara-Avatar.usdz: \(error.localizedDescription)"
-                    self.onLog?("[ARA STATIC] USDZ load failed: \(error.localizedDescription)")
+                    self.onLog?("[ARA MODEL] USDZ load failed: \(error.localizedDescription)")
                 }
             }, receiveValue: { [weak self] model in
                 guard let self else { return }
@@ -106,12 +219,13 @@ private final class AraAvatarLoader: ObservableObject {
 
                 let embeddedAnimations = model.availableAnimations
                 let names = embeddedAnimations.compactMap(\.name).joined(separator: ", ")
-                self.onLog?("[ARA STATIC] Embedded animation resources=\(embeddedAnimations.count); playback is disabled")
+                self.onLog?("[ARA MODEL] Embedded animation resources=\(embeddedAnimations.count); playback is disabled")
                 if !names.isEmpty {
-                    self.onLog?("[ARA STATIC] Asset animation names (not played): \(names)")
+                    self.onLog?("[ARA MODEL] Embedded animation names (not used by gesture review): \(names)")
                 }
 
                 var rigCount = 0
+                var actionRig: ModelEntity?
                 let inspectedJointNames: Set<String> = [
                     "Spine", "Spine1", "Spine2", "Neck",
                     "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
@@ -121,6 +235,7 @@ private final class AraAvatarLoader: ObservableObject {
                 func inspectRig(_ candidate: Entity) {
                     if let rig = candidate as? ModelEntity, !rig.jointNames.isEmpty {
                         rigCount += 1
+                        if actionRig == nil { actionRig = rig }
                         let joints = rig.jointNames
                         let transforms = rig.jointTransforms
                         let upperBody = joints.enumerated().compactMap { index, path in
@@ -147,12 +262,15 @@ private final class AraAvatarLoader: ObservableObject {
                 }
                 inspectRig(model)
                 if rigCount == 0 {
-                    self.onLog?("[ARA RIG] No imported ModelEntity exposes jointNames; stop before adding movement")
+                    self.onLog?("[ARA RIG] No imported ModelEntity exposes jointNames; movement review skipped")
                 }
 
                 self.entity = model
-                self.status = "Ara đã tải — chế độ đứng yên"
-                self.onLog?("[ARA STATIC] Model mounted in its imported pose; animation generation and playback are not present in the app")
+                self.status = "Ara đã tải — đang kiểm tra 3 cử chỉ thân trên"
+                if let rig = actionRig {
+                    playGestureReview(on: rig)
+                }
+                self.onLog?("[ARA ACTION] Model mounted; one-time upper-body gesture review requested")
             })
     }
 }
