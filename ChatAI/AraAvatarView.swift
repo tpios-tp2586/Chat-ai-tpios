@@ -362,6 +362,9 @@ private final class AraAvatarLoader: ObservableObject {
                 self.status = "Ara đã tải — đang kiểm tra 3 cử chỉ thân trên"
                 if let rig = actionRig {
                     self.playGestureReview(on: rig)
+                    if self.isSpeaking, let baseline = self.restTransforms {
+                        self.playSpeakingGesture(on: rig, baseline: baseline)
+                    }
                 }
                 if actionRig == nil {
                     self.onLog?("[ARA ACTION] No valid rig found; gesture review skipped")
