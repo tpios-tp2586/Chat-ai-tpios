@@ -13,11 +13,12 @@
 - Đã triển khai một lượt chuyển động tự chạy một lần khi Ara nạp xong trong Chat Voice, để người dùng quan sát liên tục: **vẫy tay → đưa tay giải thích → mở hai tay → trở về tư thế gốc**.
 - Chỉ tác động 8 joint vai/cánh tay/cẳng tay/bàn tay trái và phải (index 10–13, 34–37) đã xác nhận từ IPA: 69 joint và 69 transforms. Không điều khiển Spine, Neck, Head, mặt, ngón tay hoặc BlendShape.
 - `ChatAI/AraAvatarView.swift`: tạo `FromToByAnimation<JointTransforms>` cho đúng các joint có liên quan, dùng tên joint full-path runtime; ghép bằng `AnimationResource.sequence`. Mỗi động tác có bước trở về đúng baseline transform đã chụp khi load.
+- **Fix sau kiểm tra IPA 17:09:** cả hai animation clip (cử chỉ và trở về tư thế nghỉ) dùng `animation.bindTarget = .jointTransforms` thay cho `.transform`, để bind `JointTransforms` vào skeleton joints. Đây là sửa đúng target; chưa xác nhận chuyển động cho đến khi build IPA mới và quan sát trực tiếp.
 - Chỉ tạo animation procedural cho 3 cử chỉ; không phát embedded global animation của USDZ. Không thêm popup, nút TEST hoặc batch UI; chuỗi tự chạy một lần khi avatar được nạp.
 - Các góc xoay/trục trong lượt này là **tham số hiệu chỉnh ban đầu**, chưa được xác nhận bằng hình ảnh trên iPhone. Mục tiêu IPA là quan sát hướng nâng tay, độ cong khuỷu, cổ tay, độ phối hợp hai tay và việc trở về tư thế nghỉ; nếu hướng xoay sai, chỉnh theo video/log quan sát, không tăng góc tùy tiện.
 - LOG/Copy Log vẫn được giữ. Log mới dùng prefix `[ARA ACTION]`, `[ARA MODEL]` và `[ARA RIG]`.
 - Không sửa `CompanionChatView.swift`, `LiveVoice.swift`, Gemini Live, chatbot/API, chat history, Text Chat hoặc Chibi Chat.
-- Source commits: `d6b7ed70e437284ecaca620c45486485c1628681` (3 cử chỉ procedural); `1dc9efeed8431f51e14334af29be30a59bde4d85` (log phân biệt embedded playback); `689780afba8edbf8264c91c869d353be0454dd03` (sửa log fallback).
+- Source commit mới nhất: `4d0dff1718a943499330918ef57d8a699c7a8962` (sửa bind target cho joint transforms); các commit trước: `d6b7ed70e437284ecaca620c45486485c1628681` (3 cử chỉ procedural); `1dc9efeed8431f51e14334af29be30a59bde4d85` (log phân biệt embedded playback); `689780afba8edbf8264c91c869d353be0454dd03` (sửa log fallback).
 - **Chưa chạy Xcode/Codemagic và chưa xác nhận chuyển động trên iPhone.** Người dùng build IPA từ `main`, quan sát trực tiếp rồi gửi video hoặc log `[ARA ACTION]` nếu có lỗi. Không được tuyên bố build thành công trước khi có kết quả.
 
 ## Lịch sử kiểm thử hành động Ara — đã hoàn tất, không tái sử dụng
