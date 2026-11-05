@@ -25,13 +25,13 @@
 - Log trước đây xác nhận các clip được gọi và bắt đầu phát theo thứ tự; người dùng đã quan sát thực tế và xác định một số hành động không hoạt động/không phù hợp. Đợt test hành động này được đóng lại theo yêu cầu người dùng; không giữ lại popup, nút, batch hoặc logic test.
 - Các lần rút xuống 11 clip và điều phối Talk/Listening/Thinking/Idle sau đó chỉ là bước trung gian. Toàn bộ test và điều phối animation đó đã bị thay thế bởi chế độ Ara đứng yên hiện tại.
 
-## Quy trình xác minh mới
-1. Người dùng build IPA từ `main`.
-2. Mở Chat Voice, quan sát Ara trong trạng thái ban đầu, khi kết nối, khi AI nói, khi nghe và sau khi kết thúc phiên. Ara phải giữ nguyên tư thế, không cử động theo bất kỳ trạng thái nào.
-3. Mở LOG và sao chép. Kiểm tra có `[ARA STATIC]` ghi asset nạp thành công và playback bị vô hiệu hóa; không còn log `[ARA TEST]` hoặc `[ARA] Playback started`.
-4. Nếu avatar vẫn tự chuyển động dù source không còn code phát animation, điều tra khả năng animation tự chạy từ asset/import/runtime trước khi sửa tiếp. Không thêm test UI mới.
-5. Chỉ sau khi xác nhận Ara đứng yên hoàn toàn mới thiết kế bộ hành động phục vụ hội thoại thực tế. Khi đó hành động được tích hợp trực tiếp vào luồng trò chuyện và đánh giá qua hội thoại thật, không tạo một hệ thống test hành động riêng.
-
+## Quy trình xác minh lượt cử chỉ hiện tại
+1. Người dùng build IPA từ `main` bằng Codemagic.
+2. Mở Chat Voice. Sau khi USDZ nạp, Ara tự chạy một chuỗi duy nhất: vẫy tay → giải thích bằng một tay → mở hai tay → trở về tư thế nghỉ.
+3. Quan sát riêng từng phần: hướng nâng vai/cánh tay, độ cong khuỷu, cổ tay có vẫy rõ không, hai tay có mở cân đối không, và cuối chuỗi có trở về đúng tư thế ban đầu không.
+4. Mở LOG/Copy Log. Kiểm tra `[ARA ACTION] Started 3 gestures`, các dòng `[ARA RIG]`, và không có lỗi tạo sequence. Embedded global animation vẫn không được phát.
+5. Nếu một cử chỉ xoay sai hướng hoặc không nhìn thấy, gửi video ngắn và log; hiệu chỉnh đúng joint/axis/sign/biên độ từ quan sát. Không sửa voice pipeline, không thêm popup TEST và không yêu cầu build lại nếu chưa có thay đổi source cần thiết.
+6. Chỉ sau khi ba cử chỉ đạt yêu cầu mới tích hợp trigger vào ngữ cảnh hội thoại thật.
 ## Ara — kết quả nghiên cứu kỹ thuật đã xác minh (2026-11-02)
 
 > Mục đích: lưu toàn bộ kết quả nghiên cứu để các phiên làm việc sau đọc checkpoint là có thể tiếp tục, không phải tải artifact hoặc nghiên cứu lại từ đầu. Đây là kết quả phân tích, **chưa phải thay đổi code**.
