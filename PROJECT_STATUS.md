@@ -9,15 +9,16 @@
 - Không tự chạy Codemagic hoặc GitHub Actions. Người dùng tự build IPA.
 - `PROJECT_STATUS.md` là checkpoint duy nhất.
 
-## Trạng thái hiện tại — Ara đứng yên, xóa code hành động và TEST (2026-11-04)
-- **Mục tiêu hiện tại:** Ara chỉ nạp model USDZ và giữ nguyên tư thế nhập vào; không có chuyển động tự động, animation theo trạng thái thoại, clip hành động, popup TEST hoặc TEST tổng hợp.
-- `ChatAI/AraAvatarView.swift`: đã bỏ enum Clip, timeline parser, AnimationView/AnimationResource generation, AnimationPlaybackController và mọi lệnh phát animation. Loader chỉ nạp model; log số/tên animation nhúng trong asset nhưng không kích hoạt chúng.
-- `ChatAI/CompanionChatView.swift`: đã bỏ nút TEST, popup, danh sách clip, batch, task test, thời lượng clip và toàn bộ logic chuyển trạng thái voice thành clip Ara. Các trạng thái cảm xúc còn lại chỉ cập nhật nhãn/trạng thái chữ của giao diện, không điều khiển avatar; đã bỏ cả thuộc tính label cũ không còn dùng.
-- Nút LOG và Sao chép log được giữ. Log có prefix `[ARA STATIC]` để ghi nhận asset được nạp, số/tên animation nhúng (nếu có), và xác nhận app không tạo hoặc phát animation.
-- Zoom và xoay bằng thao tác người dùng chỉ thay đổi góc nhìn camera/model root; không phải animation hay hành động tự động của Ara.
-- USDZ gốc vẫn chứa animation data. Đây là dữ liệu nguồn bất hoạt trong app hiện tại, không phải code phát hành động. Không chỉnh/xóa dữ liệu USDZ hoặc pipeline tạo asset trong bước này.
-- Source commits: `d9e2c7fbb9d99a7c50a50d4224b715e997b9e62d` (static loader và bỏ playback); `f52991ce79ddf19deca25041c7c8d90c42bf6e58` (xóa TEST/action orchestration khỏi Chat Voice); `0177f6686367177ff3a93d596fa3995f9c5705f0` (log xác nhận chế độ tĩnh); `4d77bbff62a26246ad9346e354bcbd5d65423c9a` (dọn trạng thái cảm xúc chỉ còn phục vụ nhãn giao diện).
-- Chưa build/chưa kiểm chứng trên iPhone. Không tuyên bố đã xác nhận đứng im hoàn toàn cho đến khi người dùng build IPA và quan sát trực tiếp.
+## Trạng thái hiện tại — Ara: lượt kiểm tra 3 cử chỉ thân trên (2026-11-05)
+- Đã triển khai một lượt chuyển động tự chạy một lần khi Ara nạp xong trong Chat Voice, để người dùng quan sát liên tục: **vẫy tay → đưa tay giải thích → mở hai tay → trở về tư thế gốc**.
+- Chỉ tác động 8 joint vai/cánh tay/cẳng tay/bàn tay trái và phải (index 10–13, 34–37) đã xác nhận từ IPA: 69 joint và 69 transforms. Không điều khiển Spine, Neck, Head, mặt, ngón tay hoặc BlendShape.
+- `ChatAI/AraAvatarView.swift`: tạo `FromToByAnimation<JointTransforms>` cho đúng các joint có liên quan, dùng tên joint full-path runtime; ghép bằng `AnimationResource.sequence`. Mỗi động tác có bước trở về đúng baseline transform đã chụp khi load.
+- Chỉ tạo animation procedural cho 3 cử chỉ; không phát embedded global animation của USDZ. Không thêm popup, nút TEST hoặc batch UI; chuỗi tự chạy một lần khi avatar được nạp.
+- Các góc xoay/trục trong lượt này là **tham số hiệu chỉnh ban đầu**, chưa được xác nhận bằng hình ảnh trên iPhone. Mục tiêu IPA là quan sát hướng nâng tay, độ cong khuỷu, cổ tay, độ phối hợp hai tay và việc trở về tư thế nghỉ; nếu hướng xoay sai, chỉnh theo video/log quan sát, không tăng góc tùy tiện.
+- LOG/Copy Log vẫn được giữ. Log mới dùng prefix `[ARA ACTION]`, `[ARA MODEL]` và `[ARA RIG]`.
+- Không sửa `CompanionChatView.swift`, `LiveVoice.swift`, Gemini Live, chatbot/API, chat history, Text Chat hoặc Chibi Chat.
+- Source commits: `d6b7ed70e437284ecaca620c45486485c1628681` (3 cử chỉ procedural); `1dc9efeed8431f51e14334af29be30a59bde4d85` (log phân biệt embedded playback); `689780afba8edbf8264c91c869d353be0454dd03` (sửa log fallback).
+- **Chưa chạy Xcode/Codemagic và chưa xác nhận chuyển động trên iPhone.** Người dùng build IPA từ `main`, quan sát trực tiếp rồi gửi video hoặc log `[ARA ACTION]` nếu có lỗi. Không được tuyên bố build thành công trước khi có kết quả.
 
 ## Lịch sử kiểm thử hành động Ara — đã hoàn tất, không tái sử dụng
 - Đợt kiểm thử trước dùng batch 30 clip, theo timeline: Idle; Wave; Talk; TalkExplain; AraListening; AraThinking; AraEmpathy; AraLaugh; Walk; Run; Walk backwards; Strafe left; Strafe right; Jump start; Jump (in air); Jump land; Sit down (chair); Sit idle (chair); Stand up (chair); Lie down; Sleep; Turn left 45°; Turn left 90°; Turn right 45°; Turn right 90°; Full turn 360°; Ride horse (trot); Cheer; Laugh; Cry.
@@ -237,3 +238,11 @@
 - Source commit mới: `f0c5b5c3ff51514d70206c73587414e3f58e5efe` — `ChatAI/AraAvatarView.swift` chỉ sửa log mapping và bổ sung dump tư thế gốc (translation/quaternion/scale) cho 11 joints: Spine 1–3 và hai tay 10–13, 34–37.
 - Không có điều khiển joint, không thay đổi tư thế, không phát animation, không thêm TEST UI; không sửa CompanionChatView, LiveVoice/Gemini Live hoặc voice pipeline.
 - Cần người dùng build IPA từ `main` và gửi các dòng `[ARA RIG] upper-body matches` cùng `[ARA RIG] rest[` để xác định local axes/pose trước khi triển khai Wave. Chưa build Xcode/Codemagic hoặc kiểm chứng chuyển động.
+
+
+## Ara — lượt kiểm tra 3 cử chỉ thân trên (2026-11-05)
+- Đã thay bước thử một động tác đơn lẻ bằng chuỗi 3 cử chỉ: Wave (nâng một tay và vẫy cổ tay), Explain (đưa một tay lên với khuỷu cong), Open Both Arms (mở nhẹ hai tay).
+- Mỗi cử chỉ được tạo từ baseline runtime của rig; cuối từng cử chỉ trả các joint liên quan về transform gốc. Chuỗi cuối cùng cũng kết thúc ở tư thế nghỉ ban đầu.
+- Cơ chế dùng API RealityKit có sẵn `FromToByAnimation<JointTransforms>` và `AnimationResource.sequence(with:)`; không thêm thư viện và không dùng animation toàn thân nhúng trong USDZ. Tham khảo tài liệu Apple: `jointTransforms`, `FromToByAnimation`, `AnimationResource.sequence(with:)`.
+- Tự chạy một lần sau khi model nạp, không thêm UI test. Cần quan sát IPA để hiệu chỉnh local axis/sign và biên độ; chưa thể xác nhận động tác đẹp hoặc đúng hướng bằng source/log tĩnh.
+- Commit mới nhất trên main: `689780afba8edbf8264c91c869d353be0454dd03`. Chưa build/chưa kiểm chứng trên thiết bị.
