@@ -9,7 +9,16 @@
 - Không tự chạy Codemagic hoặc GitHub Actions. Người dùng tự build IPA.
 - `PROJECT_STATUS.md` là checkpoint duy nhất.
 
-## Trạng thái hiện tại — Ara: lượt kiểm tra 3 cử chỉ thân trên (2026-11-05)
+
+## Ara — cử chỉ khi AI nói (2026-11-05)
+- Đã nối trạng thái AI speaking từ CompanionChatView sang AraAvatarView; chuỗi cử chỉ lúc tải model vẫn giữ nguyên.
+- Khi AI nói, Ara lặp cử chỉ giải thích nhẹ bằng 4 joint tay phải (vai, cánh tay, khuỷu, cổ tay), dùng RealityKit AnimationResource lặp vô hạn với easing easeInOut.
+- Khi AI dừng nói, vòng lặp dừng và tay chuyển về rest transforms đã lưu. Nếu model tải xong sau khi AI đã bắt đầu nói, cử chỉ nói được khởi chạy ngay khi rig sẵn sàng.
+- Chỉ sửa AraAvatarView.swift và CompanionChatView.swift. Không sửa LiveVoice.swift, Gemini Live, audio, chatbot/API, history, Text Chat hoặc Chibi Chat. Không thêm dependency, TEST UI hoặc branch.
+- Source: 6fa52b86e938f281207afad843136176d5054f44; 58914901b7998c71352d23e32b0e03ec61c9e86c; 8be3af232fcb64641947408bf3e4d8d2cc7d2ff4; 33864f08c319d55ebd0d6cb50dcfa3b88624fe57; 3ee0ecdba06e9b3f67c32f9dce1e2573d5950f56.
+- Chưa build hoặc kiểm chứng trên iPhone. Người dùng build IPA từ main; kiểm tra log [ARA ACTION] khi AI bắt đầu và kết thúc nói.
+
+## Lịch sử — Ara: lượt kiểm tra 3 cử chỉ thân trên (2026-11-05)
 - Đã triển khai một lượt chuyển động tự chạy một lần khi Ara nạp xong trong Chat Voice, để người dùng quan sát liên tục: **vẫy tay → đưa tay giải thích → mở hai tay → trở về tư thế gốc**.
 - Chỉ tác động 8 joint vai/cánh tay/cẳng tay/bàn tay trái và phải (index 10–13, 34–37) đã xác nhận từ IPA: 69 joint và 69 transforms. Không điều khiển Spine, Neck, Head, mặt, ngón tay hoặc BlendShape.
 - `ChatAI/AraAvatarView.swift`: tạo `FromToByAnimation<JointTransforms>` cho đúng các joint có liên quan, dùng tên joint full-path runtime; ghép bằng `AnimationResource.sequence`. Mỗi động tác có bước trở về đúng baseline transform đã chụp khi load.
@@ -32,7 +41,7 @@
 3. Quan sát riêng từng phần: hướng nâng vai/cánh tay, độ cong khuỷu, cổ tay có vẫy rõ không, hai tay có mở cân đối không, và cuối chuỗi có trở về đúng tư thế ban đầu không.
 4. Mở LOG/Copy Log. Kiểm tra `[ARA ACTION] Started 3 gestures`, các dòng `[ARA RIG]`, và không có lỗi tạo sequence. Embedded global animation vẫn không được phát.
 5. Nếu một cử chỉ xoay sai hướng hoặc không nhìn thấy, gửi video ngắn và log; hiệu chỉnh đúng joint/axis/sign/biên độ từ quan sát. Không sửa voice pipeline, không thêm popup TEST và không yêu cầu build lại nếu chưa có thay đổi source cần thiết.
-6. Chỉ sau khi ba cử chỉ đạt yêu cầu mới tích hợp trigger vào ngữ cảnh hội thoại thật.
+6. Tiếp theo đã tích hợp trigger hội thoại thật; xem mục Ara — cử chỉ khi AI nói.
 ## Ara — kết quả nghiên cứu kỹ thuật đã xác minh (2026-11-02)
 
 > Mục đích: lưu toàn bộ kết quả nghiên cứu để các phiên làm việc sau đọc checkpoint là có thể tiếp tục, không phải tải artifact hoặc nghiên cứu lại từ đầu. Đây là kết quả phân tích, **chưa phải thay đổi code**.
