@@ -228,3 +228,12 @@
 - Không đổi logic duyệt joint, nạp USDZ, chuyển động, UI, Gemini Live hoặc voice pipeline.
 - Fix commit: `dcaa4151f3160fb6a29690c4c40ab4c49cc14b8d` trên `main`.
 - Chưa chạy Xcode/Codemagic; cần build IPA lại để xác minh compiler. Nếu còn lỗi, xử lý theo lỗi đầu tiên trong log mới.
+
+
+## Ara — xác nhận skeleton và dump tư thế gốc (2026-11-05)
+- IPA do người dùng build xác nhận runtime rig: 1 ModelEntity tên `Hips`, `jointNames=69`, `jointTransforms=69`; đủ skeleton để tiếp tục giai đoạn 2.
+- Mapping đã xác nhận từ log: Spine/Spine1/Spine2 = 1–3; LeftShoulder/LeftArm/LeftForeArm/LeftHand = 10–13; RightShoulder/RightArm/RightForeArm/RightHand = 34–37.
+- Joint name do RealityKit trả về là full path (ví dụ `Hips/Spine/Spine1/Spine2/LeftShoulder`), vì vậy phép so sánh exact-name cũ với leaf name làm log báo nhầm `none`. Đã sửa phần diagnostic để so sánh thành phần cuối của path.
+- Source commit mới: `f0c5b5c3ff51514d70206c73587414e3f58e5efe` — `ChatAI/AraAvatarView.swift` chỉ sửa log mapping và bổ sung dump tư thế gốc (translation/quaternion/scale) cho 11 joints: Spine 1–3 và hai tay 10–13, 34–37.
+- Không có điều khiển joint, không thay đổi tư thế, không phát animation, không thêm TEST UI; không sửa CompanionChatView, LiveVoice/Gemini Live hoặc voice pipeline.
+- Cần người dùng build IPA từ `main` và gửi các dòng `[ARA RIG] upper-body matches` cùng `[ARA RIG] rest[` để xác định local axes/pose trước khi triển khai Wave. Chưa build Xcode/Codemagic hoặc kiểm chứng chuyển động.
