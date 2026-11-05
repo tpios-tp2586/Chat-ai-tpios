@@ -77,8 +77,97 @@ private final class AraAvatarLoader: ObservableObject {
     var onLog: ((String) -> Void)?
 
     private var loadSubscription: AnyCancellable?
+    private var activeRig: ModelEntity?
+    private var restTransforms: JointTransforms?
+    private var speakingController: AnimationPlaybackController?
+    private var isSpeaking = false
+
+    func setSpeaking(_ speaking: Bool) {
+        guard isSpeaking != speaking else { return }
+        isSpeaking = speaking
+        guard let rig = activeRig, let restTransforms else { return }
+
+        if speaking {
+            playSpeakingGesture(on: rig, baseline: restTransforms)
+        } else {
+            speakingController?.stop()
+            speakingController = nil
+            let indices = [34, 35, 36, 37]
+            let current = rig.jointTransforms
+            do {
+                var animation = FromToByAnimation<JointTransforms>()
+                animation.name = "speech-return-to-rest"
+                animation.jointNames = indices.map { rig.jointNames[$0] }
+                animation.isScaleAnimated = false
+                animation.isRotationAnimated = true
+                animation.isTranslationAnimated = false
+                animation.fromValue = JointTransforms(indices.map { current[$0] })
+                animation.toValue = JointTransforms(indices.map { restTransforms[$0] })
+                animation.duration = 0.55
+                animation.timing = .easeInOut
+                animation.bindTarget = .jointTransforms
+                animation.fillMode = .forwards
+                speakingController = rig.playAnimation(try AnimationResource.generate(with: animation), transitionDuration: 0.2)
+                onLog?("[ARA ACTION] AI stopped speaking; returning arm to rest")
+            } catch {
+                rig.jointTransforms = restTransforms
+                onLog?("[ARA ACTION] Rest transition failed; restored baseline: \\(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func playSpeakingGesture(on rig: ModelEntity, baseline: JointTransforms) {
+        let indices = [34, 35, 36, 37]
+        guard indices.allSatisfy({ $0 < baseline.count && $0 < rig.jointNames.count }) else { return }
+
+        var gesture = indices.map { baseline[$0] }
+        gesture[0].rotation = gesture[0].rotation * simd_quatf(angle: -18 * .pi / 180, axis: [0, 0, 1])
+        gesture[1].rotation = gesture[1].rotation * simd_quatf(angle: -12 * .pi / 180, axis: [0, 0, 1])
+        gesture[2].rotation = gesture[2].rotation * simd_quatf(angle: 24 * .pi / 180, axis: [0, 0, 1])
+        gesture[3].rotation = gesture[3].rotation * simd_quatf(angle: 7 * .pi / 180, axis: [1, 0, 0])
+
+        do {
+            var raise = FromToByAnimation<JointTransforms>()
+            raise.name = "speech-explain"
+            raise.jointNames = indices.map { rig.jointNames[$0] }
+            raise.isScaleAnimated = false
+            raise.isRotationAnimated = true
+            raise.isTranslationAnimated = false
+            raise.fromValue = JointTransforms(indices.map { baseline[$0] })
+            raise.toValue = JointTransforms(gesture)
+            raise.duration = 1.05
+            raise.timing = .easeInOut
+            raise.bindTarget = .jointTransforms
+            raise.fillMode = .forwards
+
+            var lower = FromToByAnimation<JointTransforms>()
+            lower.name = "speech-explain-return"
+            lower.jointNames = raise.jointNames
+            lower.isScaleAnimated = false
+            lower.isRotationAnimated = true
+            lower.isTranslationAnimated = false
+            lower.fromValue = JointTransforms(gesture)
+            lower.toValue = JointTransforms(indices.map { baseline[$0] })
+            lower.duration = 1.0
+            lower.timing = .easeInOut
+            lower.bindTarget = .jointTransforms
+            lower.fillMode = .forwards
+
+            let cycle = try AnimationResource.sequence(with: [
+                AnimationResource.generate(with: raise),
+                AnimationResource.generate(with: lower)
+            ]).repeat(duration: .infinity)
+            speakingController?.stop()
+            speakingController = rig.playAnimation(cycle, transitionDuration: 0.35)
+            onLog?("[ARA ACTION] AI speaking; looping gentle arm explanation gesture")
+        } catch {
+            onLog?("[ARA ACTION] Could not create speaking gesture: \\(error.localizedDescription)")
+        }
+    }
 
     private func playGestureReview(on rig: ModelEntity) {
+        activeRig = rig
+        restTransforms = rig.jointTransforms
         let requiredIndices = [10, 11, 12, 13, 34, 35, 36, 37]
         let baseline = rig.jointTransforms
         guard baseline.count == rig.jointNames.count,
