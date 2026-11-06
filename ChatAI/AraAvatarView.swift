@@ -2,8 +2,16 @@ import Combine
 import RealityKit
 import SwiftUI
 
+// MARK: - Emotion
+
+enum AraEmotion: Equatable {
+    case idle, speaking, happy, thinking, empathy, surprised
+}
+
+// MARK: - View
+
 struct AraAvatarView: View {
-    let isSpeaking: Bool
+    let emotion: AraEmotion
     let onLog: (String) -> Void
 
     @StateObject private var loader = AraAvatarLoader()
@@ -14,36 +22,20 @@ struct AraAvatarView: View {
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
-            .onChanged { magnification in
-                savedZoomScale = min(max(pinchStartScale * Double(magnification), 0.7), 4.5)
-            }
-            .onEnded { _ in
-                pinchStartScale = savedZoomScale
-                onLog("[ARA VIEW] Zoom saved: \(String(format: "%.2f", savedZoomScale))x")
-            }
+            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.7), 4.5) }
+            .onEnded { _ in pinchStartScale = savedZoomScale }
     }
 
     private var rotationGesture: some Gesture {
         DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                let radiansPerPoint = Float.pi / 360
-                rotationY = dragStartRotation + Float(value.translation.width) * radiansPerPoint
-            }
-            .onEnded { _ in
-                dragStartRotation = rotationY
-                let degrees = rotationY * 180 / Float.pi
-                onLog("[ARA VIEW] Camera rotation: \(String(format: "%.0f", degrees))°")
-            }
+            .onChanged { rotationY = dragStartRotation + Float($0.translation.width) * (.pi / 360) }
+            .onEnded { _ in dragStartRotation = rotationY }
     }
 
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                AraRealityView(
-                    entity: entity,
-                    zoomScale: Float(savedZoomScale),
-                    rotationY: rotationY
-                )
+                AraRealityView(entity: entity, zoomScale: Float(savedZoomScale), rotationY: rotationY)
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -59,20 +51,13 @@ struct AraAvatarView: View {
         .task {
             pinchStartScale = savedZoomScale
             loader.onLog = onLog
-            let info = Bundle.main.infoDictionary
-            let sourceCommit = info?["ChatAISourceCommit"] as? String ?? "unknown"
-            let buildNumber = info?["ChatAIBuildNumber"] as? String ?? "unknown"
-            onLog("[BUILD] source=\(sourceCommit.prefix(12)) build=\(buildNumber)")
             loader.load()
         }
-        .onReceive(loader.$status.dropFirst()) { status in
-            onLog("[ARA] \(status)")
-        }
-        .onChange(of: isSpeaking) { speaking in
-            loader.setSpeaking(speaking)
-        }
+        .onChange(of: emotion) { loader.setEmotion($0) }
     }
 }
+
+// MARK: - Loader
 
 @MainActor
 private final class AraAvatarLoader: ObservableObject {
@@ -83,298 +68,223 @@ private final class AraAvatarLoader: ObservableObject {
     private var loadSubscription: AnyCancellable?
     private var activeRig: ModelEntity?
     private var restTransforms: [Transform]?
-    private var speakingController: AnimationPlaybackController?
-    private var gestureReviewController: AnimationPlaybackController?
-    private var isSpeaking = false
+    private var activeController: AnimationPlaybackController?
+    private var currentEmotion: AraEmotion = .idle
 
-    func setSpeaking(_ speaking: Bool) {
-        guard isSpeaking != speaking else { return }
-        isSpeaking = speaking
-        guard let rig = activeRig, let restTransforms else { return }
+    // MARK: Emotion dispatch
 
-        if speaking {
-            gestureReviewController?.stop()
-            gestureReviewController = nil
-            playSpeakingGesture(on: rig, baseline: restTransforms)
-        } else {
-            speakingController?.stop()
-            speakingController = nil
-            let indices = [34, 35, 36, 37]
-            let current = rig.jointTransforms
-            do {
-                var animation = FromToByAnimation<JointTransforms>()
-                animation.name = "speech-return-to-rest"
-                animation.jointNames = indices.map { rig.jointNames[$0] }
-                animation.isScaleAnimated = false
-                animation.isRotationAnimated = true
-                animation.isTranslationAnimated = false
-                animation.fromValue = JointTransforms(indices.map { current[$0] })
-                animation.toValue = JointTransforms(indices.map { restTransforms[$0] })
-                animation.duration = 0.55
-                animation.timing = .easeInOut
-                animation.bindTarget = .jointTransforms
-                animation.fillMode = .forwards
-                speakingController = rig.playAnimation(try AnimationResource.generate(with: animation), transitionDuration: 0.2)
-                onLog?("[ARA ACTION] AI stopped speaking; returning arm to rest")
-            } catch {
-                rig.jointTransforms = restTransforms
-                onLog?("[ARA ACTION] Rest transition failed; restored baseline: \\(error.localizedDescription)")
-            }
+    func setEmotion(_ emotion: AraEmotion) {
+        guard emotion != currentEmotion else { return }
+        currentEmotion = emotion
+        guard let rig = activeRig, let baseline = restTransforms else { return }
+        playEmotion(emotion, on: rig, baseline: baseline)
+    }
+
+    private func playEmotion(_ emotion: AraEmotion, on rig: ModelEntity, baseline: [Transform]) {
+        activeController?.stop()
+        activeController = nil
+
+        switch emotion {
+        case .idle:
+            returnToRest(on: rig, baseline: baseline, indices: [10,11,12,13,34,35,36,37])
+
+        case .speaking:
+            // Right arm gentle raise-lower loop
+            activeController = buildLoop(on: rig, baseline: baseline,
+                pose: poseWith(baseline, deltas: [
+                    34: rot(-18, [0,0,1]), 35: rot(-12, [0,0,1]),
+                    36: rot(24,  [0,0,1]), 37: rot(7,   [1,0,0])
+                ]),
+                indices: [34,35,36,37], raiseDur: 1.05, lowerDur: 1.0)
+            onLog?("[ARA] speaking gesture")
+
+        case .happy:
+            // Both arms open outward, hold 1.8s, return
+            activeController = buildHold(on: rig, baseline: baseline,
+                pose: poseWith(baseline, deltas: [
+                    10: rot(22,  [0,0,1]), 11: rot(18,  [0,0,1]), 12: rot(-10, [0,0,1]),
+                    34: rot(-22, [0,0,1]), 35: rot(-18, [0,0,1]), 36: rot(10,  [0,0,1])
+                ]),
+                indices: [10,11,12,13,34,35,36,37], raiseDur: 0.55, holdDur: 1.8, lowerDur: 0.65)
+            onLog?("[ARA] happy gesture")
+
+        case .thinking:
+            // Right arm raises high, elbow bent toward chin
+            activeController = buildHold(on: rig, baseline: baseline,
+                pose: poseWith(baseline, deltas: [
+                    34: rot(-28, [0,0,1]), 35: rot(-20, [0,0,1]),
+                    36: rot(55,  [0,0,1]), 37: rot(-15, [1,0,0])
+                ]),
+                indices: [34,35,36,37], raiseDur: 0.7, holdDur: 2.4, lowerDur: 0.65)
+            onLog?("[ARA] thinking gesture")
+
+        case .empathy:
+            // Left arm crosses toward chest
+            activeController = buildHold(on: rig, baseline: baseline,
+                pose: poseWith(baseline, deltas: [
+                    10: rot(-22, [0,0,1]), 11: rot(-28, [0,0,1]), 12: rot(18, [0,0,1])
+                ]),
+                indices: [10,11,12,13], raiseDur: 0.6, holdDur: 2.0, lowerDur: 0.65)
+            onLog?("[ARA] empathy gesture")
+
+        case .surprised:
+            // Both arms fan out quickly, return
+            activeController = buildHold(on: rig, baseline: baseline,
+                pose: poseWith(baseline, deltas: [
+                    10: rot(32,  [0,0,1]), 11: rot(26,  [0,0,1]),
+                    34: rot(-32, [0,0,1]), 35: rot(-26, [0,0,1])
+                ]),
+                indices: [10,11,12,13,34,35,36,37], raiseDur: 0.28, holdDur: 0.9, lowerDur: 0.55)
+            onLog?("[ARA] surprised gesture")
         }
     }
 
-    private func playSpeakingGesture(on rig: ModelEntity, baseline: [Transform]) {
-        let indices = [34, 35, 36, 37]
-        guard indices.allSatisfy({ $0 < baseline.count && $0 < rig.jointNames.count }) else { return }
+    // MARK: Helpers
 
-        var gesture = indices.map { baseline[$0] }
-        gesture[0].rotation = gesture[0].rotation * simd_quatf(angle: -18 * .pi / 180, axis: [0, 0, 1])
-        gesture[1].rotation = gesture[1].rotation * simd_quatf(angle: -12 * .pi / 180, axis: [0, 0, 1])
-        gesture[2].rotation = gesture[2].rotation * simd_quatf(angle: 24 * .pi / 180, axis: [0, 0, 1])
-        gesture[3].rotation = gesture[3].rotation * simd_quatf(angle: 7 * .pi / 180, axis: [1, 0, 0])
+    private func rot(_ deg: Float, _ axis: SIMD3<Float>) -> simd_quatf {
+        simd_quatf(angle: deg * .pi / 180, axis: axis)
+    }
 
+    private func poseWith(_ baseline: [Transform], deltas: [Int: simd_quatf]) -> [Int: Transform] {
+        var out: [Int: Transform] = [:]
+        for (i, q) in deltas {
+            var t = baseline[i]
+            t.rotation = t.rotation * q
+            out[i] = t
+        }
+        return out
+    }
+
+    // Single raise → lower loop (for speaking)
+    private func buildLoop(
+        on rig: ModelEntity, baseline: [Transform],
+        pose: [Int: Transform], indices: [Int],
+        raiseDur: Double, lowerDur: Double
+    ) -> AnimationPlaybackController? {
+        let names = indices.map { rig.jointNames[$0] }
+        let from  = JointTransforms(indices.map { baseline[$0] })
+        let to    = JointTransforms(indices.map { pose[$0] ?? baseline[$0] })
         do {
-            var raise = FromToByAnimation<JointTransforms>()
-            raise.name = "speech-explain"
-            raise.jointNames = indices.map { rig.jointNames[$0] }
-            raise.isScaleAnimated = false
-            raise.isRotationAnimated = true
-            raise.isTranslationAnimated = false
-            raise.fromValue = JointTransforms(indices.map { baseline[$0] })
-            raise.toValue = JointTransforms(gesture)
-            raise.duration = 1.05
-            raise.timing = .easeInOut
-            raise.bindTarget = .jointTransforms
-            raise.fillMode = .forwards
+            var up = FromToByAnimation<JointTransforms>()
+            up.jointNames = names; up.fromValue = from; up.toValue = to
+            up.duration = raiseDur; up.timing = .easeInOut
+            up.bindTarget = .jointTransforms; up.fillMode = .forwards
+            up.isScaleAnimated = false
 
-            var lower = FromToByAnimation<JointTransforms>()
-            lower.name = "speech-explain-return"
-            lower.jointNames = raise.jointNames
-            lower.isScaleAnimated = false
-            lower.isRotationAnimated = true
-            lower.isTranslationAnimated = false
-            lower.fromValue = JointTransforms(gesture)
-            lower.toValue = JointTransforms(indices.map { baseline[$0] })
-            lower.duration = 1.0
-            lower.timing = .easeInOut
-            lower.bindTarget = .jointTransforms
-            lower.fillMode = .forwards
+            var dn = FromToByAnimation<JointTransforms>()
+            dn.jointNames = names; dn.fromValue = to; dn.toValue = from
+            dn.duration = lowerDur; dn.timing = .easeInOut
+            dn.bindTarget = .jointTransforms; dn.fillMode = .forwards
+            dn.isScaleAnimated = false
 
             let cycle = try AnimationResource.sequence(with: [
-                AnimationResource.generate(with: raise),
-                AnimationResource.generate(with: lower)
+                AnimationResource.generate(with: up),
+                AnimationResource.generate(with: dn)
             ]).repeat(duration: .infinity)
-            speakingController?.stop()
-            speakingController = rig.playAnimation(cycle, transitionDuration: 0.35)
-            onLog?("[ARA ACTION] AI speaking; looping gentle arm explanation gesture")
-        } catch {
-            onLog?("[ARA ACTION] Could not create speaking gesture: \\(error.localizedDescription)")
-        }
+            return rig.playAnimation(cycle, transitionDuration: 0.35)
+        } catch { return nil }
     }
 
-    private func playGestureReview(on rig: ModelEntity) {
-        activeRig = rig
-        restTransforms = rig.jointTransforms
-        let requiredIndices = [10, 11, 12, 13, 34, 35, 36, 37]
-        let baseline = rig.jointTransforms
-        guard baseline.count == rig.jointNames.count,
-              requiredIndices.allSatisfy({ $0 < baseline.count }) else {
-            onLog?("[ARA ACTION] Invalid rig transform mapping; gestures skipped")
-            return
-        }
-
-        var current = baseline
-        var resources: [AnimationResource] = []
-
-        func appendStep(
-            name: String,
-            rotations: [Int: simd_quatf],
-            duration: TimeInterval
-        ) throws {
-            let indices = rotations.keys.sorted()
-            let from = indices.map { current[$0] }
-            let to = indices.map { index -> Transform in
-                var transform = current[index]
-                transform.rotation = transform.rotation * rotations[index]!
-                current[index] = transform
-                return transform
-            }
-
-            var animation = FromToByAnimation<JointTransforms>()
-            animation.name = name
-            animation.jointNames = indices.map { rig.jointNames[$0] }
-            animation.isScaleAnimated = false
-            animation.isRotationAnimated = true
-            animation.isTranslationAnimated = false
-            animation.fromValue = JointTransforms(from)
-            animation.toValue = JointTransforms(to)
-            animation.duration = duration
-            animation.timing = .easeInOut
-            animation.bindTarget = .jointTransforms
-            animation.fillMode = .forwards
-            resources.append(try AnimationResource.generate(with: animation))
-        }
-
-        func appendRest(name: String, indices: [Int], duration: TimeInterval) throws {
-            let from = indices.map { current[$0] }
-            let to = indices.map { baseline[$0] }
-            var animation = FromToByAnimation<JointTransforms>()
-            animation.name = name
-            animation.jointNames = indices.map { rig.jointNames[$0] }
-            animation.isScaleAnimated = false
-            animation.isRotationAnimated = true
-            animation.isTranslationAnimated = false
-            animation.fromValue = JointTransforms(from)
-            animation.toValue = JointTransforms(to)
-            animation.duration = duration
-            animation.timing = .easeInOut
-            animation.bindTarget = .jointTransforms
-            animation.fillMode = .forwards
-            resources.append(try AnimationResource.generate(with: animation))
-            for index in indices { current[index] = baseline[index] }
-        }
-
-        func rotation(_ degrees: Float, axis: SIMD3<Float>) -> simd_quatf {
-            simd_quatf(angle: degrees * .pi / 180, axis: axis)
-        }
-
+    // Raise → hold → lower (for all other emotions)
+    private func buildHold(
+        on rig: ModelEntity, baseline: [Transform],
+        pose: [Int: Transform], indices: [Int],
+        raiseDur: Double, holdDur: Double, lowerDur: Double
+    ) -> AnimationPlaybackController? {
+        let names = indices.map { rig.jointNames[$0] }
+        let from  = JointTransforms(indices.map { baseline[$0] })
+        let to    = JointTransforms(indices.map { pose[$0] ?? baseline[$0] })
         do {
-            let rightArm = [34, 35, 36, 37]
-            let bothArms = [10, 11, 12, 13, 34, 35, 36, 37]
+            var up = FromToByAnimation<JointTransforms>()
+            up.jointNames = names; up.fromValue = from; up.toValue = to
+            up.duration = raiseDur; up.timing = .easeOut
+            up.bindTarget = .jointTransforms; up.fillMode = .forwards
+            up.isScaleAnimated = false
 
-            // 1. Wave: lift the right arm, move the wrist, then restore the imported pose.
-            try appendStep(name: "wave-lift", rotations: [
-                34: rotation(-32, axis: [0, 0, 1]),
-                35: rotation(-24, axis: [0, 0, 1]),
-                36: rotation(18, axis: [0, 0, 1])
-            ], duration: 0.85)
-            try appendStep(name: "wave-wrist-out", rotations: [
-                37: rotation(16, axis: [1, 0, 0])
-            ], duration: 0.24)
-            try appendStep(name: "wave-wrist-back", rotations: [
-                37: rotation(-32, axis: [1, 0, 0])
-            ], duration: 0.28)
-            try appendStep(name: "wave-wrist-center", rotations: [
-                37: rotation(16, axis: [1, 0, 0])
-            ], duration: 0.24)
-            try appendRest(name: "wave-return", indices: rightArm, duration: 0.75)
+            var hold = FromToByAnimation<JointTransforms>()
+            hold.jointNames = names; hold.fromValue = to; hold.toValue = to
+            hold.duration = holdDur; hold.timing = .linear
+            hold.bindTarget = .jointTransforms; hold.fillMode = .forwards
+            hold.isScaleAnimated = false
 
-            // 2. Explain: one arm comes forward with a clear elbow bend.
-            try appendStep(name: "explain-gesture", rotations: [
-                34: rotation(-22, axis: [0, 0, 1]),
-                35: rotation(-16, axis: [0, 0, 1]),
-                36: rotation(38, axis: [0, 0, 1]),
-                37: rotation(9, axis: [1, 0, 0])
-            ], duration: 0.9)
-            try appendRest(name: "explain-return", indices: rightArm, duration: 0.75)
+            var dn = FromToByAnimation<JointTransforms>()
+            dn.jointNames = names; dn.fromValue = to; dn.toValue = from
+            dn.duration = lowerDur; dn.timing = .easeIn
+            dn.bindTarget = .jointTransforms; dn.fillMode = .forwards
+            dn.isScaleAnimated = false
 
-            // 3. Open both arms gently, then return both sides to the exact baseline.
-            try appendStep(name: "open-both-arms", rotations: [
-                10: rotation(20, axis: [0, 0, 1]),
-                11: rotation(18, axis: [0, 0, 1]),
-                12: rotation(-12, axis: [0, 0, 1]),
-                34: rotation(-20, axis: [0, 0, 1]),
-                35: rotation(-18, axis: [0, 0, 1]),
-                36: rotation(12, axis: [0, 0, 1])
-            ], duration: 1.0)
-            try appendRest(name: "open-arms-return", indices: bothArms, duration: 0.85)
+            let seq = try AnimationResource.sequence(with: [
+                AnimationResource.generate(with: up),
+                AnimationResource.generate(with: hold),
+                AnimationResource.generate(with: dn)
+            ])
+            return rig.playAnimation(seq, transitionDuration: 0.25)
+        } catch { return nil }
+    }
 
-            let sequence = try AnimationResource.sequence(with: resources)
-            gestureReviewController = rig.playAnimation(sequence, transitionDuration: 0.2)
-            onLog?("[ARA ACTION] Started 3 gestures: wave → explain → open both arms → exact rest pose")
+    private func returnToRest(on rig: ModelEntity, baseline: [Transform], indices: [Int]) {
+        let names = indices.map { rig.jointNames[$0] }
+        let current = rig.jointTransforms
+        let from = JointTransforms(indices.map { current[$0] })
+        let to   = JointTransforms(indices.map { baseline[$0] })
+        do {
+            var anim = FromToByAnimation<JointTransforms>()
+            anim.jointNames = names; anim.fromValue = from; anim.toValue = to
+            anim.duration = 0.55; anim.timing = .easeInOut
+            anim.bindTarget = .jointTransforms; anim.fillMode = .forwards
+            anim.isScaleAnimated = false
+            activeController = rig.playAnimation(try AnimationResource.generate(with: anim), transitionDuration: 0.2)
         } catch {
-            onLog?("[ARA ACTION] Could not create gesture sequence: \(error.localizedDescription)")
+            rig.jointTransforms = baseline
         }
     }
+
+    // MARK: Load
 
     func load() {
         guard entity == nil, loadSubscription == nil else { return }
-        status = "Đang nạp Ara-Avatar.usdz từ app bundle…"
-
+        status = "Đang nạp Ara-Avatar.usdz…"
         guard let url = Bundle.main.url(forResource: "Ara-Avatar", withExtension: "usdz") else {
-            status = "Không tìm thấy Ara-Avatar.usdz trong app bundle"
-            onLog?("[ARA MODEL] Bundle lookup failed: Ara-Avatar.usdz")
+            status = "Không tìm thấy Ara-Avatar.usdz"
+            onLog?("[ARA MODEL] Bundle lookup failed")
             return
         }
-
-        let assetBytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        onLog?("[ARA MODEL] Found bundled asset: \(url.lastPathComponent), size=\(assetBytes) bytes")
-
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
                 guard let self else { return }
                 self.loadSubscription = nil
                 if case .failure(let error) = completion {
-                    self.status = "Lỗi nạp Ara-Avatar.usdz: \(error.localizedDescription)"
-                    self.onLog?("[ARA MODEL] USDZ load failed: \(error.localizedDescription)")
+                    self.status = "Lỗi nạp USDZ: \(error.localizedDescription)"
+                    self.onLog?("[ARA MODEL] Load failed: \(error.localizedDescription)")
                 }
             }, receiveValue: { [weak self] model in
                 guard let self else { return }
                 self.loadSubscription = nil
 
-                let embeddedAnimations = model.availableAnimations
-                let names = embeddedAnimations.compactMap(\.name).joined(separator: ", ")
-                self.onLog?("[ARA MODEL] Embedded animation resources=\(embeddedAnimations.count); embedded playback is disabled")
-                if !names.isEmpty {
-                    self.onLog?("[ARA MODEL] Embedded animation names (not used by gesture review): \(names)")
+                // Find rig (first ModelEntity with jointNames)
+                var found: ModelEntity?
+                func findRig(_ e: Entity) {
+                    if found == nil, let m = e as? ModelEntity, !m.jointNames.isEmpty { found = m }
+                    if found == nil { e.children.forEach(findRig) }
                 }
-
-                var rigCount = 0
-                var actionRig: ModelEntity?
-                let inspectedJointNames: Set<String> = [
-                    "Spine", "Spine1", "Spine2", "Neck",
-                    "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
-                    "RightShoulder", "RightArm", "RightForeArm", "RightHand"
-                ]
-                let rigLog = self.onLog
-                @MainActor func inspectRig(_ candidate: Entity) {
-                    if let rig = candidate as? ModelEntity, !rig.jointNames.isEmpty {
-                        rigCount += 1
-                        if actionRig == nil { actionRig = rig }
-                        let joints = rig.jointNames
-                        let transforms = rig.jointTransforms
-                        let upperBody = joints.enumerated().compactMap { index, path in
-                            let name = path.split(separator: "/").last.map(String.init) ?? path
-                            return inspectedJointNames.contains(name) ? "\(index):\(name)" : nil
-                        }
-                        rigLog?("[ARA RIG] model=\(rigCount - 1) name=\(rig.name) joints=\(joints.count) transforms=\(transforms.count)")
-                        rigLog?("[ARA RIG] upper-body matches: \(upperBody.isEmpty ? "none" : upperBody.joined(separator: ", "))")
-                        for index in [1, 2, 3, 10, 11, 12, 13, 34, 35, 36, 37] where index < joints.count && index < transforms.count {
-                            let transform = transforms[index]
-                            let position = transform.translation
-                            let rotation = transform.rotation.vector
-                            let scale = transform.scale
-                            let name = joints[index].split(separator: "/").last.map(String.init) ?? joints[index]
-                            rigLog?("[ARA RIG] rest[\(index)] \(name) t=(\(position.x),\(position.y),\(position.z)) q=(\(rotation.x),\(rotation.y),\(rotation.z),\(rotation.w)) s=(\(scale.x),\(scale.y),\(scale.z))")
-                        }
-                        let indexedJointNames = joints.enumerated().map { "\($0.offset):\($0.element)" }
-                        for start in stride(from: 0, to: indexedJointNames.count, by: 12) {
-                            let end = min(start + 12, indexedJointNames.count)
-                            rigLog?("[ARA RIG] joints[\(start)-\(end - 1)]: \(indexedJointNames[start..<end].joined(separator: " | "))")
-                        }
-                    }
-                    candidate.children.forEach(inspectRig)
-                }
-                inspectRig(model)
-                if rigCount == 0 {
-                    self.onLog?("[ARA RIG] No imported ModelEntity exposes jointNames; movement review skipped")
-                }
+                findRig(model)
 
                 self.entity = model
-                self.status = "Ara đã tải — đang kiểm tra 3 cử chỉ thân trên"
-                if let rig = actionRig {
-                    self.playGestureReview(on: rig)
-                    if self.isSpeaking, let baseline = self.restTransforms {
-                        self.playSpeakingGesture(on: rig, baseline: baseline)
-                    }
-                }
-                if actionRig == nil {
-                    self.onLog?("[ARA ACTION] No valid rig found; gesture review skipped")
+                if let rig = found {
+                    self.activeRig = rig
+                    self.restTransforms = rig.jointTransforms
+                    self.status = "Ara sẵn sàng"
+                    self.onLog?("[ARA RIG] joints=\(rig.jointNames.count)")
+                } else {
+                    self.status = "Ara loaded (no rig)"
+                    self.onLog?("[ARA RIG] No rig found")
                 }
             })
     }
 }
+
+// MARK: - RealityView
 
 private struct AraRealityView: UIViewRepresentable {
     let entity: Entity
@@ -392,38 +302,21 @@ private struct AraRealityView: UIViewRepresentable {
         if context.coordinator.currentEntity !== entity {
             attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         } else {
-            if context.coordinator.currentZoom != zoomScale {
-                applyZoom(zoomScale, to: entity, coordinator: context.coordinator)
-            }
-            if context.coordinator.currentRotationY != rotationY {
-                applyRotation(rotationY, coordinator: context.coordinator)
-            }
+            if context.coordinator.currentZoom != zoomScale { applyZoom(zoomScale, to: entity, coordinator: context.coordinator) }
+            if context.coordinator.currentRotationY != rotationY { applyRotation(rotationY, coordinator: context.coordinator) }
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    private func attach(
-        _ model: Entity,
-        zoomScale: Float,
-        rotationY: Float,
-        to view: ARView,
-        coordinator: Coordinator
-    ) {
+    private func attach(_ model: Entity, zoomScale: Float, rotationY: Float, to view: ARView, coordinator: Coordinator) {
         let bounds = model.visualBounds(recursive: true, relativeTo: model)
         let height = bounds.extents.y
         let baseScale: Float = height.isFinite && height > 0 ? 1.35 / height : 1
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
-
-        // Keep the existing upper-body framing while the model itself stays in its imported static pose.
-        let upperBodyCenter = SIMD3<Float>(
-            bounds.center.x,
-            bounds.center.y + height * 0.27,
-            bounds.center.z
-        )
+        let upperBodyCenter = SIMD3<Float>(bounds.center.x, bounds.center.y + height * 0.27, bounds.center.z)
         coordinator.basePosition = -upperBodyCenter * baseScale
         coordinator.currentEntity = model
-
         let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.4))
         anchor.addChild(model)
         coordinator.rotationPivot = anchor
