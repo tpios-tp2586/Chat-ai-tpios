@@ -212,15 +212,17 @@ private final class AraAvatarLoader: ObservableObject {
                 guard let self else { return }
                 self.loadSubscription = nil
 
-                // Log available clips for verification
-                func collectAnims(_ e: Entity) -> [String] {
-                    var names = e.availableAnimations.compactMap(\.name)
-                    for child in e.children { names += collectAnims(child) }
-                    return names
+                // Log all animations with index for clip mapping
+                func collectAnims(_ e: Entity, prefix: String) -> [(Int, String)] {
+                    let anims = e.availableAnimations.enumerated().map { (i, a) in (i, a.name ?? "(nil)") }
+                    var result = anims.map { (i, n) in (i, "\(prefix)[\(i)]=\(n)") }
+                    for child in e.children { result += collectAnims(child, prefix: prefix + ">") }
+                    return result
                 }
-                let allNames = collectAnims(model)
+                let allAnims = collectAnims(model, prefix: "")
                 self.globalAnimation = model.availableAnimations.first
-                self.onLog?("[ARA ANIM] \(allNames.count) clips: \(allNames.prefix(12).joined(separator: ", "))") 
+                let summary = allAnims.prefix(20).map { $0.1 }.joined(separator: ", ")
+                self.onLog?("[ARA ANIM] \(allAnims.count) clips: \(summary)")
 
                 self.entity = model
                 self.status = "Ara sẵn sàng"
