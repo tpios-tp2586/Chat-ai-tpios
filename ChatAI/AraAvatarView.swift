@@ -214,7 +214,7 @@ private final class AraAvatarLoader: ObservableObject {
 
                 // Log available clips for verification
                 func collectAnims(_ e: Entity) -> [String] {
-                    var names = e.availableAnimations.map(\.name)
+                    var names = e.availableAnimations.compactMap(\.name)
                     for child in e.children { names += collectAnims(child) }
                     return names
                 }
