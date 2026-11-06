@@ -2,10 +2,34 @@ import Combine
 import RealityKit
 import SwiftUI
 
-// MARK: - Emotion
+// MARK: - Emotion (public, shared with CompanionChatView)
 
 enum AraEmotion: Equatable {
-    case idle, speaking, happy, thinking, empathy, surprised
+    case idle, speaking, listening, thinking, happy, surprised, empathy
+}
+
+// MARK: - Clip definitions (name + time range from confirmed animation-timeline.json)
+// Global USDZ timeline: 0–3539 timecodes @ 60 tc/s ≈ 58.983s total
+// Clip offsets verified in ara-avatar-research-bundle / usdz-animation-diagnostics.txt
+
+private struct AraClip {
+    let name: String
+    let start: Double   // seconds
+    let duration: Double
+
+    var timeRange: ClosedRange<Double> { start ... start + duration }
+}
+
+private enum AraClips {
+    static let idle        = AraClip(name: "Idle",          start:  0.000, duration: 3.933)
+    static let wave        = AraClip(name: "Wave",          start:  3.933, duration: 3.000)
+    static let talk        = AraClip(name: "Talk",          start:  6.933, duration: 6.400)
+    static let talkExplain = AraClip(name: "TalkExplain",   start: 13.333, duration: 2.800)
+    static let listening   = AraClip(name: "AraListening",  start: 16.133, duration: 3.200)
+    static let thinking    = AraClip(name: "AraThinking",   start: 19.333, duration: 3.267)
+    static let empathy     = AraClip(name: "AraEmpathy",    start: 22.600, duration: 3.200)
+    static let laugh       = AraClip(name: "Laugh",         start: 25.800, duration: 3.133)  // mouthSmile 1.0
+    static let cheer       = AraClip(name: "Cheer",         start: 28.933, duration: 2.467)
 }
 
 // MARK: - View
@@ -66,180 +90,100 @@ private final class AraAvatarLoader: ObservableObject {
     var onLog: ((String) -> Void)?
 
     private var loadSubscription: AnyCancellable?
-    private var activeRig: ModelEntity?
-    private var restTransforms: [Transform]?
+    private var globalAnimation: AnimationResource?  // full USDZ global animation
     private var activeController: AnimationPlaybackController?
     private var currentEmotion: AraEmotion = .idle
+    private var speakingTask: Task<Void, Never>?
 
-    // MARK: Emotion dispatch
+    // MARK: - Emotion dispatch
 
     func setEmotion(_ emotion: AraEmotion) {
         guard emotion != currentEmotion else { return }
         currentEmotion = emotion
-        guard let rig = activeRig, let baseline = restTransforms else { return }
-        playEmotion(emotion, on: rig, baseline: baseline)
-    }
-
-    private func playEmotion(_ emotion: AraEmotion, on rig: ModelEntity, baseline: [Transform]) {
-        activeController?.stop()
-        activeController = nil
+        guard let entity = entity, let anim = globalAnimation else { return }
+        speakingTask?.cancel()
+        speakingTask = nil
 
         switch emotion {
         case .idle:
-            returnToRest(on: rig, baseline: baseline, indices: [10,11,12,13,34,35,36,37])
+            play(clip: AraClips.idle, on: entity, anim: anim, loop: true)
 
-        case .speaking:
-            // Right arm gentle raise-lower loop
-            activeController = buildLoop(on: rig, baseline: baseline,
-                pose: poseWith(baseline, deltas: [
-                    34: rot(-18, [0,0,1]), 35: rot(-12, [0,0,1]),
-                    36: rot(24,  [0,0,1]), 37: rot(7,   [1,0,0])
-                ]),
-                indices: [34,35,36,37], raiseDur: 1.05, lowerDur: 1.0)
-            onLog?("[ARA] speaking gesture")
-
-        case .happy:
-            // Both arms open outward, hold 1.8s, return
-            activeController = buildHold(on: rig, baseline: baseline,
-                pose: poseWith(baseline, deltas: [
-                    10: rot(22,  [0,0,1]), 11: rot(18,  [0,0,1]), 12: rot(-10, [0,0,1]),
-                    34: rot(-22, [0,0,1]), 35: rot(-18, [0,0,1]), 36: rot(10,  [0,0,1])
-                ]),
-                indices: [10,11,12,13,34,35,36,37], raiseDur: 0.55, holdDur: 1.8, lowerDur: 0.65)
-            onLog?("[ARA] happy gesture")
+        case .listening:
+            play(clip: AraClips.listening, on: entity, anim: anim, loop: true)
 
         case .thinking:
-            // Right arm raises high, elbow bent toward chin
-            activeController = buildHold(on: rig, baseline: baseline,
-                pose: poseWith(baseline, deltas: [
-                    34: rot(-28, [0,0,1]), 35: rot(-20, [0,0,1]),
-                    36: rot(55,  [0,0,1]), 37: rot(-15, [1,0,0])
-                ]),
-                indices: [34,35,36,37], raiseDur: 0.7, holdDur: 2.4, lowerDur: 0.65)
-            onLog?("[ARA] thinking gesture")
+            play(clip: AraClips.thinking, on: entity, anim: anim, loop: false)
+            scheduleReturn(to: .listening, after: AraClips.thinking.duration + 0.3)
 
-        case .empathy:
-            // Left arm crosses toward chest
-            activeController = buildHold(on: rig, baseline: baseline,
-                pose: poseWith(baseline, deltas: [
-                    10: rot(-22, [0,0,1]), 11: rot(-28, [0,0,1]), 12: rot(18, [0,0,1])
-                ]),
-                indices: [10,11,12,13], raiseDur: 0.6, holdDur: 2.0, lowerDur: 0.65)
-            onLog?("[ARA] empathy gesture")
+        case .speaking:
+            // Wave once on first speak, then loop Talk → occasionally TalkExplain
+            speakingTask = Task { [weak self] in
+                guard let self else { return }
+                // Wave greeting (only plays once per session via flag in loader)
+                if !self.hasWaved {
+                    self.hasWaved = true
+                    self.play(clip: AraClips.wave, on: entity, anim: anim, loop: false)
+                    self.onLog?("[ARA] wave greeting")
+                    try? await Task.sleep(nanoseconds: UInt64(AraClips.wave.duration * 1_000_000_000))
+                    guard !Task.isCancelled else { return }
+                }
+                // Speaking loop: Talk → TalkExplain → Talk → Talk → TalkExplain ...
+                var cycle = 0
+                while !Task.isCancelled {
+                    let clip = (cycle % 3 == 2) ? AraClips.talkExplain : AraClips.talk
+                    self.play(clip: clip, on: entity, anim: anim, loop: false)
+                    self.onLog?("[ARA] \(clip.name) (cycle \(cycle))")
+                    let wait = clip.duration - 0.25  // blend 0.25s before end
+                    try? await Task.sleep(nanoseconds: UInt64(max(0.1, wait) * 1_000_000_000))
+                    cycle += 1
+                }
+            }
+
+        case .happy:
+            play(clip: AraClips.laugh, on: entity, anim: anim, loop: false)
+            onLog?("[ARA] laugh/happy")
+            scheduleReturn(to: .idle, after: AraClips.laugh.duration + 0.3)
 
         case .surprised:
-            // Both arms fan out quickly, return
-            activeController = buildHold(on: rig, baseline: baseline,
-                pose: poseWith(baseline, deltas: [
-                    10: rot(32,  [0,0,1]), 11: rot(26,  [0,0,1]),
-                    34: rot(-32, [0,0,1]), 35: rot(-26, [0,0,1])
-                ]),
-                indices: [10,11,12,13,34,35,36,37], raiseDur: 0.28, holdDur: 0.9, lowerDur: 0.55)
-            onLog?("[ARA] surprised gesture")
+            play(clip: AraClips.cheer, on: entity, anim: anim, loop: false)
+            onLog?("[ARA] cheer/surprised")
+            scheduleReturn(to: .idle, after: AraClips.cheer.duration + 0.3)
+
+        case .empathy:
+            play(clip: AraClips.empathy, on: entity, anim: anim, loop: false)
+            onLog?("[ARA] empathy")
+            scheduleReturn(to: .idle, after: AraClips.empathy.duration + 0.3)
         }
     }
 
-    // MARK: Helpers
+    private var hasWaved = false
 
-    private func rot(_ deg: Float, _ axis: SIMD3<Float>) -> simd_quatf {
-        simd_quatf(angle: deg * .pi / 180, axis: axis)
-    }
-
-    private func poseWith(_ baseline: [Transform], deltas: [Int: simd_quatf]) -> [Int: Transform] {
-        var out: [Int: Transform] = [:]
-        for (i, q) in deltas {
-            var t = baseline[i]
-            t.rotation = t.rotation * q
-            out[i] = t
+    private func scheduleReturn(to emotion: AraEmotion, after seconds: Double) {
+        speakingTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.setEmotion(emotion)
         }
-        return out
     }
 
-    // Single raise → lower loop (for speaking)
-    private func buildLoop(
-        on rig: ModelEntity, baseline: [Transform],
-        pose: [Int: Transform], indices: [Int],
-        raiseDur: Double, lowerDur: Double
-    ) -> AnimationPlaybackController? {
-        let names = indices.map { rig.jointNames[$0] }
-        let from  = JointTransforms(indices.map { baseline[$0] })
-        let to    = JointTransforms(indices.map { pose[$0] ?? baseline[$0] })
+    // MARK: - Clip playback
+
+    private func play(clip: AraClip, on entity: Entity, anim: AnimationResource, loop: Bool) {
         do {
-            var up = FromToByAnimation<JointTransforms>()
-            up.jointNames = names; up.fromValue = from; up.toValue = to
-            up.duration = raiseDur; up.timing = .easeInOut
-            up.bindTarget = .jointTransforms; up.fillMode = .forwards
-            up.isScaleAnimated = false
-
-            var dn = FromToByAnimation<JointTransforms>()
-            dn.jointNames = names; dn.fromValue = to; dn.toValue = from
-            dn.duration = lowerDur; dn.timing = .easeInOut
-            dn.bindTarget = .jointTransforms; dn.fillMode = .forwards
-            dn.isScaleAnimated = false
-
-            let cycle = try AnimationResource.sequence(with: [
-                AnimationResource.generate(with: up),
-                AnimationResource.generate(with: dn)
-            ]).repeat(duration: .infinity)
-            return rig.playAnimation(cycle, transitionDuration: 0.35)
-        } catch { return nil }
-    }
-
-    // Raise → hold → lower (for all other emotions)
-    private func buildHold(
-        on rig: ModelEntity, baseline: [Transform],
-        pose: [Int: Transform], indices: [Int],
-        raiseDur: Double, holdDur: Double, lowerDur: Double
-    ) -> AnimationPlaybackController? {
-        let names = indices.map { rig.jointNames[$0] }
-        let from  = JointTransforms(indices.map { baseline[$0] })
-        let to    = JointTransforms(indices.map { pose[$0] ?? baseline[$0] })
-        do {
-            var up = FromToByAnimation<JointTransforms>()
-            up.jointNames = names; up.fromValue = from; up.toValue = to
-            up.duration = raiseDur; up.timing = .easeOut
-            up.bindTarget = .jointTransforms; up.fillMode = .forwards
-            up.isScaleAnimated = false
-
-            var hold = FromToByAnimation<JointTransforms>()
-            hold.jointNames = names; hold.fromValue = to; hold.toValue = to
-            hold.duration = holdDur; hold.timing = .linear
-            hold.bindTarget = .jointTransforms; hold.fillMode = .forwards
-            hold.isScaleAnimated = false
-
-            var dn = FromToByAnimation<JointTransforms>()
-            dn.jointNames = names; dn.fromValue = to; dn.toValue = from
-            dn.duration = lowerDur; dn.timing = .easeIn
-            dn.bindTarget = .jointTransforms; dn.fillMode = .forwards
-            dn.isScaleAnimated = false
-
-            let seq = try AnimationResource.sequence(with: [
-                AnimationResource.generate(with: up),
-                AnimationResource.generate(with: hold),
-                AnimationResource.generate(with: dn)
-            ])
-            return rig.playAnimation(seq, transitionDuration: 0.25)
-        } catch { return nil }
-    }
-
-    private func returnToRest(on rig: ModelEntity, baseline: [Transform], indices: [Int]) {
-        let names = indices.map { rig.jointNames[$0] }
-        let current = rig.jointTransforms
-        let from = JointTransforms(indices.map { current[$0] })
-        let to   = JointTransforms(indices.map { baseline[$0] })
-        do {
-            var anim = FromToByAnimation<JointTransforms>()
-            anim.jointNames = names; anim.fromValue = from; anim.toValue = to
-            anim.duration = 0.55; anim.timing = .easeInOut
-            anim.bindTarget = .jointTransforms; anim.fillMode = .forwards
-            anim.isScaleAnimated = false
-            activeController = rig.playAnimation(try AnimationResource.generate(with: anim), transitionDuration: 0.2)
+            let start = AnimationView.TimeInterval(clip.start)
+            let duration = AnimationView.TimeInterval(clip.duration)
+            let trimmed = try anim.trim(startTime: start, endTime: start + duration)
+            let final: AnimationResource = loop
+                ? trimmed.repeat(duration: .infinity)
+                : trimmed
+            activeController?.stop()
+            activeController = entity.playAnimation(final, transitionDuration: 0.25, startsPaused: false)
         } catch {
-            rig.jointTransforms = baseline
+            onLog?("[ARA ERROR] trim \(clip.name): \(error)")
         }
     }
 
-    // MARK: Load
+    // MARK: - Load
 
     func load() {
         guard entity == nil, loadSubscription == nil else { return }
@@ -262,23 +206,30 @@ private final class AraAvatarLoader: ObservableObject {
                 guard let self else { return }
                 self.loadSubscription = nil
 
-                // Find rig (first ModelEntity with jointNames)
-                var found: ModelEntity?
-                func findRig(_ e: Entity) {
-                    if found == nil, let m = e as? ModelEntity, !m.jointNames.isEmpty { found = m }
-                    if found == nil { e.children.forEach(findRig) }
+                // Extract global AnimationResource
+                if let lib = model.components[AnimationLibraryComponent.self],
+                   let (name, anim) = lib.animations.first {
+                    self.globalAnimation = anim
+                    self.onLog?("[ARA ANIM] global clip '\(name)' loaded")
+                } else {
+                    // Fallback: collect available animations
+                    let availableAnims = model.availableAnimations
+                    if let first = availableAnims.first {
+                        self.globalAnimation = first
+                        self.onLog?("[ARA ANIM] fallback: \(availableAnims.count) animations found")
+                    } else {
+                        self.onLog?("[ARA ANIM] WARNING: no animations found")
+                    }
                 }
-                findRig(model)
 
                 self.entity = model
-                if let rig = found {
-                    self.activeRig = rig
-                    self.restTransforms = rig.jointTransforms
-                    self.status = "Ara sẵn sàng"
-                    self.onLog?("[ARA RIG] joints=\(rig.jointNames.count)")
-                } else {
-                    self.status = "Ara loaded (no rig)"
-                    self.onLog?("[ARA RIG] No rig found")
+                self.status = "Ara sẵn sàng"
+                self.onLog?("[ARA MODEL] loaded")
+
+                // Start idle immediately
+                if let anim = self.globalAnimation {
+                    self.play(clip: AraClips.idle, on: model, anim: anim, loop: true)
+                    self.onLog?("[ARA] idle start")
                 }
             })
     }
@@ -302,8 +253,12 @@ private struct AraRealityView: UIViewRepresentable {
         if context.coordinator.currentEntity !== entity {
             attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         } else {
-            if context.coordinator.currentZoom != zoomScale { applyZoom(zoomScale, to: entity, coordinator: context.coordinator) }
-            if context.coordinator.currentRotationY != rotationY { applyRotation(rotationY, coordinator: context.coordinator) }
+            if context.coordinator.currentZoom != zoomScale {
+                applyZoom(zoomScale, to: entity, coordinator: context.coordinator)
+            }
+            if context.coordinator.currentRotationY != rotationY {
+                applyRotation(rotationY, coordinator: context.coordinator)
+            }
         }
     }
 
@@ -312,12 +267,13 @@ private struct AraRealityView: UIViewRepresentable {
     private func attach(_ model: Entity, zoomScale: Float, rotationY: Float, to view: ARView, coordinator: Coordinator) {
         let bounds = model.visualBounds(recursive: true, relativeTo: model)
         let height = bounds.extents.y
-        let baseScale: Float = height.isFinite && height > 0 ? 1.35 / height : 1
+        let baseScale: Float = height.isFinite && height > 0 ? 1.6 / height : 1  // full body: scale down vs 1.35
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
-        let upperBodyCenter = SIMD3<Float>(bounds.center.x, bounds.center.y + height * 0.27, bounds.center.z)
-        coordinator.basePosition = -upperBodyCenter * baseScale
+        // Full body center (not upper-body offset)
+        let center = bounds.center
+        coordinator.basePosition = -center * baseScale
         coordinator.currentEntity = model
-        let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.4))
+        let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.8))
         anchor.addChild(model)
         coordinator.rotationPivot = anchor
         view.scene.anchors.removeAll()
@@ -347,3 +303,6 @@ private struct AraRealityView: UIViewRepresentable {
         var currentRotationY: Float = 0
     }
 }
+
+// Needed for trim API
+private typealias AnimationView = AnimationResource
