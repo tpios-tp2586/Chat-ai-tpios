@@ -24,12 +24,13 @@ struct CompanionChatView: View {
 
     private var araEmotion: AraEmotion {
         switch emotion {
-        case .speaking: return .speaking
-        case .happy:    return .happy
-        case .surprised: return .surprised
-        case .thinking: return .thinking
-        case .sad:      return .empathy
-        default:        return .idle
+        case .speaking:          return .speaking
+        case .listening:         return .listening
+        case .thinking:          return .thinking
+        case .happy:             return .happy
+        case .surprised:         return .surprised
+        case .sad:               return .empathy
+        case .idle, .confused, .angry, .sleepy: return .idle
         }
     }
 
