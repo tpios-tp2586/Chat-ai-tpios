@@ -12,24 +12,28 @@ enum AraEmotion: Equatable {
 // Global USDZ timeline: 0–3539 timecodes @ 60 tc/s ≈ 58.983s total
 // Clip offsets verified in ara-avatar-research-bundle / usdz-animation-diagnostics.txt
 
+// Clip index mapping confirmed by batch-30 manual TEST on device
+// Order: Idle=0, Wave=1, Talk=2, TalkExplain=3, AraListening=4, AraThinking=5,
+//        AraEmpathy=6, AraLaugh=7, Walk=8, Run=9, WalkBack=10, StrafeL=11, StrafeR=12,
+//        JumpStart=13, JumpAir=14, JumpLand=15, SitDown=16, SitIdle=17, StandUp=18,
+//        LieDown=19, Sleep=20, TurnL45=21, TurnL90=22, TurnR45=23, TurnR90=24, Turn360=25, RideHorse=26
+// Duration from animation-timeline.json (approximate seconds)
 private struct AraClip {
-    let name: String
-    let start: Double   // seconds
+    let name: String    // display only
+    let index: Int      // index in entity.availableAnimations
     let duration: Double
-
-    var timeRange: ClosedRange<Double> { start ... start + duration }
 }
 
 private enum AraClips {
-    static let idle        = AraClip(name: "Idle",          start:  0.000, duration: 3.933)
-    static let wave        = AraClip(name: "Wave",          start:  3.933, duration: 3.000)
-    static let talk        = AraClip(name: "Talk",          start:  6.933, duration: 6.400)
-    static let talkExplain = AraClip(name: "TalkExplain",   start: 13.333, duration: 2.800)
-    static let listening   = AraClip(name: "AraListening",  start: 16.133, duration: 3.200)
-    static let thinking    = AraClip(name: "AraThinking",   start: 19.333, duration: 3.267)
-    static let empathy     = AraClip(name: "AraEmpathy",    start: 22.600, duration: 3.200)
-    static let laugh       = AraClip(name: "Laugh",         start: 25.800, duration: 3.133)  // mouthSmile 1.0
-    static let cheer       = AraClip(name: "Cheer",         start: 28.933, duration: 2.467)
+    static let idle        = AraClip(name: "Idle",         index: 0,  duration: 3.933)
+    static let wave        = AraClip(name: "Wave",         index: 1,  duration: 3.000)
+    static let talk        = AraClip(name: "Talk",         index: 2,  duration: 6.400)
+    static let talkExplain = AraClip(name: "TalkExplain",  index: 3,  duration: 2.800)
+    static let listening   = AraClip(name: "AraListening", index: 4,  duration: 3.200)
+    static let thinking    = AraClip(name: "AraThinking",  index: 5,  duration: 3.267)
+    static let empathy     = AraClip(name: "AraEmpathy",   index: 6,  duration: 3.200)
+    static let laugh       = AraClip(name: "AraLaugh",     index: 7,  duration: 3.133)
+    static let cheer       = AraClip(name: "Cheer",        index: 26, duration: 2.467)
 }
 
 // MARK: - View
@@ -170,23 +174,24 @@ private final class AraAvatarLoader: ObservableObject {
     // MARK: - Clip playback
 
     private func play(clip: AraClip, on entity: Entity, anim: AnimationResource?, loop: Bool) {
-        // Find named clip from availableAnimations on the entity
-        func findAnim(_ e: Entity, name: String) -> AnimationResource? {
-            if let hit = e.availableAnimations.first(where: { $0.name == name }) { return hit }
-            for child in e.children {
-                if let hit = findAnim(child, name: name) { return hit }
-            }
-            return nil
+        // Collect all availableAnimations recursively
+        func collectAnims(_ e: Entity) -> [AnimationResource] {
+            var result = e.availableAnimations
+            for child in e.children { result += collectAnims(child) }
+            return result
         }
-        guard let clip_anim = findAnim(entity, name: clip.name) ?? entity.availableAnimations.first else {
-            onLog?("[ARA ERROR] clip not found: \(clip.name) (available: \(entity.availableAnimations.map(\.name)))")
+        let all = collectAnims(entity)
+        guard clip.index < all.count else {
+            onLog?("[ARA ERROR] index \(clip.index) out of range (count=\(all.count)) for \(clip.name)")
             return
         }
+        let clip_anim = all[clip.index]
         let final: AnimationResource = loop
             ? clip_anim.repeat(duration: .infinity)
             : clip_anim
         activeController?.stop()
         activeController = entity.playAnimation(final, transitionDuration: 0.25, startsPaused: false)
+        onLog?("[ARA] play[\(clip.index)] \(clip.name) loop=\(loop)")
     }
 
     // MARK: - Load
@@ -212,17 +217,12 @@ private final class AraAvatarLoader: ObservableObject {
                 guard let self else { return }
                 self.loadSubscription = nil
 
-                // Log all animations with index for clip mapping
-                func collectAnims(_ e: Entity, prefix: String) -> [(Int, String)] {
-                    let anims = e.availableAnimations.enumerated().map { (i, a) in (i, a.name ?? "(nil)") }
-                    var result = anims.map { (i, n) in (i, "\(prefix)[\(i)]=\(n)") }
-                    for child in e.children { result += collectAnims(child, prefix: prefix + ">") }
-                    return result
+                func countAnims(_ e: Entity) -> Int {
+                    e.availableAnimations.count + e.children.reduce(0) { $0 + countAnims($1) }
                 }
-                let allAnims = collectAnims(model, prefix: "")
+                let totalAnims = countAnims(model)
                 self.globalAnimation = model.availableAnimations.first
-                let summary = allAnims.prefix(20).map { $0.1 }.joined(separator: ", ")
-                self.onLog?("[ARA ANIM] \(allAnims.count) clips: \(summary)")
+                self.onLog?("[ARA ANIM] \(totalAnims) clips ready")
 
                 self.entity = model
                 self.status = "Ara sẵn sàng"
