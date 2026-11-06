@@ -100,7 +100,8 @@ private final class AraAvatarLoader: ObservableObject {
     func setEmotion(_ emotion: AraEmotion) {
         guard emotion != currentEmotion else { return }
         currentEmotion = emotion
-        guard let entity = entity, let anim = globalAnimation else { return }
+        guard let entity = entity else { return }
+        let anim = globalAnimation ?? entity.availableAnimations.first
         speakingTask?.cancel()
         speakingTask = nil
 
@@ -168,19 +169,24 @@ private final class AraAvatarLoader: ObservableObject {
 
     // MARK: - Clip playback
 
-    private func play(clip: AraClip, on entity: Entity, anim: AnimationResource, loop: Bool) {
-        do {
-            let start = AnimationView.TimeInterval(clip.start)
-            let duration = AnimationView.TimeInterval(clip.duration)
-            let trimmed = try anim.trim(startTime: start, endTime: start + duration)
-            let final: AnimationResource = loop
-                ? trimmed.repeat(duration: .infinity)
-                : trimmed
-            activeController?.stop()
-            activeController = entity.playAnimation(final, transitionDuration: 0.25, startsPaused: false)
-        } catch {
-            onLog?("[ARA ERROR] trim \(clip.name): \(error)")
+    private func play(clip: AraClip, on entity: Entity, anim: AnimationResource?, loop: Bool) {
+        // Find named clip from availableAnimations on the entity
+        func findAnim(_ e: Entity, name: String) -> AnimationResource? {
+            if let hit = e.availableAnimations.first(where: { $0.name == name }) { return hit }
+            for child in e.children {
+                if let hit = findAnim(child, name: name) { return hit }
+            }
+            return nil
         }
+        guard let clip_anim = findAnim(entity, name: clip.name) ?? entity.availableAnimations.first else {
+            onLog?("[ARA ERROR] clip not found: \(clip.name) (available: \(entity.availableAnimations.map(\.name)))")
+            return
+        }
+        let final: AnimationResource = loop
+            ? clip_anim.repeat(duration: .infinity)
+            : clip_anim
+        activeController?.stop()
+        activeController = entity.playAnimation(final, transitionDuration: 0.25, startsPaused: false)
     }
 
     // MARK: - Load
@@ -206,31 +212,23 @@ private final class AraAvatarLoader: ObservableObject {
                 guard let self else { return }
                 self.loadSubscription = nil
 
-                // Extract global AnimationResource
-                if let lib = model.components[AnimationLibraryComponent.self],
-                   let (name, anim) = lib.animations.first {
-                    self.globalAnimation = anim
-                    self.onLog?("[ARA ANIM] global clip '\(name)' loaded")
-                } else {
-                    // Fallback: collect available animations
-                    let availableAnims = model.availableAnimations
-                    if let first = availableAnims.first {
-                        self.globalAnimation = first
-                        self.onLog?("[ARA ANIM] fallback: \(availableAnims.count) animations found")
-                    } else {
-                        self.onLog?("[ARA ANIM] WARNING: no animations found")
-                    }
+                // Log available clips for verification
+                func collectAnims(_ e: Entity) -> [String] {
+                    var names = e.availableAnimations.map(\.name)
+                    for child in e.children { names += collectAnims(child) }
+                    return names
                 }
+                let allNames = collectAnims(model)
+                self.globalAnimation = model.availableAnimations.first
+                self.onLog?("[ARA ANIM] \(allNames.count) clips: \(allNames.prefix(12).joined(separator: ", "))") 
 
                 self.entity = model
                 self.status = "Ara sẵn sàng"
                 self.onLog?("[ARA MODEL] loaded")
 
                 // Start idle immediately
-                if let anim = self.globalAnimation {
-                    self.play(clip: AraClips.idle, on: model, anim: anim, loop: true)
-                    self.onLog?("[ARA] idle start")
-                }
+                self.play(clip: AraClips.idle, on: model, anim: nil, loop: true)
+                self.onLog?("[ARA] idle start")
             })
     }
 }
@@ -304,5 +302,3 @@ private struct AraRealityView: UIViewRepresentable {
     }
 }
 
-// Needed for trim API
-private typealias AnimationView = AnimationResource
