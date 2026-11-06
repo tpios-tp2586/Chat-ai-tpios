@@ -22,6 +22,17 @@ struct CompanionChatView: View {
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
+    private var araEmotion: AraEmotion {
+        switch emotion {
+        case .speaking: return .speaking
+        case .happy:    return .happy
+        case .surprised: return .surprised
+        case .thinking: return .thinking
+        case .sad:      return .empathy
+        default:        return .idle
+        }
+    }
+
     var body: some View {
         ZStack {
             ChatAIThemeBackground(theme: activeTheme)
@@ -32,7 +43,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AraAvatarView(isSpeaking: liveManager.aiSpeaking) { log in
+                            AraAvatarView(emotion: araEmotion) { log in
                                 addDiagnostic(log)
                             }
 
