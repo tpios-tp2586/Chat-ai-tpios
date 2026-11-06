@@ -9,16 +9,33 @@
 - Không tự chạy Codemagic hoặc GitHub Actions. Người dùng tự build IPA.
 - `PROJECT_STATUS.md` là checkpoint duy nhất.
 
+## Ara — trạng thái hiện tại sau video IPA (2026-11-06)
+- Người dùng gửi video `IMG_0364.mp4` (22 giây) để kiểm tra Ara trong Chat Voice.
+- Quan sát video: khi AI đang nói, nhân vật có một nhịp **chúi/ngả xuống rất nhanh rồi bật trở lại tư thế đứng**; ở khoảng 14–15 giây có hiện tượng hình/bóng nhân vật chồng hoặc nhòe trong lúc chuyển tư thế. Đây là lỗi chuyển động nhìn thấy được và cần ưu tiên xử lý trước khi bổ sung gesture.
+- Không được mô tả video là “Ara hoàn toàn không chuyển động”: có chuyển động bất thường nói trên. Tuy nhiên video hiện chưa đủ để xác định nguyên nhân kỹ thuật.
+- Chưa kết luận được lỗi nằm ở Hips/Spine, root/entity transform, animation resource, hoặc hai animation cùng ghi vào joint transforms. Đây chỉ là các hướng cần kiểm tra, không phải kết luận.
+- **Nghi vấn cần kiểm tra từ source hiện tại:** `playGestureReview(on:)` khởi chạy sequence một lần nhưng không lưu `AnimationPlaybackController`; trong khi `setSpeaking(true)` khởi chạy vòng lặp `playSpeakingGesture(on:baseline:)` trên cùng nhóm joint tay phải. Cần kiểm tra thời điểm hai animation có thể chạy chồng nhau và có clip nào đang điều khiển joint ngoài ý muốn. Không sửa theo phỏng đoán.
+- Source hiện tại truyền trạng thái `isSpeaking` từ `CompanionChatView.swift` sang `AraAvatarView.swift`. Khi AI nói, animation procedural lặp cử chỉ giải thích nhẹ bằng 4 joint tay phải: RightShoulder, RightArm, RightForeArm, RightHand (indices 34–37); khi AI dừng, code tạo animation trở về baseline.
+- Lượt review ban đầu tự chạy chuỗi: vẫy tay → giải thích bằng một tay → mở hai tay → trở về pose gốc. Chỉ nhắm các joint tay indices 10–13 và 34–37. Các góc/trục xoay là giá trị hiệu chỉnh ban đầu, chưa xác nhận tự nhiên trên thiết bị.
+- Rig mapping đã xác minh từ IPA: 69 joint và 69 transforms; Spine 1–3; LeftShoulder/Arm/ForeArm/Hand 10–13; RightShoulder/Arm/ForeArm/Hand 34–37. Đường dẫn runtime là full path; phải dùng leaf-name khi so tên để log.
+- Baseline transform đã được dump cho Spine và hai tay. Rest quaternion/translation một mình không đủ xác định hướng xoay nhìn thấy; phải đối chiếu video và runtime logs.
+- USDZ có embedded global animation resource nhưng app hiện không chủ động phát resource đó. Các gesture đang thử là procedural RealityKit `FromToByAnimation<JointTransforms>`, bind target `.jointTransforms`, ghép bằng `AnimationResource.sequence`.
+- Build fix gần nhất: `restTransforms` và baseline dùng `[Transform]`, chỉ bọc thành `JointTransforms` tại animation clip; `inspectRig` đánh dấu `@MainActor`. Fix source: `ce4c789b1cb0ef518342e62e0c363f1277b9f96d`; checkpoint ghi nhận lỗi build: `267b8171c0b0211928f9bfd2d9893597077f6b28`.
+- Commit liên quan trigger nói: `33864f08c319d55ebd0d6cb50dcfa3b88624fe57`, `3ee0ecdba06e9b3f67c32f9dce1e2573d5950f56`, `8be3af232fcb64641947408bf3e4d8d2cc7d2ff4`, `58914901b7998c71352d23e32b0e03ec61c9e86c`, `6fa52b86e938f281207afad843136176d5054f44`.
+- LOG/Copy Log được giữ. Cần dùng log [ARA ACTION], [ARA MODEL], [ARA RIG] và build metadata để đối chiếu video với đúng source commit.
+- Video xác nhận app chạy và avatar render; **chưa xác nhận cử chỉ nói hoạt động đúng**. Chưa có xác nhận build thành công sau các fix compile mới nhất; không tự tuyên bố build pass.
 
-## Ara — cử chỉ khi AI nói (2026-11-05)
-- Đã nối trạng thái AI speaking từ CompanionChatView sang AraAvatarView; chuỗi cử chỉ lúc tải model vẫn giữ nguyên.
-- Khi AI nói, Ara lặp cử chỉ giải thích nhẹ bằng 4 joint tay phải (vai, cánh tay, khuỷu, cổ tay), dùng RealityKit AnimationResource lặp vô hạn với easing easeInOut.
-- Khi AI dừng nói, vòng lặp dừng và tay chuyển về rest transforms đã lưu. Nếu model tải xong sau khi AI đã bắt đầu nói, cử chỉ nói được khởi chạy ngay khi rig sẵn sàng.
-- Chỉ sửa AraAvatarView.swift và CompanionChatView.swift. Không sửa LiveVoice.swift, Gemini Live, audio, chatbot/API, history, Text Chat hoặc Chibi Chat. Không thêm dependency, TEST UI hoặc branch.
-- Source: 6fa52b86e938f281207afad843136176d5054f44; 58914901b7998c71352d23e32b0e03ec61c9e86c; 8be3af232fcb64641947408bf3e4d8d2cc7d2ff4; 33864f08c319d55ebd0d6cb50dcfa3b88624fe57; 3ee0ecdba06e9b3f67c32f9dce1e2573d5950f56.
+### Việc tiếp theo — điều tra lỗi chúi xuống/bật đứng
+1. Đọc lại HEAD, `AraAvatarView.swift`, `CompanionChatView.swift` và checkpoint trước khi sửa.
+2. Kiểm tra toàn bộ nơi gọi `playGestureReview`, `playSpeakingGesture`, `setSpeaking`, mọi controller được giữ/dừng và các clip có thể ghi vào cùng joint transforms.
+3. Bổ sung log có giới hạn, chỉ ghi thời điểm bắt đầu/kết thúc animation, tên clip, joint indices/path, baseline/current transforms cần thiết; tránh log quá lớn.
+4. Xác định có animation chồng lấn hoặc transform của Hips/Spine/root/entity bị thay đổi hay không. Không chỉnh Hips/Spine/root nếu chưa có bằng chứng.
+5. Ưu tiên một nguồn điều khiển animation tại một thời điểm; nếu cần, lưu controller và dừng/transition có kiểm soát trước khi khởi chạy clip khác. Giữ chuyển tiếp mượt và trở về đúng baseline.
+6. Sau khi sửa, người dùng build IPA bằng Codemagic và gửi video/log mới. Đánh giá riêng: không còn chúi/ngã; tay chuyển động nhẹ khi AI nói; dừng nói trở về tự nhiên.
+7. Chưa thêm gesture mới, chưa làm facial/viseme, không tạo TEST UI hoặc popup mới cho đến khi lỗi chuyển tư thế được giải quyết.
 
-- **Build fix sau lỗi Codemagic:** `restTransforms` và tham số baseline dùng `[Transform]` đúng với kiểu `ModelEntity.jointTransforms`; chỉ bọc thành `JointTransforms` tại các animation clip. Hàm `inspectRig` được đánh dấu `@MainActor` để truy cập `jointNames` đúng actor isolation. Source fix: `ce4c789b1cb0ef518342e62e0c363f1277b9f96d`. Chưa có build xác nhận sau fix.
-- Chưa build hoặc kiểm chứng trên iPhone. Người dùng build IPA từ main; kiểm tra log [ARA ACTION] khi AI bắt đầu và kết thúc nói.
+- Phạm vi bảo vệ: không sửa `LiveVoice.swift`, Gemini Live, audio pipeline, chatbot/API, history, Text Chat hoặc Chibi Chat. Chỉ sửa lớp Ara nếu thực sự cần.
+- Branch: chỉ `main` (đã kiểm tra danh sách branch hiện chỉ có `main`).
 
 ## Lịch sử — Ara: lượt kiểm tra 3 cử chỉ thân trên (2026-11-05)
 - Đã triển khai một lượt chuyển động tự chạy một lần khi Ara nạp xong trong Chat Voice, để người dùng quan sát liên tục: **vẫy tay → đưa tay giải thích → mở hai tay → trở về tư thế gốc**.
