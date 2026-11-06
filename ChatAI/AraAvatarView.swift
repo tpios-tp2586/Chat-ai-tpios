@@ -102,12 +102,14 @@ private final class AraAvatarLoader: ObservableObject {
     // MARK: - Emotion dispatch
 
     func setEmotion(_ emotion: AraEmotion) {
-        guard emotion != currentEmotion else { return }
-        currentEmotion = emotion
         guard let entity = entity else { return }
+        // Allow re-entry if task was running (speaking loop needs restart)
+        let isRedundant = emotion == currentEmotion && speakingTask == nil
+        guard !isRedundant else { return }
         let anim = globalAnimation ?? entity.availableAnimations.first
         speakingTask?.cancel()
         speakingTask = nil
+        currentEmotion = emotion
 
         switch emotion {
         case .idle:
@@ -228,7 +230,8 @@ private final class AraAvatarLoader: ObservableObject {
                 self.status = "Ara sẵn sàng"
                 self.onLog?("[ARA MODEL] loaded")
 
-                // Start idle immediately
+                // Stop autoplay from USDZ, then start Idle
+                model.stopAllAnimations()
                 self.play(clip: AraClips.idle, on: model, anim: nil, loop: true)
                 self.onLog?("[ARA] idle start")
             })
