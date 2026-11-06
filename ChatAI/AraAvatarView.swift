@@ -84,6 +84,7 @@ private final class AraAvatarLoader: ObservableObject {
     private var activeRig: ModelEntity?
     private var restTransforms: [Transform]?
     private var speakingController: AnimationPlaybackController?
+    private var gestureReviewController: AnimationPlaybackController?
     private var isSpeaking = false
 
     func setSpeaking(_ speaking: Bool) {
@@ -92,6 +93,8 @@ private final class AraAvatarLoader: ObservableObject {
         guard let rig = activeRig, let restTransforms else { return }
 
         if speaking {
+            gestureReviewController?.stop()
+            gestureReviewController = nil
             playSpeakingGesture(on: rig, baseline: restTransforms)
         } else {
             speakingController?.stop()
@@ -277,7 +280,7 @@ private final class AraAvatarLoader: ObservableObject {
             try appendRest(name: "open-arms-return", indices: bothArms, duration: 0.85)
 
             let sequence = try AnimationResource.sequence(with: resources)
-            rig.playAnimation(sequence, transitionDuration: 0.2)
+            gestureReviewController = rig.playAnimation(sequence, transitionDuration: 0.2)
             onLog?("[ARA ACTION] Started 3 gestures: wave → explain → open both arms → exact rest pose")
         } catch {
             onLog?("[ARA ACTION] Could not create gesture sequence: \(error.localizedDescription)")
