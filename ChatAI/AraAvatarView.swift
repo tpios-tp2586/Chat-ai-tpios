@@ -99,10 +99,8 @@ private final class AraAvatarLoader: ObservableObject {
     // MARK: - Emotion
 
     func setEmotion(_ emotion: AraEmotion) {
-        guard emotion != currentEmotion || speakingTask == nil else {
-            // Allow speaking re-entry after task cancel
-            if emotion != .speaking { return }
-        }
+        // Skip redundant calls unless it's a speaking re-entry
+        if emotion == currentEmotion && speakingTask == nil && emotion != .speaking { return }
         currentEmotion = emotion
         speakingTask?.cancel()
         speakingTask = nil
