@@ -1,0 +1,59 @@
+name: Split Ara USDZ into per-clip files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up USDZ conversion engine
+        uses: actions/checkout@v4
+        with:
+          repository: robotson/usdz-forge
+          ref: d474129ce1f026fa6904c9ac95dd74212a501a9d
+          path: usdz-forge
+
+      - name: Setup engine
+        working-directory: usdz-forge
+        run: ./engine/setup-engine.sh
+
+      - name: Download Ara-Avatar.usdz from release v5
+        run: |
+          curl -L --fail -o Ara-Avatar.usdz             "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v5/Ara-Avatar.usdz"
+          curl -L --fail -o animation-timeline.json             "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v5/animation-timeline.json"
+          test -s Ara-Avatar.usdz
+          test -s animation-timeline.json
+          echo "Downloaded $(wc -c < Ara-Avatar.usdz) bytes"
+
+      - name: Split into per-clip USDZ files
+        run: |
+          PY="$GITHUB_WORKSPACE/usdz-forge/engine/python/bin/python3.14"
+          mkdir -p clips-out
+          "$PY" scripts/split-ara-clips.py Ara-Avatar.usdz animation-timeline.json clips-out
+          ls -lh clips-out/
+
+      - name: Verify required clips exist
+        run: |
+          for CLIP in Idle Wave Talk TalkExplain AraListening AraThinking AraEmpathy AraLaugh Cheer Laugh; do
+            test -s "clips-out/Ara-$CLIP.usdz" && echo "OK: Ara-$CLIP.usdz" || echo "MISSING: Ara-$CLIP.usdz"
+          done
+
+      - name: Publish per-clip files to release v6
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ara-avatar-v6
+          name: Ara Avatar Per-Clip USDZ v6
+          body: |
+            Per-clip USDZ files split from ara-avatar-v5 Ara-Avatar.usdz.
+            Each file contains exactly one animation clip, ready to load directly in RealityKit.
+            Clips: Idle, Wave, Talk, TalkExplain, AraListening, AraThinking, AraEmpathy, AraLaugh, Cheer, Laugh.
+          files: clips-out/*.usdz
+          fail_on_unmatched_files: true
