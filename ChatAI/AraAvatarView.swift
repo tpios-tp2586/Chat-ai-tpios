@@ -191,6 +191,10 @@ private final class AraAvatarLoader: ObservableObject {
 
         status = entity == nil ? "Đang nạp \(clip.rawValue)…" : "Chuyển \(clip.rawValue)…"
 
+        // Debug: log all USDZ files in bundle
+        let allUSDZ = Bundle.main.paths(forResourcesOfType: "usdz", inDirectory: nil)
+        onLog?("[ARA BUNDLE] \(allUSDZ.count) usdz files: \(allUSDZ.map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", "))")
+
         guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
             status = "Không tìm thấy \(clip.rawValue).usdz"
             onLog?("[ARA ERROR] missing \(clip.rawValue).usdz")
