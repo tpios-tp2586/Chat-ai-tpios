@@ -8,6 +8,30 @@ enum AraEmotion: Equatable {
     case idle, speaking, listening, thinking, happy, surprised, empathy
 }
 
+// MARK: - Clip index map
+// Confirmed order from availableAnimations on Ara-Avatar.usdz (batch-30 test, ara-avatar-v5):
+// 0=Idle 1=Wave 2=Talk 3=TalkExplain 4=AraListening 5=AraThinking
+// 6=AraEmpathy 7=AraLaugh 8=Walk 9=Run ... 27=Cheer 28=Laugh 29=Cry
+
+private struct AraClip {
+    let name: String
+    let index: Int
+    let duration: Double
+    let loops: Bool
+}
+
+private enum AraClips {
+    static let idle        = AraClip(name: "Idle",         index: 0,  duration: 3.2,  loops: true)
+    static let wave        = AraClip(name: "Wave",         index: 1,  duration: 1.6,  loops: false)
+    static let talk        = AraClip(name: "Talk",         index: 2,  duration: 6.4,  loops: false)
+    static let talkExplain = AraClip(name: "TalkExplain",  index: 3,  duration: 2.8,  loops: false)
+    static let listening   = AraClip(name: "AraListening", index: 4,  duration: 3.2,  loops: true)
+    static let thinking    = AraClip(name: "AraThinking",  index: 5,  duration: 3.2,  loops: false)
+    static let empathy     = AraClip(name: "AraEmpathy",   index: 6,  duration: 3.2,  loops: false)
+    static let laugh       = AraClip(name: "AraLaugh",     index: 7,  duration: 2.4,  loops: false)
+    static let cheer       = AraClip(name: "Cheer",        index: 27, duration: 1.2,  loops: false)
+}
+
 // MARK: - View
 
 struct AraAvatarView: View {
@@ -51,44 +75,9 @@ struct AraAvatarView: View {
         .task {
             pinchStartScale = savedZoomScale
             loader.onLog = onLog
-            loader.show(.idle)
+            loader.load()
         }
         .onChange(of: emotion) { loader.setEmotion($0) }
-    }
-}
-
-// MARK: - Clip
-
-private enum AraClip: String, CaseIterable {
-    case idle        = "Ara-Idle"
-    case wave        = "Ara-Wave"
-    case talk        = "Ara-Talk"
-    case talkExplain = "Ara-TalkExplain"
-    case listening   = "Ara-AraListening"
-    case thinking    = "Ara-AraThinking"
-    case empathy     = "Ara-AraEmpathy"
-    case laugh       = "Ara-AraLaugh"
-    case cheer       = "Ara-Cheer"
-
-    var duration: Double {
-        switch self {
-        case .idle:        return 3.2
-        case .wave:        return 1.6
-        case .talk:        return 6.4
-        case .talkExplain: return 2.8
-        case .listening:   return 3.2
-        case .thinking:    return 3.2
-        case .empathy:     return 3.2
-        case .laugh:       return 2.4
-        case .cheer:       return 1.2
-        }
-    }
-
-    var loops: Bool {
-        switch self {
-        case .idle, .listening: return true
-        default:                return false
-        }
     }
 }
 
@@ -100,69 +89,65 @@ private final class AraAvatarLoader: ObservableObject {
     @Published var status = "Đang nạp Ara…"
     var onLog: ((String) -> Void)?
 
-    private var currentClip: AraClip?
-    private var loadID = 0
+    private var allClips: [AnimationResource] = []
     private var loadSubscription: AnyCancellable?
-    private var cache: [AraClip: Entity] = [:]
+    private var controller: AnimationPlaybackController?
     private var speakingTask: Task<Void, Never>?
     private var hasWaved = false
+    private var currentEmotion: AraEmotion = .idle
 
-    // MARK: Emotion → clip
+    // MARK: - Emotion
 
     func setEmotion(_ emotion: AraEmotion) {
+        guard emotion != currentEmotion || speakingTask == nil else {
+            // Allow speaking re-entry after task cancel
+            if emotion != .speaking { return }
+        }
+        currentEmotion = emotion
+        speakingTask?.cancel()
+        speakingTask = nil
+
         switch emotion {
         case .idle:
-            cancelSpeaking()
-            show(.idle)
+            play(AraClips.idle)
         case .listening:
-            cancelSpeaking()
-            show(.listening)
+            play(AraClips.listening)
         case .thinking:
-            cancelSpeaking()
-            show(.thinking)
+            play(AraClips.thinking)
+            scheduleReturn(to: .listening, after: AraClips.thinking.duration + 0.3)
         case .speaking:
             startSpeakingLoop()
         case .happy:
-            cancelSpeaking()
-            show(.laugh)
-            scheduleReturn(to: .idle, after: AraClip.laugh.duration + 0.3)
+            play(AraClips.laugh)
+            scheduleReturn(to: .idle, after: AraClips.laugh.duration + 0.3)
         case .surprised:
-            cancelSpeaking()
-            show(.cheer)
-            scheduleReturn(to: .idle, after: AraClip.cheer.duration + 0.3)
+            play(AraClips.cheer)
+            scheduleReturn(to: .idle, after: AraClips.cheer.duration + 0.3)
         case .empathy:
-            cancelSpeaking()
-            show(.empathy)
-            scheduleReturn(to: .idle, after: AraClip.empathy.duration + 0.3)
+            play(AraClips.empathy)
+            scheduleReturn(to: .idle, after: AraClips.empathy.duration + 0.3)
         }
     }
 
     private func startSpeakingLoop() {
-        cancelSpeaking()
         speakingTask = Task { [weak self] in
             guard let self else { return }
             if !self.hasWaved {
                 self.hasWaved = true
-                self.show(.wave)
-                self.onLog?("[ARA] wave greeting")
-                try? await Task.sleep(nanoseconds: UInt64(AraClip.wave.duration * 1_000_000_000))
+                self.play(AraClips.wave)
+                self.onLog?("[ARA] wave")
+                try? await Task.sleep(nanoseconds: UInt64(AraClips.wave.duration * 1_000_000_000))
                 guard !Task.isCancelled else { return }
             }
             var cycle = 0
             while !Task.isCancelled {
-                let clip: AraClip = (cycle % 3 == 2) ? .talkExplain : .talk
-                self.show(clip)
-                self.onLog?("[ARA] \(clip.rawValue) cycle=\(cycle)")
-                let wait = clip.duration - 0.25
-                try? await Task.sleep(nanoseconds: UInt64(max(0.1, wait) * 1_000_000_000))
+                let clip = (cycle % 3 == 2) ? AraClips.talkExplain : AraClips.talk
+                self.play(clip)
+                self.onLog?("[ARA] \(clip.name) cycle=\(cycle)")
+                try? await Task.sleep(nanoseconds: UInt64((clip.duration - 0.25) * 1_000_000_000))
                 cycle += 1
             }
         }
-    }
-
-    private func cancelSpeaking() {
-        speakingTask?.cancel()
-        speakingTask = nil
     }
 
     private func scheduleReturn(to emotion: AraEmotion, after seconds: Double) {
@@ -173,56 +158,60 @@ private final class AraAvatarLoader: ObservableObject {
         }
     }
 
-    // MARK: Load & play
+    // MARK: - Playback
 
-    func show(_ clip: AraClip) {
-        guard currentClip != clip || entity == nil else { return }
-        currentClip = clip
-        loadID += 1
-        let reqID = loadID
-        loadSubscription?.cancel()
-
-        if let cached = cache[clip] {
-            play(cached, clip: clip)
-            entity = cached
-            onLog?("[ARA] cached \(clip.rawValue)")
+    private func play(_ clip: AraClip) {
+        guard let entity = entity else { return }
+        guard clip.index < allClips.count else {
+            onLog?("[ARA ERROR] index \(clip.index) out of range (total=\(allClips.count))")
             return
         }
+        let anim = allClips[clip.index]
+        let final = clip.loops ? anim.repeat(duration: .infinity) : anim
+        controller?.stop()
+        controller = entity.playAnimation(final, transitionDuration: 0.25)
+        onLog?("[ARA] play[\(clip.index)] \(clip.name)")
+    }
 
-        status = entity == nil ? "Đang nạp \(clip.rawValue)…" : "Đang chuyển \(clip.rawValue)…"
-        guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
-            status = "Không tìm thấy \(clip.rawValue).usdz"
-            onLog?("[ARA ERROR] missing \(clip.rawValue).usdz")
+    // MARK: - Load
+
+    func load() {
+        guard entity == nil, loadSubscription == nil else { return }
+        status = "Đang nạp Ara-Avatar.usdz…"
+        guard let url = Bundle.main.url(forResource: "Ara-Avatar", withExtension: "usdz") else {
+            status = "Không tìm thấy Ara-Avatar.usdz"
+            onLog?("[ARA ERROR] bundle lookup failed")
             return
         }
-
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
+                self?.loadSubscription = nil
                 if case .failure(let e) = completion {
-                    self?.status = "Lỗi nạp \(clip.rawValue)"
-                    self?.onLog?("[ARA ERROR] \(clip.rawValue): \(e)")
+                    self?.status = "Lỗi: \(e.localizedDescription)"
+                    self?.onLog?("[ARA ERROR] load failed: \(e)")
                 }
             }, receiveValue: { [weak self] model in
-                guard let self, reqID == self.loadID else { return }
-                guard model.availableAnimations.first != nil else {
-                    self.status = "\(clip.rawValue) không có animation"
-                    self.onLog?("[ARA ERROR] \(clip.rawValue) no animations")
-                    return
+                guard let self else { return }
+                self.loadSubscription = nil
+
+                // Collect all availableAnimations recursively
+                func collect(_ e: Entity) -> [AnimationResource] {
+                    var r = e.availableAnimations
+                    for c in e.children { r += collect(c) }
+                    return r
                 }
-                self.cache[clip] = model
-                self.play(model, clip: clip)
+                let clips = collect(model)
+                self.allClips = clips
+                self.onLog?("[ARA] \(clips.count) clips loaded")
+
+                model.stopAllAnimations()
                 self.entity = model
                 self.status = "Ara sẵn sàng"
-                self.onLog?("[ARA] loaded \(clip.rawValue)")
-            })
-    }
 
-    private func play(_ model: Entity, clip: AraClip) {
-        guard let anim = model.availableAnimations.first else { return }
-        model.stopAllAnimations()
-        let final = clip.loops ? anim.repeat(duration: .infinity) : anim
-        model.playAnimation(final, transitionDuration: 0.25)
+                // Start idle
+                self.play(AraClips.idle)
+            })
     }
 }
 
@@ -255,7 +244,8 @@ private struct AraRealityView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    private func attach(_ model: Entity, zoomScale: Float, rotationY: Float, to view: ARView, coordinator: Coordinator) {
+    private func attach(_ model: Entity, zoomScale: Float, rotationY: Float,
+                        to view: ARView, coordinator: Coordinator) {
         let bounds = model.visualBounds(recursive: true, relativeTo: model)
         let height = bounds.extents.y
         let baseScale: Float = height.isFinite && height > 0 ? 1.6 / height : 1
