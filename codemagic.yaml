@@ -73,7 +73,7 @@ workflows:
             exit 1
           }
           CHANGED_FILES="$(git diff --name-only "$RUN_SHA...$MAIN_SHA")"
-          printf '%s\n' "$CHANGED_FILES" | python3 -c 'import sys; changed={x.strip() for x in sys.stdin if x.strip()}; allowed={"PROJECT_STATUS.md","codemagic.yaml","ChatAI/CompanionChatView.swift","ChatAI/AraAvatarView.swift","scripts/apply-ara-hip-sway.py","scripts/split-ara-clips.py"}; assert changed <= allowed, f"Non-documentation changes since Ara asset run: {sorted(changed-allowed)}"; print("Only status/pipeline documentation changed after the successful Ara asset run." if changed else "Build commit matches the successful Ara asset run.")'
+          printf '%s\n' "$CHANGED_FILES" | python3 -c 'import sys; changed={x.strip() for x in sys.stdin if x.strip()}; allowed={"PROJECT_STATUS.md","codemagic.yaml","ChatAI/CompanionChatView.swift","ChatAI/AraAvatarView.swift","scripts/apply-ara-hip-sway.py"}; assert changed <= allowed, f"Non-documentation changes since Ara asset run: {sorted(changed-allowed)}"; print("Only status/pipeline documentation changed after the successful Ara asset run." if changed else "Build commit matches the successful Ara asset run.")'
 
           USE_ARTIFACT=0
           if api_get "$API/commits/ara-avatar-v5" "$USD_TMP/release-commit.json"; then
@@ -152,14 +152,7 @@ workflows:
           grep -q 'Talk vs TalkExplain' "$USD_TMP/usdz-animation-diagnostics.txt"
           test -s ChatAI/Resources/Ara-Avatar.usdz
 
-          # Split global USDZ into per-clip files for the app
-          "$USD_PY" scripts/split-ara-clips.py ChatAI/Resources/Ara-Avatar.usdz "$TIMELINE" ChatAI/Resources
-          for CLIP in Idle Wave Talk TalkExplain AraListening AraThinking AraEmpathy AraLaugh Cheer Laugh; do
-            test -s "ChatAI/Resources/Ara-$CLIP.usdz" || { echo "Missing Ara-$CLIP.usdz after split"; exit 1; }
-          done
-          echo "All per-clip USDZ files ready."
-
-          echo "Ara USDZ split and validated with OpenUSD before the Xcode build."
+          echo "Ara USDZ baked and validated with OpenUSD before the Xcode build."
 
       - name: Install XcodeGen
         script: brew install xcodegen
