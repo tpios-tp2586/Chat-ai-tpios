@@ -200,16 +200,24 @@ private final class AraAvatarLoader: ObservableObject {
             onLog?("[ARA ERROR] missing \(clip.rawValue).usdz")
             return
         }
+        onLog?("[ARA] loadAsync start: \(url.lastPathComponent)")
 
         loadSubscription = Entity.loadAsync(contentsOf: url)
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
-                if case .failure(let e) = completion {
+                switch completion {
+                case .failure(let e):
                     self?.status = "Lỗi nạp \(clip.rawValue)"
                     self?.onLog?("[ARA ERROR] \(clip.rawValue): \(e)")
+                case .finished:
+                    self?.onLog?("[ARA] loadAsync finished: \(clip.rawValue)")
                 }
             }, receiveValue: { [weak self] model in
-                guard let self, reqID == self.loadID else { return }
+                self?.onLog?("[ARA] receiveValue: \(clip.rawValue)")
+                guard let self, reqID == self.loadID else {
+                    self?.onLog?("[ARA] stale load ignored reqID=\(reqID)")
+                    return
+                }
                 guard model.availableAnimations.first != nil else {
                     self.status = "\(clip.rawValue) không có animation"
                     self.onLog?("[ARA ERROR] \(clip.rawValue) no animations")
