@@ -1,96 +1,123 @@
 #!/usr/bin/env python3
-"""Split Ara-Avatar.usdz into per-clip USDZ files using animation-timeline.json.
+"""Split Ara-Avatar.usdz into per-clip USDZ files.
+
+Reads skeletal animation data directly from USD time samples,
+writes per-clip .usda files, packs into .usdz using zip.
 
 Usage:
     python3 split-ara-clips.py <Ara-Avatar.usdz> <animation-timeline.json> <output_dir>
-
-Writes one .usdz per clip entry in the timeline, e.g. Ara-Idle.usdz, Ara-Wave.usdz ...
 """
 import json
 import sys
 import os
-import shutil
 import zipfile
 import tempfile
-from pxr import Usd, UsdSkel, Sdf, UsdGeom, UsdUtils, Gf
+import shutil
+from pxr import Usd, UsdSkel, Sdf, Gf, Vt
 
-# Clips to extract — only what the app needs
 WANTED = {
     "Idle", "Wave", "Talk", "TalkExplain",
     "AraListening", "AraThinking", "AraEmpathy", "AraLaugh",
     "Cheer", "Laugh",
 }
 
-def slug(name: str) -> str:
+def slug(name):
     return "".join(c if c.isalnum() else "-" for c in name).strip("-")
 
-def extract_usdz(usdz_path: str, tmp_dir: str) -> str:
-    """Unzip usdz, return path to the main .usda/.usdc file."""
-    with zipfile.ZipFile(usdz_path) as zf:
-        zf.extractall(tmp_dir)
-    # Find root layer
-    for name in ["Ara-Avatar.usdc", "Ara-Avatar.usda", "root.usdc", "root.usda"]:
-        p = os.path.join(tmp_dir, name)
-        if os.path.exists(p):
-            return p
-    # fallback: first .usdc or .usda
-    for f in sorted(os.listdir(tmp_dir)):
-        if f.endswith((".usdc", ".usda")):
-            return os.path.join(tmp_dir, f)
-    raise RuntimeError("No USD root layer found in USDZ")
 
-def retime_stage(src_stage, start_sec: float, end_sec: float, dst_path: str, fps: float):
-    """Create a new stage containing only frames [start_sec, end_sec], offset to t=0."""
+def pack_usdz(usda_path, out_path, extra_files=None):
+    """Pack a .usda (and optional extra files) into a .usdz zip."""
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_STORED) as zf:
+        zf.write(usda_path, os.path.basename(usda_path))
+        for ep in (extra_files or []):
+            zf.write(ep, os.path.basename(ep))
+
+
+def write_clip_usda(src_stage, src_skel_anim, joints, fps,
+                    start_sec, end_sec, out_path):
+    """Write a trimmed skeletal animation as .usda, timecodes starting at 0."""
     start_tc = start_sec * fps
     end_tc   = end_sec   * fps
 
-    dst_stage = Usd.Stage.CreateNew(dst_path)
+    # Collect all src timecodes in range
+    all_tc = src_skel_anim.GetRotationsAttr().GetTimeSamples()
+    clip_tc = [t for t in all_tc if start_tc - 0.5 <= t <= end_tc + 0.5]
+    if not clip_tc:
+        raise RuntimeError(f"No time samples found between {start_sec}s and {end_sec}s")
+
+    offset = -start_tc  # shift so clip starts at 0
+
+    # Gather rotation, translation, scale samples for the clip
+    rot_attr   = src_skel_anim.GetRotationsAttr()
+    trans_attr = src_skel_anim.GetTranslationsAttr()
+    scale_attr = src_skel_anim.GetScalesAttr()
+
+    # Build new stage
+    dst_stage = Usd.Stage.CreateNew(out_path)
     dst_stage.SetStartTimeCode(0)
     dst_stage.SetEndTimeCode(round((end_sec - start_sec) * fps))
     dst_stage.SetTimeCodesPerSecond(fps)
     dst_stage.SetFramesPerSecond(fps)
-    dst_stage.GetRootLayer().subLayerPaths = src_stage.GetRootLayer().subLayerPaths
 
-    # Copy all prims
+    # Recreate prim hierarchy from source
+    # Find the root skeleton prim to preserve structure
+    skel_root = None
+    for prim in src_stage.Traverse():
+        if prim.GetTypeName() == "SkelRoot":
+            skel_root = prim
+            break
+
+    if skel_root is None:
+        raise RuntimeError("No SkelRoot found in source stage")
+
+    # Copy the full hierarchy with Sdf.CopySpec on individual prims
+    # Use SkelRoot path
     src_layer = src_stage.GetRootLayer()
     dst_layer = dst_stage.GetRootLayer()
-    Sdf.CopySpec(src_layer, Sdf.Path("/"), dst_layer, Sdf.Path("/"))
 
-    # Re-time all time-sampled attributes by shifting offset
-    offset = -start_tc
-    for prim in dst_stage.Traverse():
-        for attr in prim.GetAttributes():
-            samples = attr.GetTimeSamples()
-            if not samples:
-                continue
-            # Only keep samples in [start_tc, end_tc]
-            new_samples = {}
-            for t in samples:
-                if start_tc - 1 <= t <= end_tc + 1:
-                    new_samples[t + offset] = attr.Get(t)
-            if new_samples:
-                # Clear old samples
-                attr.Clear()
-                for t, v in new_samples.items():
-                    attr.Set(v, t)
-            else:
-                attr.Clear()
+    # Copy only the prim specs we need (SkelRoot + descendants)
+    root_path = skel_root.GetPath()
+
+    # Use CreateClassPrim approach — directly define prims and copy attributes
+    # This avoids the subLayerPaths incompatibility
+    Sdf.CopySpec(src_layer, root_path, dst_layer, root_path)
+
+    # Now re-time the animation prim
+    anim_path = src_skel_anim.GetPrim().GetPath()
+    dst_anim_prim = dst_stage.GetPrimAtPath(anim_path)
+    if not dst_anim_prim.IsValid():
+        raise RuntimeError(f"Anim prim {anim_path} not in dst stage after copy")
+
+    dst_anim = UsdSkel.Animation(dst_anim_prim)
+
+    # Clear and re-write rotation timecodes
+    dst_rot = dst_anim.GetRotationsAttr()
+    dst_rot.Clear()
+    for tc in clip_tc:
+        val = rot_attr.Get(Usd.TimeCode(tc))
+        if val is not None:
+            dst_rot.Set(val, tc + offset)
+
+    # Translation
+    dst_trans = dst_anim.GetTranslationsAttr()
+    dst_trans.Clear()
+    trans_tc = trans_attr.GetTimeSamples() if trans_attr else []
+    for tc in [t for t in trans_tc if start_tc - 0.5 <= t <= end_tc + 0.5]:
+        val = trans_attr.Get(Usd.TimeCode(tc))
+        if val is not None:
+            dst_trans.Set(val, tc + offset)
+
+    # Scale
+    dst_scale = dst_anim.GetScalesAttr()
+    dst_scale.Clear()
+    scale_tc = scale_attr.GetTimeSamples() if scale_attr else []
+    for tc in [t for t in scale_tc if start_tc - 0.5 <= t <= end_tc + 0.5]:
+        val = scale_attr.Get(Usd.TimeCode(tc))
+        if val is not None:
+            dst_scale.Set(val, tc + offset)
 
     dst_stage.Save()
 
-def pack_usdz(usdc_path: str, source_dir: str, out_path: str):
-    """Pack usdc + textures into a usdz."""
-    asset_resolver = UsdUtils.CreateNewARKitUsdzPackage(
-        Sdf.AssetPath(usdc_path), out_path
-    )
-    # If that fails (older OpenUSD), fallback to zip
-    if not os.path.exists(out_path) or os.path.getsize(out_path) < 100:
-        with zipfile.ZipFile(out_path, "w", zipfile.ZIP_STORED) as zf:
-            for root, _, files in os.walk(source_dir):
-                for f in files:
-                    fp = os.path.join(root, f)
-                    arcname = os.path.relpath(fp, source_dir)
-                    zf.write(fp, arcname)
 
 def main():
     if len(sys.argv) != 4:
@@ -102,39 +129,55 @@ def main():
     with open(timeline_path) as f:
         timeline = json.load(f)
 
-    fps = float(timeline.get("fps", 30))
     clips = {c["name"]: c for c in timeline["clips"]}
 
-    with tempfile.TemporaryDirectory() as tmp:
-        root_layer_path = extract_usdz(usdz_path, tmp)
-        src_stage = Usd.Stage.Open(root_layer_path)
-        print(f"Opened stage: {root_layer_path}, fps={fps}")
+    # Open source stage
+    stage = Usd.Stage.Open(usdz_path)
+    if stage is None:
+        raise RuntimeError("Cannot open USDZ")
 
-        for clip_name, clip_data in clips.items():
-            if clip_name not in WANTED:
-                continue
-            start = float(clip_data["start"])
-            end   = float(clip_data["end"])
-            out_name = f"Ara-{slug(clip_name)}.usdz"
-            out_path = os.path.join(output_dir, out_name)
+    fps = float(stage.GetTimeCodesPerSecond())
+    print(f"Source: fps={fps}, range={stage.GetStartTimeCode()}..{stage.GetEndTimeCode()}")
 
-            clip_tmp = tempfile.mkdtemp()
+    # Find animation
+    anims = [p for p in stage.Traverse() if p.IsA(UsdSkel.Animation)]
+    if not anims:
+        raise RuntimeError("No UsdSkel.Animation found")
+    skel_anim = UsdSkel.Animation(anims[0])
+    joints = list(skel_anim.GetJointsAttr().Get() or [])
+    print(f"Animation: {anims[0].GetPath()}, joints={len(joints)}")
+
+    for clip_name, clip_data in clips.items():
+        if clip_name not in WANTED:
+            continue
+        start = float(clip_data["start"])
+        end   = float(clip_data["end"])
+        out_name = f"Ara-{slug(clip_name)}.usdz"
+        out_path = os.path.join(output_dir, out_name)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            usda_name = f"Ara-{slug(clip_name)}.usda"
+            usda_path = os.path.join(tmp, usda_name)
             try:
-                usdc_out = os.path.join(clip_tmp, f"Ara-{slug(clip_name)}.usdc")
-                retime_stage(src_stage, start, end, usdc_out, fps)
-                # Copy textures
-                for f in os.listdir(tmp):
-                    if not f.endswith((".usdc", ".usda")):
-                        shutil.copy2(os.path.join(tmp, f), os.path.join(clip_tmp, f))
-                pack_usdz(usdc_out, clip_tmp, out_path)
-                size = os.path.getsize(out_path)
-                print(f"  {out_name}: {size/1024:.0f} KB (start={start:.3f}s end={end:.3f}s)")
+                write_clip_usda(stage, skel_anim, joints, fps,
+                                start, end, usda_path)
+                # Also copy textures from source USDZ
+                tex_files = []
+                with zipfile.ZipFile(usdz_path) as zf:
+                    for name in zf.namelist():
+                        if not name.endswith((".usdc", ".usda", ".usdz")):
+                            tex_path = os.path.join(tmp, os.path.basename(name))
+                            with zf.open(name) as src, open(tex_path, "wb") as dst:
+                                dst.write(src.read())
+                            tex_files.append(tex_path)
+                pack_usdz(usda_path, out_path, tex_files)
+                size = os.path.getsize(out_path) / 1024
+                print(f"  OK {out_name}: {size:.0f} KB")
             except Exception as e:
                 print(f"  ERROR {clip_name}: {e}")
-            finally:
-                shutil.rmtree(clip_tmp, ignore_errors=True)
 
     print("Done.")
+
 
 if __name__ == "__main__":
     main()
