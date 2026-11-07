@@ -191,44 +191,36 @@ private final class AraAvatarLoader: ObservableObject {
 
         status = entity == nil ? "Đang nạp \(clip.rawValue)…" : "Chuyển \(clip.rawValue)…"
 
-        // Debug: log all USDZ files in bundle
-        let allUSDZ = Bundle.main.paths(forResourcesOfType: "usdz", inDirectory: nil)
-        onLog?("[ARA BUNDLE] \(allUSDZ.count) usdz files: \(allUSDZ.map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", "))")
-
         guard let url = Bundle.main.url(forResource: clip.rawValue, withExtension: "usdz") else {
             status = "Không tìm thấy \(clip.rawValue).usdz"
             onLog?("[ARA ERROR] missing \(clip.rawValue).usdz")
             return
         }
-        onLog?("[ARA] loadAsync start: \(url.lastPathComponent)")
 
-        loadSubscription = Entity.loadAsync(contentsOf: url)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                switch completion {
-                case .failure(let e):
+        onLog?("[ARA] loading \(clip.rawValue)")
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let model = try await Entity.load(contentsOf: url)
+                await MainActor.run { [weak self] in
+                    guard let self, reqID == self.loadID else { return }
+                    guard model.availableAnimations.first != nil else {
+                        self.status = "\(clip.rawValue) không có animation"
+                        self.onLog?("[ARA ERROR] \(clip.rawValue) no animations")
+                        return
+                    }
+                    self.cache[clip] = model
+                    self.play(model, clip: clip)
+                    self.entity = model
+                    self.status = "Ara sẵn sàng"
+                    self.onLog?("[ARA] loaded \(clip.rawValue)")
+                }
+            } catch {
+                await MainActor.run { [weak self] in
                     self?.status = "Lỗi nạp \(clip.rawValue)"
-                    self?.onLog?("[ARA ERROR] \(clip.rawValue): \(e)")
-                case .finished:
-                    self?.onLog?("[ARA] loadAsync finished: \(clip.rawValue)")
+                    self?.onLog?("[ARA ERROR] \(clip.rawValue): \(error)")
                 }
-            }, receiveValue: { [weak self] model in
-                self?.onLog?("[ARA] receiveValue: \(clip.rawValue)")
-                guard let self, reqID == self.loadID else {
-                    self?.onLog?("[ARA] stale load ignored reqID=\(reqID)")
-                    return
-                }
-                guard model.availableAnimations.first != nil else {
-                    self.status = "\(clip.rawValue) không có animation"
-                    self.onLog?("[ARA ERROR] \(clip.rawValue) no animations")
-                    return
-                }
-                self.cache[clip] = model
-                self.play(model, clip: clip)
-                self.entity = model
-                self.status = "Ara sẵn sàng"
-                self.onLog?("[ARA] loaded \(clip.rawValue)")
-            })
+            }
+        }
     }
 
     private func play(_ model: Entity, clip: AraClip) {
