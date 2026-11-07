@@ -15,6 +15,9 @@ workflows:
           test -s IMG_0290.png
           echo "Required project and icon files are present."
 
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
       - name: Download Ara per-clip USDZ from release v6
         script: |
           set -euo pipefail
@@ -26,9 +29,6 @@ workflows:
             echo "OK: Ara-${CLIP}.usdz ($(wc -c < ChatAI/Resources/Ara-${CLIP}.usdz) bytes)"
           done
           echo "All 9 Ara clips ready."
-
-      - name: Install XcodeGen
-        script: brew install xcodegen
 
       - name: Generate app icon
         script: |
