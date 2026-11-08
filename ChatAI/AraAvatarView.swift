@@ -215,7 +215,9 @@ private final class AraAvatarLoader: ObservableObject {
         let final = clip.loops ? anim.repeat(duration: .infinity) : anim
         controller?.stop()
         controller = entity.playAnimation(final, transitionDuration: 0.25)
-        onLog?("[ARA] play[\(clip.index)] \(clip.name)")
+        // Check if entity is in a scene
+        let inScene = entity.scene != nil
+        onLog?("[ARA] play[\(clip.index)] \(clip.name) inScene=\(inScene)")
     }
 }
 
