@@ -257,21 +257,31 @@ private struct AraRealityView: UIViewRepresentable {
     private func attach(_ model: Entity, zoomScale: Float, rotationY: Float,
                         to view: ARView, coordinator: Coordinator) {
 
-        // Log entity hierarchy to find ModelEntity children
-        func inspectModels(_ e: Entity, depth: Int = 0) {
-            let indent = String(repeating: "  ", count: depth)
-            let isModel = e is ModelEntity
-            print("[ARA VIEW] \(indent)\(e.name) isModel=\(isModel) scale=\(e.scale)")
-            for child in e.children { inspectModels(child, depth: depth + 1) }
+        // Ensure all children are enabled and visible
+        func enableAll(_ e: Entity) {
+            e.isEnabled = true
+            for child in e.children { enableAll(child) }
         }
-        inspectModels(model)
+        enableAll(model)
 
-        // Use recursive visualBounds — mesh is in child entities
-        let bounds = model.visualBounds(recursive: true, relativeTo: nil)
+        // Find bounds from ModelEntity children (mesh is not on root)
+        func findModelBounds(_ e: Entity) -> BoundingBox? {
+            if let m = e as? ModelEntity {
+                return m.visualBounds(recursive: false, relativeTo: nil)
+            }
+            var combined: BoundingBox? = nil
+            for child in e.children {
+                if let b = findModelBounds(child) {
+                    combined = combined == nil ? b : combined!.union(b)
+                }
+            }
+            return combined
+        }
+
+        let bounds = findModelBounds(model) ?? model.visualBounds(recursive: true, relativeTo: nil)
         let height = bounds.extents.y
-        print("[ARA VIEW] bounds: extents=\(bounds.extents) center=\(bounds.center) height=\(height)")
-
-        let baseScale: Float = height.isFinite && height > 0 ? 1.6 / height : 1.0
+        // Fallback: if bounds still zero, use default scale for a ~1.7m human
+        let baseScale: Float = (height.isFinite && height > 0.1) ? 1.6 / height : 0.94
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = SIMD3<Float>(
             -bounds.center.x * baseScale,
