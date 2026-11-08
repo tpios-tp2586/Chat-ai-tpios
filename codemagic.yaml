@@ -18,17 +18,19 @@ workflows:
       - name: Install XcodeGen
         script: brew install xcodegen
 
-      - name: Download Ara per-clip USDZ from release v6
+      - name: Download Ara-Avatar.usdz from release v5
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         script: |
           set -euo pipefail
           mkdir -p ChatAI/Resources
-          BASE="https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v6"
-          for CLIP in Idle Wave Talk TalkExplain AraListening AraThinking AraEmpathy Laugh Cheer; do
-            curl -L --fail --silent --show-error -o "ChatAI/Resources/Ara-${CLIP}.usdz" "${BASE}/Ara-${CLIP}.usdz"
-            test -s "ChatAI/Resources/Ara-${CLIP}.usdz" || { echo "Missing Ara-${CLIP}.usdz"; exit 1; }
-            echo "OK: Ara-${CLIP}.usdz ($(wc -c < ChatAI/Resources/Ara-${CLIP}.usdz) bytes)"
-          done
-          echo "All 9 Ara clips ready."
+          curl -L --fail \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/698530668" \
+            -o ChatAI/Resources/Ara-Avatar.usdz
+          test -s ChatAI/Resources/Ara-Avatar.usdz
+          echo "OK: Ara-Avatar.usdz ($(wc -c < ChatAI/Resources/Ara-Avatar.usdz) bytes)"
 
       - name: Generate app icon
         script: |
@@ -73,7 +75,6 @@ workflows:
             ls -la build/Build/Products/Release-iphoneos/ || echo "Products folder not found"
             exit 1
           fi
-
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qr "chat-ai-tpios-$BUILD_NUMBER.ipa" Payload
