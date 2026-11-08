@@ -133,7 +133,11 @@ private final class AraAvatarLoader: ObservableObject {
                     model.stopAllAnimations()
                     self.entity = model
                     self.status = "Ara sẵn sàng"
-                    self.play(AraClips.idle)
+                    // Play idle after entity enters scene (slight delay for ARView attach)
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                        self.play(AraClips.idle)
+                    }
                 }
             } catch {
                 await MainActor.run { [weak self] in
