@@ -19,15 +19,11 @@ workflows:
         script: brew install xcodegen
 
       - name: Download Ara-Avatar.usdz from release v5
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         script: |
           set -euo pipefail
           mkdir -p ChatAI/Resources
           curl -L --fail \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/698530668" \
+            "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v5/Ara-Avatar.usdz" \
             -o ChatAI/Resources/Ara-Avatar.usdz
           test -s ChatAI/Resources/Ara-Avatar.usdz
           echo "OK: Ara-Avatar.usdz ($(wc -c < ChatAI/Resources/Ara-Avatar.usdz) bytes)"
