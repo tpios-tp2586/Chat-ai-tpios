@@ -23,16 +23,21 @@ private struct AraClip {
     let loops: Bool
 }
 
+// AraConversation clips confirmed at index 3–12 from device log
+// [0]=global scene animation (autoplay — must stop)
+// [1],[2]=empty  [3]=Idle [4]=Wave [5]=Talk [6]=TalkExplain
+// [7]=AraListening [8]=AraThinking [9]=AraEmpathy [10]=AraLaugh [11]=Walk [12]=Run
+// [13]=default scene animation [14]=default subtree animation [15–26]=empty
 private enum AraClips {
-    static let idle        = AraClip(name: "Idle",         index: 0,  duration: 3.2,  loops: true)
-    static let wave        = AraClip(name: "Wave",         index: 1,  duration: 1.6,  loops: false)
-    static let talk        = AraClip(name: "Talk",         index: 2,  duration: 6.4,  loops: false)
-    static let talkExplain = AraClip(name: "TalkExplain",  index: 3,  duration: 2.8,  loops: false)
-    static let listening   = AraClip(name: "AraListening", index: 4,  duration: 3.2,  loops: true)
-    static let thinking    = AraClip(name: "AraThinking",  index: 5,  duration: 3.2,  loops: false)
-    static let empathy     = AraClip(name: "AraEmpathy",   index: 6,  duration: 3.2,  loops: false)
-    static let laugh       = AraClip(name: "Laugh",        index: 26, duration: 2.4,  loops: false)
-    static let cheer       = AraClip(name: "Cheer",        index: 27, duration: 1.2,  loops: false)
+    static let idle        = AraClip(name: "Idle",         index: 3,  duration: 3.2,  loops: true)
+    static let wave        = AraClip(name: "Wave",         index: 4,  duration: 1.6,  loops: false)
+    static let talk        = AraClip(name: "Talk",         index: 5,  duration: 6.4,  loops: false)
+    static let talkExplain = AraClip(name: "TalkExplain",  index: 6,  duration: 2.8,  loops: false)
+    static let listening   = AraClip(name: "AraListening", index: 7,  duration: 3.2,  loops: true)
+    static let thinking    = AraClip(name: "AraThinking",  index: 8,  duration: 3.2,  loops: false)
+    static let empathy     = AraClip(name: "AraEmpathy",   index: 9,  duration: 3.2,  loops: false)
+    static let laugh       = AraClip(name: "Laugh",        index: 10, duration: 2.4,  loops: false)
+    static let cheer       = AraClip(name: "Cheer",        index: 11, duration: 1.2,  loops: false)
 }
 
 // MARK: - View
@@ -132,7 +137,6 @@ private final class AraAvatarLoader: ObservableObject {
                         return
                     }
                     self.clips = all
-                    model.stopAllAnimations()
                     self.entity = model
                     self.status = "Ara sẵn sàng"
                     // Play idle after entity enters scene (slight delay for ARView attach)
@@ -296,6 +300,8 @@ private struct AraRealityView: UIViewRepresentable {
         coordinator.rotationPivot = anchor
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
+        // Stop global autoplay AFTER adding to scene
+        model.stopAllAnimations()
         applyZoom(zoomScale, to: model, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
     }
