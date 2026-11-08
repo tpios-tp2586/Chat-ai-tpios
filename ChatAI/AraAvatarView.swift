@@ -256,11 +256,28 @@ private struct AraRealityView: UIViewRepresentable {
 
     private func attach(_ model: Entity, zoomScale: Float, rotationY: Float,
                         to view: ARView, coordinator: Coordinator) {
-        let bounds = model.visualBounds(recursive: true, relativeTo: model)
+
+        // Log entity hierarchy to find ModelEntity children
+        func inspectModels(_ e: Entity, depth: Int = 0) {
+            let indent = String(repeating: "  ", count: depth)
+            let isModel = e is ModelEntity
+            print("[ARA VIEW] \(indent)\(e.name) isModel=\(isModel) scale=\(e.scale)")
+            for child in e.children { inspectModels(child, depth: depth + 1) }
+        }
+        inspectModels(model)
+
+        // Use recursive visualBounds — mesh is in child entities
+        let bounds = model.visualBounds(recursive: true, relativeTo: nil)
         let height = bounds.extents.y
-        let baseScale: Float = height.isFinite && height > 0 ? 1.6 / height : 1
+        print("[ARA VIEW] bounds: extents=\(bounds.extents) center=\(bounds.center) height=\(height)")
+
+        let baseScale: Float = height.isFinite && height > 0 ? 1.6 / height : 1.0
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
-        coordinator.basePosition = -bounds.center * baseScale
+        coordinator.basePosition = SIMD3<Float>(
+            -bounds.center.x * baseScale,
+            -bounds.center.y * baseScale,
+            -bounds.center.z * baseScale
+        )
         coordinator.currentEntity = model
         let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.8))
         anchor.addChild(model)
@@ -269,7 +286,6 @@ private struct AraRealityView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
         applyZoom(zoomScale, to: model, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
-        print("[ARA VIEW] attach: height=\(height) baseScale=\(baseScale) extents=\(bounds.extents) center=\(bounds.center)")
     }
 
     private func applyZoom(_ zoom: Float, to model: Entity, coordinator: Coordinator) {
