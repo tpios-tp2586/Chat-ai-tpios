@@ -22,8 +22,11 @@ workflows:
         script: |
           set -euo pipefail
           mkdir -p ChatAI/Resources
-          curl -L --fail \
-            "https://github.com/tpios-tp2586/Chat-ai-tpios/releases/download/ara-avatar-v5/Ara-Avatar.usdz" \
+          # Use GitHub API with token to avoid 504 on large file direct URL
+          curl -L --fail --retry 3 --retry-delay 5 --max-time 120 \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/698530668" \
             -o ChatAI/Resources/Ara-Avatar.usdz
           test -s ChatAI/Resources/Ara-Avatar.usdz
           echo "OK: Ara-Avatar.usdz ($(wc -c < ChatAI/Resources/Ara-Avatar.usdz) bytes)"
