@@ -22,12 +22,13 @@ workflows:
         script: |
           set -euo pipefail
           mkdir -p ChatAI/Resources
-          # Use GitHub API with token to avoid 504 on large file direct URL
-          curl -L --fail --retry 3 --retry-delay 5 --max-time 120 \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/octet-stream" \
+          : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
+          curl --fail --location --silent --show-error --max-time 120 \
+            --header "Accept: application/octet-stream" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/698530668" \
-            -o ChatAI/Resources/Ara-Avatar.usdz
+            --output ChatAI/Resources/Ara-Avatar.usdz
           test -s ChatAI/Resources/Ara-Avatar.usdz
           echo "OK: Ara-Avatar.usdz ($(wc -c < ChatAI/Resources/Ara-Avatar.usdz) bytes)"
 
