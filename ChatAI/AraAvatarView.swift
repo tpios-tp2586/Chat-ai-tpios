@@ -122,7 +122,9 @@ private final class AraAvatarLoader: ObservableObject {
                         return r
                     }
                     let all = collect(model)
-                    self.onLog?("[ARA] loaded, clips=\(all.count)")
+                    // Log each clip name and index
+                    let names = all.enumerated().map { "[\($0.offset)]=\($0.element.name ?? "nil")" }.joined(separator: " ")
+                    self.onLog?("[ARA] loaded, clips=\(all.count): \(names)")
                     if all.isEmpty {
                         self.status = "Ara loaded (no animations)"
                         self.onLog?("[ARA ERROR] no animations found in USDZ")
