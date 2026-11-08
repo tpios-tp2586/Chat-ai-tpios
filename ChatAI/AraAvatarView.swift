@@ -269,6 +269,7 @@ private struct AraRealityView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
         applyZoom(zoomScale, to: model, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
+        print("[ARA VIEW] attach: height=\(height) baseScale=\(baseScale) extents=\(bounds.extents) center=\(bounds.center)")
     }
 
     private func applyZoom(_ zoom: Float, to model: Entity, coordinator: Coordinator) {
