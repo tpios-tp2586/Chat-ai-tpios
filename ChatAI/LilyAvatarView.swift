@@ -27,7 +27,7 @@ struct LilyAvatarView: View {
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                LilyRealityView(entity: entity, zoomScale: Float(savedZoomScale), rotationY: rotationY)
+                LilyRealityView(entity: entity, zoomScale: Float(savedZoomScale), rotationY: rotationY, onLog: onLog)
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -92,6 +92,7 @@ private struct LilyRealityView: UIViewRepresentable {
     let entity: Entity
     let zoomScale: Float
     let rotationY: Float
+    let onLog: (String) -> Void
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
@@ -132,7 +133,7 @@ private struct LilyRealityView: UIViewRepresentable {
         let height = bounds.extents.y
         // Fit the complete character into the avatar viewport.
         let baseScale: Float = (height.isFinite && height > 0.1) ? 0.55 / height : 0.3
-        onLog?("[LILY] bounds height=\(height), baseScale=\(baseScale), zoom=\(zoomScale)")
+        onLog("[LILY] bounds height=\(height), baseScale=\(baseScale), zoom=\(zoomScale)")
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = SIMD3<Float>(
             -bounds.center.x * baseScale,
