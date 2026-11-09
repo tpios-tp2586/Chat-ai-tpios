@@ -87,6 +87,9 @@ struct CompanionChatView: View {
         .onChange(of: liveManager.lines.last?.text) { _ in
             handleLatestTranscript()
         }
+        .onChange(of: viewModel.messages.count) { _ in
+            message = viewModel.messages.last?.content
+        }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
