@@ -8,7 +8,7 @@
 - USD structure report: 24 meshes, 1 skeleton, 97 joints, skin joint indices/weights, 1 skeletal animation.
 - Scene time codes are 0.0..0.0; animation has two transform samples; no BlendShape weights were reported.
 - Skeletal/facial animation playback remains disabled pending on-device validation.
-- Lily framing is under diagnosis. A temporary 0.32-world-unit target height is used to test whether reducing the full model size restores the complete body in the viewport; logs capture original hierarchy/enabled state, per-mesh local/world bounds, measured height, applied scale/position, anchor, and viewport. Zoom uses the v3 preference.
+- Lily framing now uses a 1.4-world-unit target height. Zoom storage was bumped to v4 so existing small v3 zoom values do not shrink the model on first launch; the new default is 1.0 and pinch zoom remains available. Logs capture original hierarchy/enabled state, per-mesh local/world bounds, measured height, applied scale/position, anchor, and viewport.
 - Tap Lily to start or end the Gemini Live voice conversation.
 - Chat Voice uses Gemini Live as its only conversation engine for both microphone speech and typed text. Typed text is sent through the active Live WebSocket as a history-preserving `clientContent` user turn with `turnComplete: true`; the same Live session generates the spoken audio response (`responseModalities: AUDIO`).
 - Typed messages are accepted only after the user taps Lily and Gemini Live reaches `.live`; the input is added to the on-screen transcript and sent directly to that session. No provider chat API, Azure TTS, or iOS TTS is used in Chat Voice.
