@@ -745,6 +745,26 @@ final class LiveVoiceManager: ObservableObject {
         teardown()
     }
 
+    /// Gửi văn bản vào chính phiên Gemini Live đang hoạt động.
+    /// Gemini Live vẫn tạo phản hồi âm thanh theo responseModalities đã cấu hình.
+    @discardableResult
+    func sendText(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard state == .live, let socket else {
+            note("Không gửi được văn bản: Gemini Live chưa kết nối")
+            return false
+        }
+
+        lines.append(Line(role: .user, text: trimmed))
+        openUser = lines.count - 1
+        openAI = nil
+        faceExpression = .thinking
+        socket.send(["realtimeInput": ["text": trimmed]])
+        note("Đã gửi văn bản vào Gemini Live realtimeInput")
+        return true
+    }
+
     func clearLines() {
         lines = []
         openUser = nil
