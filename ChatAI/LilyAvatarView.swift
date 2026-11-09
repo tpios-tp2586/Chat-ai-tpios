@@ -77,6 +77,7 @@ private final class LilyAvatarLoader: ObservableObject {
                 }
                 let animations = collect(model)
                 onLog?("[LILY] loaded; animations=\(animations.count); animation playback disabled pending validation")
+                onLog?("[LILY DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
                 model.stopAllAnimations()
                 entity = model
                 status = "Lily đã sẵn sàng"
@@ -95,6 +96,7 @@ private struct LilyRealityView: UIViewRepresentable {
     let onLog: (String) -> Void
 
     func makeUIView(context: Context) -> ARView {
+        onLog("[LILY DEBUG] makeUIView entered")
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
         attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
@@ -102,6 +104,10 @@ private struct LilyRealityView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: ARView, context: Context) {
+        if !context.coordinator.didLogUpdate {
+            onLog("[LILY DEBUG] updateUIView entered; bounds=\(view.bounds.size)")
+            context.coordinator.didLogUpdate = true
+        }
         if !context.coordinator.didLogLayout, view.bounds.width > 0, view.bounds.height > 0 {
             onLog("[LILY DEBUG] ARView layout size=\(view.bounds.size)")
             context.coordinator.didLogLayout = true
@@ -134,6 +140,26 @@ private struct LilyRealityView: UIViewRepresentable {
         enableAll(model)
 
         onLog("[LILY DEBUG] attach entered; root position=\(model.position), scale=\(model.scale), children=\(model.children.count)")
+        var inspectedNodes = 0
+        var meshNodes = 0
+        func inspectHierarchy(_ node: Entity, path: String) {
+            guard inspectedNodes < 90 else { return }
+            inspectedNodes += 1
+            let hasMesh = node.components[ModelComponent.self] != nil
+            if hasMesh {
+                meshNodes += 1
+                let meshBounds = node.visualBounds(recursive: false, relativeTo: model)
+                onLog("[LILY MESH] path=\(path), name=\(node.name), enabled=\(node.isEnabled), position=\(node.position), scale=\(node.scale), center=\(meshBounds.center), extents=\(meshBounds.extents)")
+            } else {
+                onLog("[LILY NODE] path=\(path), name=\(node.name), enabled=\(node.isEnabled), position=\(node.position), scale=\(node.scale), children=\(node.children.count)")
+            }
+            for (index, child) in node.children.enumerated() {
+                inspectHierarchy(child, path: "\(path)/\(index)")
+            }
+        }
+        inspectHierarchy(model, path: "root")
+        onLog("[LILY DEBUG] hierarchy summary: inspected=\(inspectedNodes), meshNodes=\(meshNodes), rootChildren=\(model.children.count)")
+
         let bounds = model.visualBounds(recursive: true, relativeTo: nil)
         let localBounds = model.visualBounds(recursive: true, relativeTo: model)
         onLog("[LILY DEBUG] world bounds center=\(bounds.center), extents=\(bounds.extents)")
@@ -180,5 +206,6 @@ private struct LilyRealityView: UIViewRepresentable {
         var currentZoom: Float = 1
         var currentRotationY: Float = 0
         var didLogLayout = false
+        var didLogUpdate = false
     }
 }
