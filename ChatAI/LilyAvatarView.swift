@@ -4,16 +4,17 @@ import SwiftUI
 
 struct LilyAvatarView: View {
     let onLog: (String) -> Void
+    let onTap: () -> Void
 
     @StateObject private var loader = LilyAvatarLoader()
-    @AppStorage("lily_avatar_zoom_scale_v1") private var savedZoomScale = 2.5
+    @AppStorage("lily_avatar_zoom_scale_v2") private var savedZoomScale = 1.0
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
-            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.7), 4.5) }
+            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.55), 1.8) }
             .onEnded { _ in pinchStartScale = savedZoomScale }
     }
 
@@ -41,6 +42,7 @@ struct LilyAvatarView: View {
         .contentShape(Rectangle())
         .simultaneousGesture(zoomGesture)
         .simultaneousGesture(rotationGesture)
+        .simultaneousGesture(TapGesture().onEnded { onTap() })
         .task {
             pinchStartScale = savedZoomScale
             loader.onLog = onLog
@@ -126,22 +128,10 @@ private struct LilyRealityView: UIViewRepresentable {
         }
         enableAll(model)
 
-        func findModelBounds(_ entity: Entity) -> BoundingBox? {
-            if let model = entity as? ModelEntity {
-                return model.visualBounds(recursive: false, relativeTo: nil)
-            }
-            var combined: BoundingBox?
-            for child in entity.children {
-                if let bounds = findModelBounds(child) {
-                    combined = combined.map { $0.union(bounds) } ?? bounds
-                }
-            }
-            return combined
-        }
-
-        let bounds = findModelBounds(model) ?? model.visualBounds(recursive: true, relativeTo: nil)
+        let bounds = model.visualBounds(recursive: true, relativeTo: nil)
         let height = bounds.extents.y
-        let baseScale: Float = (height.isFinite && height > 0.1) ? 1.6 / height : 0.94
+        // Fit the complete character into the avatar viewport.
+        let baseScale: Float = (height.isFinite && height > 0.1) ? 1.45 / height : 0.8
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = SIMD3<Float>(
             -bounds.center.x * baseScale,
@@ -150,7 +140,7 @@ private struct LilyRealityView: UIViewRepresentable {
         )
         coordinator.currentEntity = model
 
-        let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.8))
+        let anchor = AnchorEntity(world: SIMD3<Float>(0, 0, -2.0))
         anchor.addChild(model)
         coordinator.rotationPivot = anchor
         view.scene.anchors.removeAll()
