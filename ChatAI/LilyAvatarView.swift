@@ -7,14 +7,14 @@ struct LilyAvatarView: View {
     let onTap: () -> Void
 
     @StateObject private var loader = LilyAvatarLoader()
-    @AppStorage("lily_avatar_zoom_scale_v2") private var savedZoomScale = 1.0
+    @AppStorage("lily_avatar_zoom_scale_v3") private var savedZoomScale = 1.0
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
-            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.55), 1.8) }
+            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.5), 1.5) }
             .onEnded { _ in pinchStartScale = savedZoomScale }
     }
 
@@ -131,7 +131,8 @@ private struct LilyRealityView: UIViewRepresentable {
         let bounds = model.visualBounds(recursive: true, relativeTo: nil)
         let height = bounds.extents.y
         // Fit the complete character into the avatar viewport.
-        let baseScale: Float = (height.isFinite && height > 0.1) ? 1.45 / height : 0.8
+        let baseScale: Float = (height.isFinite && height > 0.1) ? 0.55 / height : 0.3
+        onLog?("[LILY] bounds height=\(height), baseScale=\(baseScale), zoom=\(zoomScale)")
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = SIMD3<Float>(
             -bounds.center.x * baseScale,
