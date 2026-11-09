@@ -190,9 +190,9 @@ private struct LilyRealityView: UIViewRepresentable {
         logDeferred("[LILY TEST SCALE] measuredHeight=\(height), targetHeight=\(targetHeight), fitMultiplier=\(fitMultiplier), importedRootScale=\(importedRootScale), fittedRootScale=\(importedRootScale * fitMultiplier), savedZoom=\(zoomScale)")
         coordinator.baseScale = importedRootScale * fitMultiplier
         coordinator.basePosition = SIMD3<Float>(
-            -bounds.center.x * baseScale,
-            -bounds.center.y * baseScale,
-            -bounds.center.z * baseScale
+            -bounds.center.x * fitMultiplier,
+            -bounds.center.y * fitMultiplier,
+            -bounds.center.z * fitMultiplier
         )
         coordinator.currentEntity = model
 
