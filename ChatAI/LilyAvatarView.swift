@@ -97,7 +97,7 @@ private struct LilyRealityView: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
-        onLog("[LILY DEBUG] ARView created; frame=\\(view.bounds.size)")
+        onLog("[LILY DEBUG] ARView created; frame=\(view.bounds.size)")
         attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         return view
     }
@@ -130,11 +130,11 @@ private struct LilyRealityView: UIViewRepresentable {
         }
         enableAll(model)
 
-        onLog("[LILY DEBUG] attach entered; root position=\\(model.position), scale=\\(model.scale), children=\\(model.children.count)")
+        onLog("[LILY DEBUG] attach entered; root position=\(model.position), scale=\(model.scale), children=\(model.children.count)")
         let bounds = model.visualBounds(recursive: true, relativeTo: nil)
         let localBounds = model.visualBounds(recursive: true, relativeTo: model)
-        onLog("[LILY DEBUG] world bounds center=\\(bounds.center), extents=\\(bounds.extents)")
-        onLog("[LILY DEBUG] local bounds center=\\(localBounds.center), extents=\\(localBounds.extents)")
+        onLog("[LILY DEBUG] world bounds center=\(bounds.center), extents=\(bounds.extents)")
+        onLog("[LILY DEBUG] local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
         let height = bounds.extents.y
         // Fit the complete character into the avatar viewport.
         let baseScale: Float = (height.isFinite && height > 0.1) ? 0.55 / height : 0.3
