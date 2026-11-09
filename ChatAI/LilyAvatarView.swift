@@ -183,11 +183,12 @@ private struct LilyRealityView: UIViewRepresentable {
         logDeferred("[LILY DEBUG] pre-fit local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
         let height = bounds.extents.y
 
-        // Temporary diagnostic fit: target a smaller 0.32-world-unit character height.
+        // Fit relative to the imported root scale; do not discard the USDZ's 0.01 root transform.
+        let importedRootScale = model.scale
         let targetHeight: Float = 0.32
-        let baseScale: Float = (height.isFinite && height > 0.1) ? targetHeight / height : 0.3
-        logDeferred("[LILY TEST SCALE] measuredHeight=\(height), targetHeight=\(targetHeight), baseScale=\(baseScale), savedZoom=\(zoomScale)")
-        coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
+        let fitMultiplier: Float = (height.isFinite && height > 0.1) ? targetHeight / height : 0.3
+        logDeferred("[LILY TEST SCALE] measuredHeight=\(height), targetHeight=\(targetHeight), fitMultiplier=\(fitMultiplier), importedRootScale=\(importedRootScale), fittedRootScale=\(importedRootScale * fitMultiplier), savedZoom=\(zoomScale)")
+        coordinator.baseScale = importedRootScale * fitMultiplier
         coordinator.basePosition = SIMD3<Float>(
             -bounds.center.x * baseScale,
             -bounds.center.y * baseScale,
