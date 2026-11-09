@@ -757,8 +757,7 @@ final class LiveVoiceManager: ObservableObject {
         }
 
         lines.append(Line(role: .user, text: trimmed))
-        openUser = lines.count - 1
-        openAI = nil
+        openUser = nil
         faceExpression = .thinking
         socket.send(["realtimeInput": ["text": trimmed]])
         note("Đã gửi văn bản vào Gemini Live realtimeInput")
