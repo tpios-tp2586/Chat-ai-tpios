@@ -7,7 +7,7 @@ struct LilyAvatarView: View {
     let onTap: () -> Void
 
     @StateObject private var loader = LilyAvatarLoader()
-    @AppStorage("lily_avatar_zoom_scale_v6") private var savedZoomScale = 2.5
+    @AppStorage("lily_avatar_zoom_scale_v7") private var savedZoomScale = 2.5
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
@@ -116,7 +116,7 @@ private struct LilyRealityView: UIViewRepresentable {
             attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         } else {
             if context.coordinator.currentZoom != zoomScale {
-                applyZoom(zoomScale, to: entity, coordinator: context.coordinator)
+                applyZoom(zoomScale, coordinator: context.coordinator)
             }
             if context.coordinator.currentRotationY != rotationY {
                 applyRotation(rotationY, coordinator: context.coordinator)
@@ -182,7 +182,7 @@ private struct LilyRealityView: UIViewRepresentable {
         logDeferred("[LILY DEBUG] pre-fit world bounds center=\(worldBounds.center), extents=\(worldBounds.extents)")
         logDeferred("[LILY DEBUG] pre-fit local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
 
-        // Match Ara's proven fitting method: measure in model-local space and normalize to 1.6 units.
+        // Match Ara's fitting method: measure in model-local space and normalize to 1.6 units.
         let height = localBounds.extents.y
         let importedRootScale = model.scale
         let baseScale: Float = (height.isFinite && height > 0) ? 1.6 / height : 1
@@ -193,20 +193,24 @@ private struct LilyRealityView: UIViewRepresentable {
 
         let anchorPosition = SIMD3<Float>(0, 0, -2.8)
         let anchor = AnchorEntity(world: anchorPosition)
-        anchor.addChild(model)
+        let zoomPivot = Entity()
+        zoomPivot.addChild(model)
+        model.position = coordinator.basePosition
+        model.scale = coordinator.baseScale
+        anchor.addChild(zoomPivot)
         coordinator.rotationPivot = anchor
+        coordinator.zoomPivot = zoomPivot
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
         model.stopAllAnimations()
-        applyZoom(zoomScale, to: model, coordinator: coordinator)
+        applyZoom(zoomScale, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
 
-        logDeferred("[LILY DEBUG] applied transform: modelPosition=\(model.position), modelScale=\(model.scale), anchorPosition=\(anchorPosition), viewport=\(view.bounds.size)")
+        logDeferred("[LILY DEBUG] applied transform: modelPosition=\(model.position), modelScale=\(model.scale), zoomPivotScale=\(zoomPivot.scale), anchorPosition=\(anchorPosition), viewport=\(view.bounds.size)")
     }
 
-    private func applyZoom(_ zoom: Float, to model: Entity, coordinator: Coordinator) {
-        model.scale = coordinator.baseScale * zoom
-        model.position = coordinator.basePosition * zoom
+    private func applyZoom(_ zoom: Float, coordinator: Coordinator) {
+        coordinator.zoomPivot?.scale = SIMD3<Float>(repeating: zoom)
         coordinator.currentZoom = zoom
     }
 
@@ -219,6 +223,7 @@ private struct LilyRealityView: UIViewRepresentable {
     final class Coordinator {
         var currentEntity: Entity?
         var rotationPivot: AnchorEntity?
+        var zoomPivot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentZoom: Float = 1
