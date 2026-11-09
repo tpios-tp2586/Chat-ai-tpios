@@ -3,8 +3,6 @@ workflows:
     name: Chat AI TPiOS - Build IPA
     max_build_duration: 60
     environment:
-      groups:
-        - ara_secrets
       xcode: 16.4
       cocoapods: default
     scripts:
@@ -18,86 +16,12 @@ workflows:
       - name: Install XcodeGen
         script: brew install xcodegen
 
-      - name: Download Ara-Avatar.usdz from release v5
+      - name: Validate Lily model resource
         script: |
           set -euo pipefail
-          mkdir -p ChatAI/Resources
-          : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
-          curl --fail --location --silent --show-error --max-time 120 \
-            --header "Accept: application/octet-stream" \
-            --header "Authorization: Bearer $GITHUB_TOKEN" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/releases/assets/698530668" \
-            --output ChatAI/Resources/Ara-Avatar.usdz
-          test -s ChatAI/Resources/Ara-Avatar.usdz
-          echo "OK: Ara-Avatar.usdz ($(wc -c < ChatAI/Resources/Ara-Avatar.usdz) bytes)"
-
-      - name: Download and inspect Lily.usdz (diagnostic only)
-        script: |
-          set -euo pipefail
-          : "${GITHUB_TOKEN:?Missing GITHUB_TOKEN in Codemagic ara_secrets group}"
-          LILY_FILE="$CM_BUILD_DIR/Lily.usdz"
-          curl --fail --location --silent --show-error --max-time 180 \
-            --header "Accept: application/vnd.github.raw" \
-            --header "Authorization: Bearer $GITHUB_TOKEN" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/tpios-tp2586/Chat-ai-tpios/contents/ChatAI/Resources/Lily.usdz?ref=main" \
-            --output "$LILY_FILE"
-          test -s "$LILY_FILE"
-          echo "=== LILY USDZ PACKAGE ==="
-          echo "Bytes: $(wc -c < "$LILY_FILE")"
-          unzip -t "$LILY_FILE"
-          echo "=== LILY USDZ STRUCTURE REPORT ==="
-          python3 -m pip install --quiet --user usd-core || true
-          PYTHONPATH="$(python3 -m site --user-site):${PYTHONPATH:-}" python3 - "$LILY_FILE" <<'PY'
-          import sys, zipfile
-          path = sys.argv[1]
-          with zipfile.ZipFile(path) as archive:
-              print("Package entries:")
-              for name in archive.namelist():
-                  info = archive.getinfo(name)
-                  print(f"  {name} ({info.file_size} bytes)")
-          try:
-              from pxr import Usd, UsdGeom, UsdSkel
-          except Exception as error:
-              print(f"USD parser unavailable; package integrity checked only: {error}")
-              raise SystemExit(0)
-          stage = Usd.Stage.Open(path)
-          if stage is None:
-              raise SystemExit("ERROR: Pixar USD could not open Lily.usdz")
-          default_prim = stage.GetDefaultPrim()
-          print(f"Default prim: {default_prim.GetPath() if default_prim else 'none'}")
-          print(f"Time codes: {stage.GetStartTimeCode()}..{stage.GetEndTimeCode()} @ {stage.GetTimeCodesPerSecond()} fps")
-          meshes = skeletons = animations = 0
-          for prim in stage.Traverse():
-              if prim.IsA(UsdGeom.Mesh):
-                  meshes += 1
-                  mesh = UsdGeom.Mesh(prim)
-                  points = mesh.GetPointsAttr().Get() or []
-                  faces = mesh.GetFaceVertexCountsAttr().Get() or []
-                  print(f"MESH {prim.GetPath()}: vertices={len(points)} faces={len(faces)}")
-                  for attr_name in ("primvars:skel:jointIndices", "primvars:skel:jointWeights", "skel:skeleton"):
-                      attr = prim.GetAttribute(attr_name)
-                      if attr and attr.IsValid():
-                          print(f"  {attr_name}: present")
-              if prim.IsA(UsdSkel.Skeleton):
-                  skeletons += 1
-                  skel = UsdSkel.Skeleton(prim)
-                  joints = [str(x) for x in (skel.GetJointsAttr().Get() or [])]
-                  print(f"SKELETON {prim.GetPath()}: joints={len(joints)}")
-                  print("  jointNames: " + ", ".join(joints))
-              if prim.IsA(UsdSkel.Animation):
-                  animations += 1
-                  anim = UsdSkel.Animation(prim)
-                  joints = anim.GetJointsAttr().Get() or []
-                  print(f"ANIMATION {prim.GetPath()}: joints={len(joints)}")
-                  for label, attr in (("translations", anim.GetTranslationsAttr()), ("rotations", anim.GetRotationsAttr()), ("scales", anim.GetScalesAttr()), ("blendShapeWeights", anim.GetBlendShapeWeightsAttr())):
-                      print(f"  {label}: samples={len(attr.GetTimeSamples())}")
-              if prim.GetTypeName() == "BlendShape":
-                  print(f"BLENDSHAPE {prim.GetPath()}")
-          print(f"TOTAL meshes={meshes} skeletons={skeletons} skeletalAnimations={animations}")
-          PY
-          echo "=== END LILY DIAGNOSTIC ==="
+          test -s ChatAI/Resources/Lily.usdz
+          unzip -tq ChatAI/Resources/Lily.usdz
+          echo "OK: Lily.usdz is present in app resources ($(wc -c < ChatAI/Resources/Lily.usdz) bytes)"
 
       - name: Generate app icon
         script: |
