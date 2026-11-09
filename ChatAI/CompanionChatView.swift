@@ -3,7 +3,6 @@ import SwiftUI
 
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
-    let speakReply: (String, VoiceGender) -> Void
     @Environment(\.dismiss) private var dismiss
     @StateObject private var liveManager = LiveVoiceManager()
 
@@ -20,8 +19,7 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
-    @State private var previousAutoSpeakReplies: Bool?
-    @State private var previousSpeakReply: ((String, VoiceGender) -> Void)?
+    @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -89,9 +87,6 @@ struct CompanionChatView: View {
         .onChange(of: liveManager.lines.last?.text) { _ in
             handleLatestTranscript()
         }
-        .onChange(of: viewModel.messages.count) { _ in
-            message = viewModel.messages.last?.content
-        }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if speaking {
@@ -125,22 +120,8 @@ struct CompanionChatView: View {
                 }
             }
         }
-        .onAppear {
-            previousAutoSpeakReplies = viewModel.autoSpeakReplies
-            previousSpeakReply = viewModel.onSpeakReply
-            viewModel.autoSpeakReplies = true
-            viewModel.onSpeakReply = { text, gender in
-                addDiagnostic("[TTS] Bắt đầu đọc câu trả lời bằng VoiceManager")
-                speakReply(text, gender)
-            }
-            addDiagnostic("[TTS] VoiceManager callback đã được gắn")
-        }
         .onDisappear {
             liveManager.end()
-            if let previousAutoSpeakReplies {
-                viewModel.autoSpeakReplies = previousAutoSpeakReplies
-            }
-            viewModel.onSpeakReply = previousSpeakReply
         }
     }
 
@@ -245,7 +226,7 @@ struct CompanionChatView: View {
 
     private var controls: some View {
         HStack(spacing: 10) {
-            TextField("Nhập tin nhắn cho Lily…", text: $viewModel.inputText, axis: .vertical)
+            TextField("Nhập tin nhắn cho Lily…", text: $typedMessage, axis: .vertical)
                 .font(.subheadline)
                 .lineLimit(1...4)
                 .padding(.horizontal, 14)
@@ -265,8 +246,8 @@ struct CompanionChatView: View {
                     .frame(width: 46, height: 46)
                     .background(activeTheme.accent, in: Circle())
             }
-            .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending)
-            .opacity(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending ? 0.45 : 1)
+            .disabled(typedMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(typedMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -274,13 +255,16 @@ struct CompanionChatView: View {
     }
 
     private func sendTypedMessage() {
-        guard !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !viewModel.isSending else { return }
-        liveManager.end()
-        viewModel.autoSpeakReplies = true
-        addDiagnostic("[VOICE] Live session stopped before typed message")
-        addDiagnostic("[TEXT] Sending via \(viewModel.selectedProvider.rawValue); TTS callback=\(viewModel.onSpeakReply != nil)")
-        viewModel.send()
+        let text = typedMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        guard liveManager.sendText(text) else {
+            message = "Anh chạm vào Lily để kết nối Gemini Live trước nhé."
+            addDiagnostic("[TEXT] Chưa gửi: Gemini Live chưa ở trạng thái kết nối")
+            return
+        }
+        typedMessage = ""
+        message = text
+        addDiagnostic("[TEXT] Đã gửi văn bản trực tiếp vào phiên Gemini Live")
     }
 
     private func toggleConversation() {
