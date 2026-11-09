@@ -19,6 +19,7 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
+    @State private var previousAutoSpeakReplies: Bool?
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -33,9 +34,11 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            LilyAvatarView { log in
+                            LilyAvatarView(onLog: { log in
                                 addDiagnostic(log)
-                            }
+                            }, onTap: {
+                                toggleConversation()
+                            })
 
                         }
                         .frame(
@@ -117,8 +120,15 @@ struct CompanionChatView: View {
                 }
             }
         }
+        .onAppear {
+            previousAutoSpeakReplies = viewModel.autoSpeakReplies
+            viewModel.autoSpeakReplies = true
+        }
         .onDisappear {
             liveManager.end()
+            if let previousAutoSpeakReplies {
+                viewModel.autoSpeakReplies = previousAutoSpeakReplies
+            }
         }
     }
 
@@ -222,56 +232,56 @@ struct CompanionChatView: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 12) {
-            Button {
-                if liveManager.state == .idle {
-                    startLive()
-                } else {
-                    liveManager.end()
+        HStack(spacing: 10) {
+            TextField("Nhập tin nhắn cho Lily…", text: $viewModel.inputText, axis: .vertical)
+                .font(.subheadline)
+                .lineLimit(1...4)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(activeTheme.accent.opacity(0.24), lineWidth: 1)
                 }
-            } label: {
-                Image(systemName: liveManager.state == .idle ? "mic.fill" : "stop.fill")
-                    .frame(width: 52, height: 52)
-                    .background(activeTheme.surface, in: Circle())
-                    .overlay(Circle().stroke(activeTheme.accent.opacity(0.24), lineWidth: 1))
-            }
+                .submitLabel(.send)
+                .onSubmit(sendTypedMessage)
 
-            Button {
-                if liveManager.state == .idle {
-                    startLive()
-                }
-            } label: {
-                Label(
-                    liveManager.state == .live
-                        ? (liveManager.aiSpeaking ? "AI đang nói..." : "Đang nghe anh")
-                        : (liveManager.state == .connecting ? "Đang kết nối..." : "Tiếp tục chat"),
-                    systemImage: "waveform"
-                )
-                .font(.subheadline.weight(.bold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .foregroundStyle(.white)
-                .background(
-                    LinearGradient(
-                        colors: [activeTheme.accent, activeTheme.accent.opacity(0.78)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: Capsule()
-                )
+            Button(action: sendTypedMessage) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 46, height: 46)
+                    .background(activeTheme.accent, in: Circle())
             }
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .frame(width: 52, height: 52)
-                    .background(Color.red.opacity(0.85), in: Circle())
-            }
+            .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending)
+            .opacity(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSending ? 0.45 : 1)
         }
-        .foregroundStyle(.white)
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .background(activeTheme.background.opacity(0.96))
     }
 
+    private func sendTypedMessage() {
+        guard !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !viewModel.isSending else { return }
+        if liveManager.state != .idle {
+            liveManager.end()
+            addDiagnostic("[VOICE] Ended live mic session before typed message")
+        }
+        addDiagnostic("[TEXT] Sending typed message; voice reply enabled")
+        viewModel.send()
+    }
+
+    private func toggleConversation() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if liveManager.state == .idle {
+            addDiagnostic("[VOICE] Avatar tapped: starting voice conversation")
+            startLive()
+        } else {
+            addDiagnostic("[VOICE] Avatar tapped: ending voice conversation")
+            liveManager.end()
+        }
+    }
     private func startLive() {
         liveManager.start(
             model: liveModel,
