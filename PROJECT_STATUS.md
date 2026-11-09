@@ -10,7 +10,7 @@
 - Skeletal/facial animation playback remains disabled pending on-device validation.
 - Avatar scale target reduced from 1.45 to 0.55 world units; zoom uses a fresh v3 preference so earlier saved zoom values cannot override the new default. Runtime logs include measured bounds and applied scale.
 - Tap Lily to start or end the Gemini Live voice conversation.
-- Chat Voice uses Gemini Live as its only conversation engine for both microphone speech and typed text. Typed text is sent through the active Live WebSocket as `realtimeInput.text`; the same Live session generates the spoken audio response (`responseModalities: AUDIO`).
+- Chat Voice uses Gemini Live as its only conversation engine for both microphone speech and typed text. Typed text is sent through the active Live WebSocket as a history-preserving `clientContent` user turn with `turnComplete: true`; the same Live session generates the spoken audio response (`responseModalities: AUDIO`).
 - Typed messages are accepted only after the user taps Lily and Gemini Live reaches `.live`; the input is added to the on-screen transcript and sent directly to that session. No provider chat API, Azure TTS, or iOS TTS is used in Chat Voice.
 - Existing diagnostic log and copy button are retained.
 
