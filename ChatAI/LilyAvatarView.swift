@@ -97,12 +97,15 @@ private struct LilyRealityView: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
-        onLog("[LILY DEBUG] ARView created; frame=\(view.bounds.size)")
         attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         return view
     }
 
     func updateUIView(_ view: ARView, context: Context) {
+        if !context.coordinator.didLogLayout, view.bounds.width > 0, view.bounds.height > 0 {
+            onLog("[LILY DEBUG] ARView layout size=\(view.bounds.size)")
+            context.coordinator.didLogLayout = true
+        }
         if context.coordinator.currentEntity !== entity {
             attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         } else {
@@ -176,5 +179,6 @@ private struct LilyRealityView: UIViewRepresentable {
         var basePosition = SIMD3<Float>(repeating: 0)
         var currentZoom: Float = 1
         var currentRotationY: Float = 0
+        var didLogLayout = false
     }
 }
