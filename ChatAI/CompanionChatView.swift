@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CompanionChatView: View {
     @ObservedObject var viewModel: ChatViewModel
+    let speakReply: (String, VoiceGender) -> Void
     @Environment(\.dismiss) private var dismiss
     @StateObject private var liveManager = LiveVoiceManager()
 
@@ -20,6 +21,7 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var message: String?
     @State private var previousAutoSpeakReplies: Bool?
+    @State private var previousSpeakReply: ((String, VoiceGender) -> Void)?
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
@@ -125,13 +127,20 @@ struct CompanionChatView: View {
         }
         .onAppear {
             previousAutoSpeakReplies = viewModel.autoSpeakReplies
+            previousSpeakReply = viewModel.onSpeakReply
             viewModel.autoSpeakReplies = true
+            viewModel.onSpeakReply = { text, gender in
+                addDiagnostic("[TTS] Bắt đầu đọc câu trả lời bằng VoiceManager")
+                speakReply(text, gender)
+            }
+            addDiagnostic("[TTS] VoiceManager callback đã được gắn")
         }
         .onDisappear {
             liveManager.end()
             if let previousAutoSpeakReplies {
                 viewModel.autoSpeakReplies = previousAutoSpeakReplies
             }
+            viewModel.onSpeakReply = previousSpeakReply
         }
     }
 
@@ -267,11 +276,10 @@ struct CompanionChatView: View {
     private func sendTypedMessage() {
         guard !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !viewModel.isSending else { return }
-        if liveManager.state != .idle {
-            liveManager.end()
-            addDiagnostic("[VOICE] Ended live mic session before typed message")
-        }
-        addDiagnostic("[TEXT] Sending typed message; voice reply enabled")
+        liveManager.end()
+        viewModel.autoSpeakReplies = true
+        addDiagnostic("[VOICE] Live session stopped before typed message")
+        addDiagnostic("[TEXT] Sending via \(viewModel.selectedProvider.rawValue); TTS callback=\(viewModel.onSpeakReply != nil)")
         viewModel.send()
     }
 
