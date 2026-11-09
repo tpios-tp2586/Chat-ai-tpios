@@ -759,8 +759,15 @@ final class LiveVoiceManager: ObservableObject {
         lines.append(Line(role: .user, text: trimmed))
         openUser = nil
         faceExpression = .thinking
-        socket.send(["realtimeInput": ["text": trimmed]])
-        note("Đã gửi văn bản vào Gemini Live realtimeInput")
+        socket.send([
+            "clientContent": [
+                "turns": [
+                    ["role": "user", "parts": [["text": trimmed]]]
+                ],
+                "turnComplete": true
+            ]
+        ])
+        note("Đã gửi text turn vào lịch sử hội thoại Gemini Live")
         return true
     }
 
