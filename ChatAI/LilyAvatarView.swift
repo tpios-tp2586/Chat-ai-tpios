@@ -7,7 +7,7 @@ struct LilyAvatarView: View {
     let onTap: () -> Void
 
     @StateObject private var loader = LilyAvatarLoader()
-    @AppStorage("lily_avatar_zoom_scale_v4") private var savedZoomScale = 1.0
+    @AppStorage("lily_avatar_zoom_scale_v5") private var savedZoomScale = 1.0
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
@@ -185,7 +185,7 @@ private struct LilyRealityView: UIViewRepresentable {
 
         // Fit relative to the imported root scale; do not discard the USDZ's 0.01 root transform.
         let importedRootScale = model.scale
-        let targetHeight: Float = 1.4
+        let targetHeight: Float = 6.45
         let fitMultiplier: Float = (height.isFinite && height > 0.1) ? targetHeight / height : 0.3
         logDeferred("[LILY TEST SCALE] measuredHeight=\(height), targetHeight=\(targetHeight), fitMultiplier=\(fitMultiplier), importedRootScale=\(importedRootScale), fittedRootScale=\(importedRootScale * fitMultiplier), savedZoom=\(zoomScale)")
         coordinator.baseScale = importedRootScale * fitMultiplier
