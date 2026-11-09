@@ -8,10 +8,10 @@
 - USD structure report: 24 meshes, 1 skeleton, 97 joints, skin joint indices/weights, 1 skeletal animation.
 - Scene time codes are 0.0..0.0; animation has two transform samples; no BlendShape weights were reported.
 - Skeletal/facial animation playback remains disabled pending on-device validation.
-- Avatar scale now fits the complete model bounds; zoom uses a fresh v2 preference to avoid the old oversized saved zoom.
+- Avatar scale target reduced from 1.45 to 0.55 world units; zoom uses a fresh v3 preference so earlier saved zoom values cannot override the new default. Runtime logs include measured bounds and applied scale.
 - Tap Lily to start or end the Gemini Live voice conversation.
-- Text composer sends through the selected chat provider; Chat Voice temporarily enables the existing auto-speak callback so AI replies are spoken. The previous global auto-speak setting is restored when leaving Chat Voice.
-- Sending a typed message ends an active microphone session first to avoid overlapping audio sessions.
+- Text composer sends through the selected chat provider. Chat Voice explicitly injects the existing VoiceManager TTS callback, enables auto-speak for typed replies, and restores the previous callback and setting when leaving.
+- Sending a typed message always tears down the Gemini Live session before provider chat; the reply is routed to VoiceManager TTS, not the Gemini Live audio stream. Diagnostic log records the selected provider and TTS callback invocation.
 - Existing diagnostic log and copy button are retained.
 
 ### Build pipeline
@@ -28,6 +28,6 @@
 ### Next validation
 1. Build and install the IPA.
 2. Confirm full Lily model framing and tap-to-start/stop voice call.
-3. Send a typed message and confirm the selected provider replies through the existing voice output.
+3. Send a typed message and confirm the selected provider replies through VoiceManager TTS (Azure when configured, otherwise iOS Vietnamese speech fallback); logs should show [TEXT] and [TTS].
 4. Confirm the prior Auto Speak setting is restored after leaving Chat Voice.
 5. Check diagnostic logs for [LILY], [TEXT], and [VOICE] entries.
