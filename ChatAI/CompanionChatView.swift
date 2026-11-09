@@ -22,17 +22,6 @@ struct CompanionChatView: View {
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
 
-    private var araEmotion: AraEmotion {
-        switch emotion {
-        case .speaking:          return .speaking
-        case .listening:         return .listening
-        case .thinking:          return .thinking
-        case .happy:             return .happy
-        case .surprised:         return .surprised
-        case .sad:               return .empathy
-        case .idle, .confused, .angry, .sleepy: return .idle
-        }
-    }
 
     var body: some View {
         ZStack {
@@ -44,7 +33,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AraAvatarView(emotion: araEmotion) { log in
+                            LilyAvatarView { log in
                                 addDiagnostic(log)
                             }
 
@@ -102,7 +91,7 @@ struct CompanionChatView: View {
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
-                    // Speech updates this status label only; Ara remains static.
+                    // Speech updates this status label only; Lily is currently displayed without facial animation.
                     if emotion == .idle || emotion == .listening || emotion == .thinking {
                         emotion = .speaking
                     }
@@ -181,7 +170,7 @@ struct CompanionChatView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Log chẩn đoán Chat Voice").font(.headline)
-                Text("Ghi trạng thái giọng nói và tải mô hình Ara. Không ghi API key.")
+                Text("Ghi trạng thái giọng nói và tải mô hình Lily. Không ghi API key.")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView {
                     Text(diagnosticLogs.joined(separator: "\n"))
