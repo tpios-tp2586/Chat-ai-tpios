@@ -1,33 +1,30 @@
 # Chat AI TPios — Project Status
 
-## Ara Avatar — Trạng thái hiện tại (2026-11-07)
+## Chat Voice avatar — Lily (2026-11-09)
 
-### Kiến trúc hiện tại
-- Load `Ara-Avatar.usdz` một lần duy nhất từ bundle
-- `availableAnimations` trả về 27 clips — dùng index để play
-- `stopAllAnimations()` sau khi load, trước khi phát Idle
-- Emotion system: idle → listening → thinking → speaking (wave+talk loop) → happy/surprised/empathy
-
-### Index clip đã xác nhận (batch-30 test, ara-avatar-v5)
-- 0=Idle, 1=Wave, 2=Talk, 3=TalkExplain, 4=AraListening, 5=AraThinking
-- 6=AraEmpathy, 7=AraLaugh, 8=Walk, 9=Run ... 27=Cheer
-
-### Vấn đề cần xác nhận sau build
-1. `stopAllAnimations()` có block được USDZ autoplay không
-2. Index 0–7 và 27 có đúng clip không (log `[ARA] play[N] Name`)
-3. Ara đứng im lúc không trò chuyện
-4. Ara chạy đúng clip khi trò chuyện
-
-### Files không được đụng
-- `LiveVoice.swift`, `ChatViewModel.swift`, `Services.swift`
-- audio pipeline, chat history, Text Chat, Chibi Chat
+### Current implementation
+- Chat Voice now uses `LilyAvatarView` and loads `Lily.usdz` from `ChatAI/Resources`.
+- Lily USDZ package integrity passed: 11,210,261 bytes.
+- USD structure report: 24 meshes, 1 skeleton, 97 joints, skin joint indices/weights, 1 skeletal animation.
+- The scene reports time codes 0.0..0.0 and the animation has two transform samples.
+- No BlendShape prims or blendShape weight samples were reported.
+- Facial animation and skeletal animation playback are intentionally disabled pending on-device validation.
+- Lily load success/failure is written to the existing Chat Voice diagnostic log.
+- Zoom and rotation gestures are retained.
 
 ### Build pipeline
-- Codemagic download `Ara-Avatar.usdz` từ release `ara-avatar-v5`
-- Validate bằng `inspect-ara-usdz-animation.py`
-- Xcode build → IPA unsigned
+- Codemagic validates `ChatAI/Resources/Lily.usdz` already present in the repository.
+- Codemagic no longer downloads or bundles Ara.
+- XcodeGen includes `ChatAI/Resources` as app resources.
+- Build output remains unsigned IPA only.
 
-### Commit gần nhất
-- `2628b92` — load single USDZ, index-based clip playback
-- `9c7da2e` — codemagic.yaml reverted + allowed split-ara-clips.py
-- `f52cf2c` — codemagic.yaml reverted về 23a38c0 (working build)
+### Protected functionality
+- Do not modify `LiveVoice.swift`, `ChatViewModel.swift`, or `Services.swift`.
+- Preserve audio pipeline, chat history, Text Chat, and Chibi Chat.
+- Keep the Chat Voice diagnostic log and copy-log button.
+
+### Next validation
+1. Build and install the IPA.
+2. Confirm Lily appears with correct materials, eyes, hair, scale, and orientation.
+3. Inspect Chat Voice logs for `[LILY] loaded` or `[LILY ERROR]`.
+4. Only after visual validation, investigate supported joint animation and facial-expression options. Do not reuse Ara clip indices.
