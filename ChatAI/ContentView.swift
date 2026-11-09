@@ -123,7 +123,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showCompanion) {
-            CompanionChatView(viewModel: viewModel)
+            CompanionChatView()
         }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
         .sheet(isPresented: $showMemory) { MemoryView() }
