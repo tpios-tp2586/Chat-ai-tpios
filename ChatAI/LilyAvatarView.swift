@@ -105,11 +105,11 @@ private struct LilyRealityView: UIViewRepresentable {
 
     func updateUIView(_ view: ARView, context: Context) {
         if !context.coordinator.didLogUpdate {
-            logDeferred("[LILY DEBUG] updateUIView entered; bounds=\(view.bounds.size)")
+            logDeferred("[LILY DEBUG] updateUIView entered; bounds=\\(view.bounds.size)")
             context.coordinator.didLogUpdate = true
         }
         if !context.coordinator.didLogLayout, view.bounds.width > 0, view.bounds.height > 0 {
-            logDeferred("[LILY DEBUG] ARView layout size=\(view.bounds.size)")
+            logDeferred("[LILY DEBUG] ARView layout size=\\(view.bounds.size)")
             context.coordinator.didLogLayout = true
         }
         if context.coordinator.currentEntity !== entity {
@@ -124,7 +124,11 @@ private struct LilyRealityView: UIViewRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator {    private func logDeferred(_ message: String) {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    private func logDeferred(_ message: String) {
         let callback = onLog
         DispatchQueue.main.async {
             callback(message)
@@ -138,49 +142,51 @@ private struct LilyRealityView: UIViewRepresentable {
         to view: ARView,
         coordinator: Coordinator
     ) {
-        // Inspect the imported hierarchy before changing enabled flags or transforms.
-        logDeferred("[LILY DEBUG] attach entered; original root position=\(model.position), scale=\(model.scale), children=\(model.children.count), enabled=\(model.isEnabled)")
+        logDeferred("[LILY DEBUG] attach entered; original root position=\\(model.position), scale=\\(model.scale), children=\\(model.children.count), enabled=\\(model.isEnabled)")
         var inspectedNodes = 0
         var meshNodes = 0
         var originallyDisabledNodes = 0
+
         func inspectHierarchy(_ node: Entity, path: String, depth: Int) {
             guard inspectedNodes < 180 else { return }
             inspectedNodes += 1
             let wasEnabled = node.isEnabled
             if !wasEnabled { originallyDisabledNodes += 1 }
-            let hasMesh = node.components[ModelComponent.self] != nil
-            if hasMesh {
+
+            if node.components[ModelComponent.self] != nil {
                 meshNodes += 1
                 let localBounds = node.visualBounds(recursive: false, relativeTo: model)
                 let worldBounds = node.visualBounds(recursive: false, relativeTo: nil)
-                logDeferred("[LILY MESH] path=\(path), name=\(node.name), enabledBeforeForce=\(wasEnabled), position=\(node.position), scale=\(node.scale), localCenter=\(localBounds.center), localExtents=\(localBounds.extents), worldCenter=\(worldBounds.center), worldExtents=\(worldBounds.extents)")
+                logDeferred("[LILY MESH] path=\\(path), name=\\(node.name), enabledBeforeForce=\\(wasEnabled), position=\\(node.position), scale=\\(node.scale), localCenter=\\(localBounds.center), localExtents=\\(localBounds.extents), worldCenter=\\(worldBounds.center), worldExtents=\\(worldBounds.extents)")
             } else if depth <= 2 {
-                logDeferred("[LILY NODE] path=\(path), name=\(node.name), enabledBeforeForce=\(wasEnabled), position=\(node.position), scale=\(node.scale), children=\(node.children.count)")
+                logDeferred("[LILY NODE] path=\\(path), name=\\(node.name), enabledBeforeForce=\\(wasEnabled), position=\\(node.position), scale=\\(node.scale), children=\\(node.children.count)")
             }
+
             for (index, child) in node.children.enumerated() {
-                inspectHierarchy(child, path: "\(path)/\(index)", depth: depth + 1)
+                inspectHierarchy(child, path: "\\(path)/\\(index)", depth: depth + 1)
             }
         }
-        inspectHierarchy(model, path: "root", depth: 0)
-        logDeferred("[LILY DEBUG] imported hierarchy: inspectedNodes=\(inspectedNodes), meshNodes=\(meshNodes), originallyDisabledNodes=\(originallyDisabledNodes), rootChildren=\(model.children.count)")
 
-        func enableAll(_ entity: Entity) {
-            entity.isEnabled = true
-            for child in entity.children { enableAll(child) }
+        inspectHierarchy(model, path: "root", depth: 0)
+        logDeferred("[LILY DEBUG] imported hierarchy: inspectedNodes=\\(inspectedNodes), meshNodes=\\(meshNodes), originallyDisabledNodes=\\(originallyDisabledNodes), rootChildren=\\(model.children.count)")
+
+        func enableAll(_ node: Entity) {
+            node.isEnabled = true
+            for child in node.children { enableAll(child) }
         }
         enableAll(model)
         logDeferred("[LILY DEBUG] hierarchy enabled after inspection")
 
         let bounds = model.visualBounds(recursive: true, relativeTo: nil)
         let localBounds = model.visualBounds(recursive: true, relativeTo: model)
-        logDeferred("[LILY DEBUG] pre-fit world bounds center=\(bounds.center), extents=\(bounds.extents)")
-        logDeferred("[LILY DEBUG] pre-fit local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
+        logDeferred("[LILY DEBUG] pre-fit world bounds center=\\(bounds.center), extents=\\(bounds.extents)")
+        logDeferred("[LILY DEBUG] pre-fit local bounds center=\\(localBounds.center), extents=\\(localBounds.extents)")
         let height = bounds.extents.y
 
-        // Temporary diagnostic fit: reduce the target character height from 0.55m to 0.32m.
+        // Temporary diagnostic fit: target a smaller 0.32-world-unit character height.
         let targetHeight: Float = 0.32
         let baseScale: Float = (height.isFinite && height > 0.1) ? targetHeight / height : 0.3
-        logDeferred("[LILY TEST SCALE] measuredHeight=\(height), targetHeight=\(targetHeight), baseScale=\(baseScale), savedZoom=\(zoomScale)")
+        logDeferred("[LILY TEST SCALE] measuredHeight=\\(height), targetHeight=\\(targetHeight), baseScale=\\(baseScale), savedZoom=\\(zoomScale)")
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = SIMD3<Float>(
             -bounds.center.x * baseScale,
@@ -199,10 +205,7 @@ private struct LilyRealityView: UIViewRepresentable {
         applyZoom(zoomScale, to: model, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
 
-        logDeferred("[LILY DEBUG] applied transform: modelPosition=\(model.position), modelScale=\(model.scale), anchorPosition=\(anchorPosition), viewport=\(view.bounds.size)")
-    }
-
-ordinator)
+        logDeferred("[LILY DEBUG] applied transform: modelPosition=\\(model.position), modelScale=\\(model.scale), anchorPosition=\\(anchorPosition), viewport=\\(view.bounds.size)")
     }
 
     private func applyZoom(_ zoom: Float, to model: Entity, coordinator: Coordinator) {
