@@ -2,7 +2,6 @@ import UIKit
 import SwiftUI
 
 struct CompanionChatView: View {
-    @ObservedObject var viewModel: ChatViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var liveManager = LiveVoiceManager()
 
@@ -54,7 +53,6 @@ struct CompanionChatView: View {
 
                             Text(
                                 message
-                                ?? viewModel.messages.last(where: { $0.role == .assistant })?.content
                                 ?? "Chào anh! Mình trò chuyện nhé."
                             )
                             .font(.subheadline)
@@ -142,7 +140,7 @@ struct CompanionChatView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("ChatAI Companion")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                Text(viewModel.selectedProvider.rawValue)
+                Text("Gemini Live")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -258,7 +256,9 @@ struct CompanionChatView: View {
         let text = typedMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         guard liveManager.sendText(text) else {
-            message = "Anh chạm vào Lily để kết nối Gemini Live trước nhé."
+            message = liveManager.state == .connecting
+                ? "Gemini Live đang kết nối, anh chờ một chút nhé."
+                : "Anh chạm vào Lily để kết nối Gemini Live trước nhé."
             addDiagnostic("[TEXT] Chưa gửi: Gemini Live chưa ở trạng thái kết nối")
             return
         }
