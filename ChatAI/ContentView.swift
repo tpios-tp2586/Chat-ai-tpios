@@ -122,7 +122,13 @@ struct ContentView: View {
         .tint(activeTheme.accent)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .fullScreenCover(isPresented: $showCompanion) { CompanionChatView(viewModel: viewModel) }
+        .fullScreenCover(isPresented: $showCompanion) {
+            CompanionChatView(viewModel: viewModel) { text, gender in
+                let azureKey = KeychainHelper.read(forKey: "azure_tts_key") ?? ""
+                let azureRegion = KeychainHelper.read(forKey: "azure_tts_region") ?? ""
+                voiceManager.speak(text: text, gender: gender, azureKey: azureKey, azureRegion: azureRegion)
+            }
+        }
         .sheet(isPresented: $showHistory) { HistoryView(viewModel: viewModel) }
         .sheet(isPresented: $showMemory) { MemoryView() }
         .sheet(isPresented: $showCamera) {
