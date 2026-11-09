@@ -7,14 +7,14 @@ struct LilyAvatarView: View {
     let onTap: () -> Void
 
     @StateObject private var loader = LilyAvatarLoader()
-    @AppStorage("lily_avatar_zoom_scale_v5") private var savedZoomScale = 1.0
+    @AppStorage("lily_avatar_zoom_scale_v6") private var savedZoomScale = 2.5
     @State private var pinchStartScale = 1.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
-            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.5), 1.5) }
+            .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.7), 4.5) }
             .onEnded { _ in pinchStartScale = savedZoomScale }
     }
 
@@ -177,26 +177,21 @@ private struct LilyRealityView: UIViewRepresentable {
         enableAll(model)
         logDeferred("[LILY DEBUG] hierarchy enabled after inspection")
 
-        let bounds = model.visualBounds(recursive: true, relativeTo: nil)
+        let worldBounds = model.visualBounds(recursive: true, relativeTo: nil)
         let localBounds = model.visualBounds(recursive: true, relativeTo: model)
-        logDeferred("[LILY DEBUG] pre-fit world bounds center=\(bounds.center), extents=\(bounds.extents)")
+        logDeferred("[LILY DEBUG] pre-fit world bounds center=\(worldBounds.center), extents=\(worldBounds.extents)")
         logDeferred("[LILY DEBUG] pre-fit local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
-        let height = bounds.extents.y
 
-        // Fit relative to the imported root scale; do not discard the USDZ's 0.01 root transform.
+        // Match Ara's proven fitting method: measure in model-local space and normalize to 1.6 units.
+        let height = localBounds.extents.y
         let importedRootScale = model.scale
-        let targetHeight: Float = 6.45
-        let fitMultiplier: Float = (height.isFinite && height > 0.1) ? targetHeight / height : 0.3
-        logDeferred("[LILY TEST SCALE] measuredHeight=\(height), targetHeight=\(targetHeight), fitMultiplier=\(fitMultiplier), importedRootScale=\(importedRootScale), fittedRootScale=\(importedRootScale * fitMultiplier), savedZoom=\(zoomScale)")
-        coordinator.baseScale = importedRootScale * fitMultiplier
-        coordinator.basePosition = SIMD3<Float>(
-            -bounds.center.x * fitMultiplier,
-            -bounds.center.y * fitMultiplier,
-            -bounds.center.z * fitMultiplier
-        )
+        let baseScale: Float = (height.isFinite && height > 0) ? 1.6 / height : 1
+        logDeferred("[LILY SCALE] localHeight=\(height), targetHeight=1.6, baseScale=\(baseScale), importedRootScale=\(importedRootScale), savedZoom=\(zoomScale)")
+        coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
+        coordinator.basePosition = -localBounds.center * baseScale
         coordinator.currentEntity = model
 
-        let anchorPosition = SIMD3<Float>(0, 0, -2.0)
+        let anchorPosition = SIMD3<Float>(0, 0, -2.8)
         let anchor = AnchorEntity(world: anchorPosition)
         anchor.addChild(model)
         coordinator.rotationPivot = anchor
