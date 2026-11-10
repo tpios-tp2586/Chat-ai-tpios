@@ -6,6 +6,10 @@ workflows:
       xcode: 16.4
       cocoapods: default
     scripts:
+      - name: Clean previous build outputs
+        script: |
+          rm -rf build Payload
+          rm -f chat-ai-tpios-*.ipa build_output.txt
       - name: Check required source files
         script: |
           set -euo pipefail
@@ -72,6 +76,10 @@ workflows:
           test -s "$IPA_PATH"
           unzip -tq "$IPA_PATH"
           echo "IPA READY: $IPA_PATH ($(wc -c < "$IPA_PATH") bytes)"
+
+      - name: Remove temporary build files
+        script: |
+          rm -rf build Payload
 
     artifacts:
       - chat-ai-tpios-*.ipa
