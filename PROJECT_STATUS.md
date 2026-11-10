@@ -8,7 +8,7 @@
 - Alina's runtime mesh, skeleton, skinning, and animation details have not yet been validated on device.
 - No facial rig or blendshape requirement; current test focuses on full-body display and skeletal animation.
 - Animation playback remains disabled until Alina's imported clips are inspected and tested on device.
-- Alina uses the existing bounds-based auto-fit method: measure `visualBounds` in model-local coordinates, normalize height to 1.6 units, center using the local bounds, and place the anchor at Z=-2.8.
+- Alina uses bounds-based auto-fit: measure `visualBounds` in model-local coordinates, normalize body height to 1.45 units, place the feet at Y=0, and set the anchor to the negative half-height so the body midpoint is centered vertically; anchor depth remains Z=-2.8.
 - Zoom now scales a dedicated child pivot around the fitted model center instead of scaling the model root position during every pinch. Alina zoom storage is v1 (default 2.5) to reset the previously persisted 4.5 value; pinch range remains 0.7–4.5. Validate full-body framing and zoom centering on device.
 - Tap Alina to start or end the Gemini Live voice conversation.
 - Chat Voice uses Gemini Live as its only conversation engine for both microphone speech and typed text. Typed text is sent through the active Live WebSocket as a history-preserving `clientContent` user turn with `turnComplete: true`; the same Live session generates the spoken audio response (`responseModalities: AUDIO`).
