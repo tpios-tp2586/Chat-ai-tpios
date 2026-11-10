@@ -9,7 +9,11 @@ struct AlinaAvatarView: View {
 
     @StateObject private var loader = AlinaAvatarLoader()
     @AppStorage("alina_avatar_zoom_scale_v1") private var savedZoomScale = 2.5
+    @AppStorage("alina_avatar_position_x_v1") private var savedOffsetX = 0.0
+    @AppStorage("alina_avatar_position_y_v1") private var savedOffsetY = 0.0
     @State private var pinchStartScale = 1.0
+    @State private var dragStartOffsetX = 0.0
+    @State private var dragStartOffsetY = 0.0
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
@@ -19,16 +23,28 @@ struct AlinaAvatarView: View {
             .onEnded { _ in pinchStartScale = savedZoomScale }
     }
 
-    private var rotationGesture: some Gesture {
+    private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 4)
-            .onChanged { rotationY = dragStartRotation + Float($0.translation.width) * (.pi / 360) }
+            .onChanged {
+                savedOffsetX = min(max(dragStartOffsetX + Double($0.translation.width) * 0.005, -1.2), 1.2)
+                savedOffsetY = min(max(dragStartOffsetY - Double($0.translation.height) * 0.005, -1.2), 1.2)
+            }
+            .onEnded { _ in
+                dragStartOffsetX = savedOffsetX
+                dragStartOffsetY = savedOffsetY
+            }
+    }
+
+    private var rotationGesture: some Gesture {
+        RotationGesture()
+            .onChanged { rotationY = dragStartRotation + Float($0.radians) }
             .onEnded { _ in dragStartRotation = rotationY }
     }
 
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                AlinaRealityView(entity: entity, isSpeaking: isSpeaking, zoomScale: Float(savedZoomScale), rotationY: rotationY, onLog: onLog)
+                AlinaRealityView(entity: entity, isSpeaking: isSpeaking, zoomScale: Float(savedZoomScale), rotationY: rotationY, offsetX: Float(savedOffsetX), offsetY: Float(savedOffsetY), onLog: onLog)
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -41,11 +57,14 @@ struct AlinaAvatarView: View {
             }
         }
         .contentShape(Rectangle())
+        .simultaneousGesture(moveGesture)
         .simultaneousGesture(zoomGesture)
         .simultaneousGesture(rotationGesture)
         .simultaneousGesture(TapGesture().onEnded { onTap() })
         .task {
             pinchStartScale = savedZoomScale
+            dragStartOffsetX = savedOffsetX
+            dragStartOffsetY = savedOffsetY
             loader.onLog = onLog
             loader.load()
         }
@@ -99,13 +118,15 @@ private struct AlinaRealityView: UIViewRepresentable {
     let isSpeaking: Bool
     let zoomScale: Float
     let rotationY: Float
+    let offsetX: Float
+    let offsetY: Float
     let onLog: (String) -> Void
 
     func makeUIView(context: Context) -> ARView {
         logDeferred("[ALINA DEBUG] makeUIView entered")
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
-        attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
+        attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
         return view
     }
 
@@ -119,7 +140,7 @@ private struct AlinaRealityView: UIViewRepresentable {
             context.coordinator.didLogLayout = true
         }
         if context.coordinator.currentEntity !== entity {
-            attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
+            attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
         } else {
             if context.coordinator.lastIsSpeaking != isSpeaking {
                 if isSpeaking {
@@ -134,6 +155,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             }
             if context.coordinator.currentRotationY != rotationY {
                 applyRotation(rotationY, coordinator: context.coordinator)
+            }
+            if context.coordinator.currentOffsetX != offsetX || context.coordinator.currentOffsetY != offsetY {
+                applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: context.coordinator)
             }
         }
     }
@@ -154,6 +178,8 @@ private struct AlinaRealityView: UIViewRepresentable {
         isSpeaking: Bool,
         zoomScale: Float,
         rotationY: Float,
+        offsetX: Float,
+        offsetY: Float,
         to view: ARView,
         coordinator: Coordinator
     ) {
@@ -215,7 +241,9 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         // Put the model's midpoint at the viewport center; do not add an upward offset.
         let midBodyY = targetHeight / 2.0
-        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY - targetHeight * 0.48 - 0.10, -2.8))
+        let anchorPosition = SIMD3<Float>(0, -midBodyY - targetHeight * 0.48 - 0.10, -2.8)
+        let anchor = AnchorEntity(world: anchorPosition)
+        coordinator.baseAnchorPosition = anchorPosition
         let zoomPivot = Entity()
         zoomPivot.addChild(model)
         model.position = coordinator.basePosition
@@ -267,6 +295,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         applyZoom(zoomScale, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
+        applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: coordinator)
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
     }
 
@@ -297,6 +326,13 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.currentRotationY = rotation
     }
 
+    private func applyPosition(offsetX: Float, offsetY: Float, coordinator: Coordinator) {
+        guard let anchor = coordinator.rotationPivot else { return }
+        anchor.position = coordinator.baseAnchorPosition + SIMD3<Float>(offsetX, offsetY, 0)
+        coordinator.currentOffsetX = offsetX
+        coordinator.currentOffsetY = offsetY
+    }
+
     final class Coordinator {
         var currentEntity: Entity?
         var animationController: AnimationPlaybackController?
@@ -305,8 +341,11 @@ private struct AlinaRealityView: UIViewRepresentable {
         var zoomPivot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
         var basePosition = SIMD3<Float>(repeating: 0)
+        var baseAnchorPosition = SIMD3<Float>(repeating: 0)
         var currentZoom: Float = 1
         var currentRotationY: Float = 0
+        var currentOffsetX: Float = 0
+        var currentOffsetY: Float = 0
         var didLogLayout = false
         var didLogUpdate = false
     }
