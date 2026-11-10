@@ -3,6 +3,7 @@ import RealityKit
 import SwiftUI
 
 struct AlinaAvatarView: View {
+    let isSpeaking: Bool
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -27,7 +28,7 @@ struct AlinaAvatarView: View {
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                AlinaRealityView(entity: entity, zoomScale: Float(savedZoomScale), rotationY: rotationY, onLog: onLog)
+                AlinaRealityView(entity: entity, isSpeaking: isSpeaking, zoomScale: Float(savedZoomScale), rotationY: rotationY, onLog: onLog)
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -95,6 +96,7 @@ private final class AlinaAvatarLoader: ObservableObject {
 
 private struct AlinaRealityView: UIViewRepresentable {
     let entity: Entity
+    let isSpeaking: Bool
     let zoomScale: Float
     let rotationY: Float
     let onLog: (String) -> Void
@@ -103,7 +105,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         logDeferred("[ALINA DEBUG] makeUIView entered")
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
-        attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
+        attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         return view
     }
 
@@ -117,8 +119,16 @@ private struct AlinaRealityView: UIViewRepresentable {
             context.coordinator.didLogLayout = true
         }
         if context.coordinator.currentEntity !== entity {
-            attach(entity, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
+            attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, to: view, coordinator: context.coordinator)
         } else {
+            if context.coordinator.lastIsSpeaking != isSpeaking {
+                if isSpeaking {
+                    context.coordinator.animationController?.resume()
+                } else {
+                    context.coordinator.animationController?.pause()
+                }
+                context.coordinator.lastIsSpeaking = isSpeaking
+            }
             if context.coordinator.currentZoom != zoomScale {
                 applyZoom(zoomScale, coordinator: context.coordinator)
             }
@@ -141,6 +151,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
     private func attach(
         _ model: Entity,
+        isSpeaking: Bool,
         zoomScale: Float,
         rotationY: Float,
         to view: ARView,
@@ -226,8 +237,9 @@ private struct AlinaRealityView: UIViewRepresentable {
                     let clip = skin.availableAnimations[testClipIndex]
                     let definition = clip.definition
                     let loopingClip = clip.repeat(duration: .infinity)
-                    let controller = skin.playAnimation(loopingClip, transitionDuration: 0.25, startsPaused: false)
+                    let controller = skin.playAnimation(loopingClip, transitionDuration: 0.25, startsPaused: !isSpeaking)
                     coordinator.animationController = controller
+                    coordinator.lastIsSpeaking = isSpeaking
                     let controllerEntity = controller.entity
                     logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=\(testClipIndex); name=\(clip.name ?? "unnamed"); duration=\(controller.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); controllerEntity=\(controllerEntity?.name ?? "nil"); controllerTargetsSkin=\(controllerEntity === skin); playing=\(controller.isPlaying); valid=\(controller.isValid)")
                     let callback = onLog
@@ -288,6 +300,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     final class Coordinator {
         var currentEntity: Entity?
         var animationController: AnimationPlaybackController?
+        var lastIsSpeaking = false
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
