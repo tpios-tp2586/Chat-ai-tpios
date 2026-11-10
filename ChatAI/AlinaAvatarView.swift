@@ -225,7 +225,8 @@ private struct AlinaRealityView: UIViewRepresentable {
                 if skin.availableAnimations.indices.contains(testClipIndex) {
                     let clip = skin.availableAnimations[testClipIndex]
                     let definition = clip.definition
-                    let controller = skin.playAnimation(clip, transitionDuration: 0.25, startsPaused: false)
+                    let loopingClip = clip.repeat(duration: .infinity)
+                    let controller = skin.playAnimation(loopingClip, transitionDuration: 0.25, startsPaused: false)
                     coordinator.animationController = controller
                     let controllerEntity = controller.entity
                     logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=\(testClipIndex); name=\(clip.name ?? "unnamed"); duration=\(controller.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); controllerEntity=\(controllerEntity?.name ?? "nil"); controllerTargetsSkin=\(controllerEntity === skin); playing=\(controller.isPlaying); valid=\(controller.isValid)")
