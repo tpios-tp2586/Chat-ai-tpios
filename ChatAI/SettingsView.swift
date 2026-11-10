@@ -23,12 +23,13 @@ struct SettingsView: View {
     @AppStorage("voiceGender") private var voiceGenderRaw = VoiceGender.female.rawValue
     @AppStorage("autoMemoryV2") private var autoMemory = false
     @AppStorage("live_persona") private var selectedPersonaPrompt = LivePersona.defaultText
+    @AppStorage("live_persona_id") private var selectedPersonaRoleID = "Lily mỏ hỗn"
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
     @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
     private var selectedPersonaTitle: String {
-        LivePersona.presets.first(where: { $0.text == selectedPersonaPrompt })?.id ?? "Tùy chỉnh"
+        selectedPersonaRoleID.isEmpty ? "Tùy chỉnh" : selectedPersonaRoleID
     }
     private var currentModel: String {
         switch AIProviderKind(rawValue: selectedProviderRaw) ?? .openAI {
@@ -300,6 +301,7 @@ struct ProfileSettingsView: View {
     @ObservedObject private var history = HistoryManager.shared
     @State private var editingItem: MemoryItem?
     @State private var draft = ""
+    @State private var isShowingEditor = false
 
     var body: some View {
         List {
@@ -314,7 +316,7 @@ struct ProfileSettingsView: View {
                 }
                 .swipeActions {
                     Button(role: .destructive) { history.deleteProfile(item) } label: { Label("Xóa", systemImage: "trash") }
-                    Button { editingItem = item; draft = item.content } label: { Label("Sửa", systemImage: "pencil") }
+                    Button { editingItem = item; draft = item.content; isShowingEditor = true } label: { Label("Sửa", systemImage: "pencil") }
                         .tint(.blue)
                 }
             }
@@ -322,22 +324,22 @@ struct ProfileSettingsView: View {
         .navigationTitle("Hồ sơ người dùng").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Thêm") { editingItem = nil; draft = "" }
+                Button("Thêm") { editingItem = nil; draft = ""; isShowingEditor = true }
             }
         }
-        .sheet(isPresented: Binding(get: { editingItem != nil || !draft.isEmpty }, set: { if !$0 { editingItem = nil; draft = "" } })) {
+        .sheet(isPresented: $isShowingEditor, onDismiss: { editingItem = nil; draft = "" }) {
             NavigationStack {
                 Form {
                     TextEditor(text: $draft).frame(minHeight: 140)
                 }
                 .navigationTitle("Chỉnh sửa hồ sơ")
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Hủy") { editingItem = nil; draft = "" } }
+                    ToolbarItem(placement: .cancellationAction) { Button("Hủy") { isShowingEditor = false } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Lưu") {
                             if let item = editingItem { history.updateProfile(item, content: draft) }
                             else { history.addProfile(draft) }
-                            editingItem = nil; draft = ""
+                            isShowingEditor = false
                         }
                         .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
