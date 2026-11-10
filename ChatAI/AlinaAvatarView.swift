@@ -69,7 +69,7 @@ struct AlinaAvatarView: View {
             }
         }
         .contentShape(Rectangle())
-        .simultaneousGesture(moveGesture)
+        .highPriorityGesture(moveGesture)
         .simultaneousGesture(zoomGesture)
         .simultaneousGesture(rotationGesture)
         .simultaneousGesture(TapGesture().onEnded { onTap() })
@@ -253,9 +253,9 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         // Put the model's midpoint at the viewport center; do not add an upward offset.
         let midBodyY = targetHeight / 2.0
-        // Raise Alina by 2% of the fitted height (positive Y is upward in RealityKit).
+        // Raise Alina by 10% of the fitted height (positive Y is upward in RealityKit).
         let baseAnchorY = -midBodyY - targetHeight * 0.50 - 0.10
-        let upwardAdjustment = targetHeight * 0.02
+        let upwardAdjustment = targetHeight * 0.10
         let anchorPosition = SIMD3<Float>(0, baseAnchorY + upwardAdjustment, -2.8)
         let anchor = AnchorEntity(world: anchorPosition)
         coordinator.baseAnchorPosition = anchorPosition
