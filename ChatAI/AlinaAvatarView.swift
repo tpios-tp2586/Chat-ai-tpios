@@ -14,6 +14,8 @@ struct AlinaAvatarView: View {
     @State private var pinchStartScale = 1.0
     @State private var dragStartOffsetX = 0.0
     @State private var dragStartOffsetY = 0.0
+    @State private var liveOffsetX = 0.0
+    @State private var liveOffsetY = 0.0
     @State private var isMovingAvatar = false
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
@@ -31,12 +33,14 @@ struct AlinaAvatarView: View {
             .onChanged { value in
                 guard case .second(true, let drag?) = value else { return }
                 isMovingAvatar = true
-                savedOffsetX = min(max(dragStartOffsetX + Double(drag.translation.width) * 0.005, -1.2), 1.2)
-                savedOffsetY = min(max(dragStartOffsetY - Double(drag.translation.height) * 0.005, -1.2), 1.2)
+                liveOffsetX = min(max(dragStartOffsetX + Double(drag.translation.width) * 0.005, -1.2), 1.2)
+                liveOffsetY = min(max(dragStartOffsetY - Double(drag.translation.height) * 0.005, -1.2), 1.2)
             }
             .onEnded { _ in
-                dragStartOffsetX = savedOffsetX
-                dragStartOffsetY = savedOffsetY
+                savedOffsetX = liveOffsetX
+                savedOffsetY = liveOffsetY
+                dragStartOffsetX = liveOffsetX
+                dragStartOffsetY = liveOffsetY
                 isMovingAvatar = false
             }
     }
@@ -56,7 +60,7 @@ struct AlinaAvatarView: View {
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                AlinaRealityView(entity: entity, isSpeaking: isSpeaking, zoomScale: Float(savedZoomScale), rotationY: rotationY, offsetX: Float(savedOffsetX), offsetY: Float(savedOffsetY), onLog: onLog)
+                AlinaRealityView(entity: entity, isSpeaking: isSpeaking, zoomScale: Float(savedZoomScale), rotationY: rotationY, offsetX: Float(liveOffsetX), offsetY: Float(liveOffsetY), onLog: onLog)
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -77,6 +81,8 @@ struct AlinaAvatarView: View {
             pinchStartScale = savedZoomScale
             dragStartOffsetX = savedOffsetX
             dragStartOffsetY = savedOffsetY
+            liveOffsetX = savedOffsetX
+            liveOffsetY = savedOffsetY
             loader.onLog = onLog
             loader.load()
         }
@@ -253,9 +259,9 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         // Put the model's midpoint at the viewport center; do not add an upward offset.
         let midBodyY = targetHeight / 2.0
-        // Raise Alina by 10% of the fitted height (positive Y is upward in RealityKit).
+        // Move the unchanged-size model upward in the viewport so the feet remain visible.
         let baseAnchorY = -midBodyY - targetHeight * 0.50 - 0.10
-        let upwardAdjustment = targetHeight * 0.10
+        let upwardAdjustment = targetHeight * 0.20
         let anchorPosition = SIMD3<Float>(0, baseAnchorY + upwardAdjustment, -2.8)
         let anchor = AnchorEntity(world: anchorPosition)
         coordinator.baseAnchorPosition = anchorPosition
