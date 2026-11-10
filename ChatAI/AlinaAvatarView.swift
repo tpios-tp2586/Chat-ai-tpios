@@ -108,7 +108,7 @@ private final class AlinaAvatarLoader: ObservableObject {
                 model.stopAllAnimations()
                 entity = model
                 status = "Alina đã sẵn sàng"
-                onLog?("[ALINA] loaded; animations=\(animationCount); playback test=default subtree animation (after attach)")
+                onLog?("[ALINA] loaded; animations=\(animationCount) across hierarchy; inventory=per entity; playback test=skin0 clip 0 (after attach)")
                 onLog?("[ALINA DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
             } catch {
                 status = "Lỗi nạp Alina: \(error.localizedDescription)"
@@ -271,7 +271,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         if coordinator.animationController == nil {
             if let skin = findEntity(named: "skin0", in: model) {
-                logAnimationInventory(for: skin)
+                logAnimationInventory(in: model)
 
                 // Diagnostic A/B test: play the first imported TempMotion clip,
                 // not the default subtree animation previously tested at skin0#20.
@@ -314,12 +314,19 @@ private struct AlinaRealityView: UIViewRepresentable {
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
     }
 
-    private func logAnimationInventory(for skin: Entity) {
-        for (index, animation) in skin.availableAnimations.enumerated() {
-            let definition = animation.definition
-            var details = "[ALINA ANIMATION INVENTORY] skin0#\(index) name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))"
-            logDeferred(details)
+    private func logAnimationInventory(in root: Entity) {
+        func visit(_ node: Entity, path: String) {
+            for (index, animation) in node.availableAnimations.enumerated() {
+                let definition = animation.definition
+                logDeferred("[ALINA ANIMATION INVENTORY] owner=\(node.name); path=\(path); clip=\(index); name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))")
+            }
+
+            for (index, child) in node.children.enumerated() {
+                visit(child, path: "\(path)/\(index):\(child.name)")
+            }
         }
+
+        visit(root, path: "root:\(root.name)")
     }
 
     private func findEntity(named name: String, in root: Entity) -> Entity? {
