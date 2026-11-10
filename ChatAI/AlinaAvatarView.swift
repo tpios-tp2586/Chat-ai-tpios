@@ -261,10 +261,6 @@ private struct AlinaRealityView: UIViewRepresentable {
         for (index, animation) in skin.availableAnimations.enumerated() {
             let definition = animation.definition
             var details = "[ALINA ANIMATION INVENTORY] skin0#\(index) name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))"
-            if let sampled = definition as? SampledAnimation {
-                let jointPreview = sampled.jointNames.prefix(12).joined(separator: ",")
-                details += "; joints=\(sampled.jointNames.count) [\(jointPreview)]; rotation=\(sampled.isRotationAnimated); translation=\(sampled.isTranslationAnimated); scale=\(sampled.isScaleAnimated)"
-            }
             logDeferred(details)
         }
     }
