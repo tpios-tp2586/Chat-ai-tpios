@@ -576,6 +576,9 @@ final class LiveVoiceManager: ObservableObject {
 
     private func connect(key: String, model: String, voice: String, persona: String) {
         var instruction = LivePersona.systemPrompt(for: persona)
+        if let profile = HistoryManager.shared.profileSystemPrompt {
+            instruction += "\n\n" + profile
+        }
         if let memory = HistoryManager.shared.memorySystemPrompt {
             instruction += "\n\n" + memory
         }
