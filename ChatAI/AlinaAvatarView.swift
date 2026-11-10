@@ -199,7 +199,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         // Slightly enlarge the fitted body while keeping the feet at Y=0.
         let height = localBounds.extents.y
-        let targetHeight: Float = 1.60
+        let targetHeight: Float = 3.20
         let baseScale: Float = (height.isFinite && height > 0.01) ? targetHeight / height : 1.0
         // After scaling: model bottom = localBounds.min.y * baseScale (negative), top = localBounds.max.y * baseScale
         // Shift model up so feet (min Y) sit at Y=0 relative to anchor
