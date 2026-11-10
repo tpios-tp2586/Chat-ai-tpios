@@ -71,7 +71,10 @@ struct AnthropicService {
             }
             messages.append(["role": message.role == .assistant ? "assistant" : "user", "content": content])
         }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "max_tokens": 1024, "messages": messages])
+        var payload: [String: Any] = ["model": model, "max_tokens": 1024, "messages": messages]
+        let systemPrompt = history.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
+        if !systemPrompt.isEmpty { payload["system"] = systemPrompt }
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let text = String(data: data, encoding: .utf8) ?? "unknown error"
@@ -104,7 +107,12 @@ struct GeminiService {
             }
             contents.append(["role": message.role == .assistant ? "model" : "user", "parts": parts])
         }
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["contents": contents])
+        var payload: [String: Any] = ["contents": contents]
+        let systemPrompt = history.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
+        if !systemPrompt.isEmpty {
+            payload["systemInstruction"] = ["parts": [["text": systemPrompt]]]
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             let text = String(data: data, encoding: .utf8) ?? "unknown error"
