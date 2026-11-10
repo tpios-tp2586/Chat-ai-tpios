@@ -56,6 +56,7 @@ private final class AlinaAvatarLoader: ObservableObject {
     @Published var entity: Entity?
     @Published var status = "Đang nạp Alina…"
     var onLog: ((String) -> Void)?
+    private var animationController: AnimationPlaybackController?
     private var loaded = false
 
     func load() {
@@ -72,10 +73,10 @@ private final class AlinaAvatarLoader: ObservableObject {
         Task { @MainActor in
             do {
                 let model = try await Entity.load(contentsOf: url)
-                var animationEntries: [(path: String, ownerName: String, localIndex: Int, animation: AnimationResource)] = []
+                var animationEntries: [(path: String, owner: Entity, localIndex: Int, animation: AnimationResource)] = []
                 func collect(_ node: Entity, path: String) {
                     for (index, animation) in node.availableAnimations.enumerated() {
-                        animationEntries.append((path, node.name, index, animation))
+                        animationEntries.append((path, node, index, animation))
                     }
                     for (index, child) in node.children.enumerated() {
                         collect(child, path: "\(path)/\(index):\(child.name)")
@@ -85,14 +86,12 @@ private final class AlinaAvatarLoader: ObservableObject {
                 model.stopAllAnimations()
                 entity = model
                 status = "Alina đã sẵn sàng"
-                onLog?("[ALINA] loaded; animations=\(animationEntries.count); playback remains disabled pending owner mapping")
-                for start in stride(from: 0, to: animationEntries.count, by: 5) {
-                    let end = min(start + 5, animationEntries.count)
-                    let entries = (start..<end).map { index in
-                        let entry = animationEntries[index]
-                        return "\(index)@\(entry.path)#\(entry.localIndex)=\(entry.animation.name ?? "unnamed")"
-                    }.joined(separator: " | ")
-                    onLog?("[ALINA ANIMATION MAP] \(entries)")
+                onLog?("[ALINA] loaded; animations=\(animationEntries.count); playback test=default subtree animation")
+                if let testClip = animationEntries.first(where: { $0.owner.name == "skin0" && $0.localIndex == 20 }) {
+                    animationController = testClip.owner.playAnimation(testClip.animation, transitionDuration: 0.25)
+                    onLog?("[ALINA ANIMATION TEST] started default subtree animation on skin0#20; playing=\(animationController?.isPlaying ?? false)")
+                } else {
+                    onLog?("[ALINA ANIMATION TEST] unable to find skin0#20; playback not started")
                 }
                 onLog?("[ALINA DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
             } catch {
@@ -224,7 +223,6 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.zoomPivot = zoomPivot
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
-        model.stopAllAnimations()
         applyZoom(zoomScale, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
