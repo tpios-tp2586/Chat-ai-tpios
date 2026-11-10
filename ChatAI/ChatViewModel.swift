@@ -163,13 +163,13 @@ final class ChatViewModel: ObservableObject {
             case .groq:      result = try await groqService.sendMessage(history: extractMsg, apiKey: key, model: groqModel)
             }
 
-            // Chấp nhận MEMORY ở đầu dòng kể cả khi model thêm dấu định dạng.
             for line in result.components(separatedBy: .newlines) {
-                guard let range = line.range(of: "MEMORY:", options: [.caseInsensitive]) else { continue }
-                let memory = String(line[range.upperBound...])
-                    .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-                if !memory.isEmpty {
-                    HistoryManager.shared.addMemory(memory)
+                if let range = line.range(of: "PROFILE:", options: [.caseInsensitive]) {
+                    let value = String(line[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+                    if !value.isEmpty { HistoryManager.shared.addProfile(value) }
+                } else if let range = line.range(of: "MEMORY:", options: [.caseInsensitive]) {
+                    let value = String(line[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+                    if !value.isEmpty { HistoryManager.shared.addMemory(value) }
                 }
             }
         } catch {
@@ -185,10 +185,9 @@ final class ChatViewModel: ObservableObject {
         let prompt = """
         Bạn đang xây dựng bộ nhớ dài hạn cho một trợ lý AI.
         Đọc câu nói của người dùng bên dưới và chỉ trích xuất những thông tin có giá trị lâu dài, có khả năng giúp trợ lý hiểu và hỗ trợ người dùng tốt hơn trong các cuộc trò chuyện sau.
-        Ưu tiên: tên/cách xưng hô, nghề nghiệp hoặc dự án lâu dài, sở thích ổn định, thói quen, mục tiêu, yêu cầu giao tiếp đặc biệt và các thông tin người dùng chủ động muốn trợ lý ghi nhớ.
-        Không lưu lời chào, cảm xúc nhất thời, câu hỏi thông thường, thông tin chỉ đúng trong vài phút, hoặc suy đoán không được người dùng nói rõ.
-        Nếu có nhiều thông tin, trả về mỗi thông tin trên một dòng theo đúng format: MEMORY: <nội dung>
-        Nếu không có gì đáng nhớ, trả về đúng: NONE
+        Phân loại thông tin dài hạn thành PROFILE (cách xưng hô, công việc, dự án lâu dài, sở thích ổn định, mục tiêu) hoặc MEMORY (chi tiết hội thoại hữu ích không thuộc hồ sơ).
+        Không lưu lời chào, cảm xúc nhất thời, câu hỏi thông thường, hoặc suy đoán.
+        Trả về từng dòng theo định dạng PROFILE: <nội dung> hoặc MEMORY: <nội dung>. Nếu không có gì đáng lưu, trả về NONE.
         Chỉ trả về các dòng MEMORY hoặc NONE, không giải thích thêm.
 
         Câu nói của người dùng:
@@ -198,18 +197,13 @@ final class ChatViewModel: ObservableObject {
         let extractMsg = [ChatMessage(role: .user, content: prompt)]
         do {
             let result = try await geminiService.sendMessage(history: extractMsg, apiKey: key, model: geminiModel)
-            let memories = result
-                .components(separatedBy: .newlines)
-                .compactMap { line -> String? in
-                    let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard value.hasPrefix("MEMORY:") else { return nil }
-                    let memory = value.replacingOccurrences(of: "MEMORY:", with: "", options: .anchored)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    return memory.isEmpty ? nil : memory
+            for line in result.components(separatedBy: .newlines).prefix(5) {
+                let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if value.hasPrefix("PROFILE:") {
+                    HistoryManager.shared.addProfile(String(value.dropFirst(8)).trimmingCharacters(in: .whitespacesAndNewlines))
+                } else if value.hasPrefix("MEMORY:") {
+                    HistoryManager.shared.addMemory(String(value.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines))
                 }
-
-            for memory in memories.prefix(5) {
-                HistoryManager.shared.addMemory(memory)
             }
         } catch {
             // Memory là tính năng bổ trợ; lỗi trích xuất không được làm gián đoạn cuộc gọi.
@@ -234,6 +228,9 @@ final class ChatViewModel: ObservableObject {
         let key = KeychainHelper.read(forKey: selectedProvider.keychainKey) ?? ""
         var history = messages
         var systemPrompts = [LivePersona.systemPrompt(for: personaPrompt)]
+        if let profilePrompt = HistoryManager.shared.profileSystemPrompt {
+            systemPrompts.append(profilePrompt)
+        }
         if let memoryPrompt = HistoryManager.shared.memorySystemPrompt {
             systemPrompts.append(memoryPrompt)
         }
