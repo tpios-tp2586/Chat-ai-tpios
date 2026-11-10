@@ -1,6 +1,7 @@
 import Combine
 import RealityKit
 import SwiftUI
+import UIKit
 
 struct AlinaAvatarView: View {
     let isSpeaking: Bool
@@ -12,10 +13,6 @@ struct AlinaAvatarView: View {
     @AppStorage("alina_avatar_position_x_v1") private var savedOffsetX = 0.0
     @AppStorage("alina_avatar_position_y_v1") private var savedOffsetY = 0.0
     @State private var pinchStartScale = 1.0
-    @State private var dragStartOffsetX = 0.0
-    @State private var dragStartOffsetY = 0.0
-    @State private var liveOffsetX = 0.0
-    @State private var liveOffsetY = 0.0
     @State private var isMovingAvatar = false
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
@@ -24,25 +21,6 @@ struct AlinaAvatarView: View {
         MagnificationGesture()
             .onChanged { savedZoomScale = min(max(pinchStartScale * Double($0), 0.7), 4.5) }
             .onEnded { _ in pinchStartScale = savedZoomScale }
-    }
-
-    // Hold Alina briefly, then drag to move her. A normal horizontal swipe rotates her.
-    private var moveGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.30)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .onChanged { value in
-                guard case .second(true, let drag?) = value else { return }
-                isMovingAvatar = true
-                liveOffsetX = min(max(dragStartOffsetX + Double(drag.translation.width) * 0.005, -1.2), 1.2)
-                liveOffsetY = min(max(dragStartOffsetY - Double(drag.translation.height) * 0.005, -1.2), 1.2)
-            }
-            .onEnded { _ in
-                savedOffsetX = liveOffsetX
-                savedOffsetY = liveOffsetY
-                dragStartOffsetX = liveOffsetX
-                dragStartOffsetY = liveOffsetY
-                isMovingAvatar = false
-            }
     }
 
     private var rotationGesture: some Gesture {
@@ -60,7 +38,21 @@ struct AlinaAvatarView: View {
     var body: some View {
         ZStack {
             if let entity = loader.entity {
-                AlinaRealityView(entity: entity, isSpeaking: isSpeaking, zoomScale: Float(savedZoomScale), rotationY: rotationY, offsetX: Float(liveOffsetX), offsetY: Float(liveOffsetY), onLog: onLog)
+                AlinaRealityView(
+                    entity: entity,
+                    isSpeaking: isSpeaking,
+                    zoomScale: Float(savedZoomScale),
+                    rotationY: rotationY,
+                    offsetX: Float(savedOffsetX),
+                    offsetY: Float(savedOffsetY),
+                    onLog: onLog,
+                    onMoveStarted: { isMovingAvatar = true },
+                    onMoveEnded: { x, y in
+                        savedOffsetX = Double(x)
+                        savedOffsetY = Double(y)
+                        isMovingAvatar = false
+                    }
+                )
             } else {
                 VStack(spacing: 10) {
                     ProgressView()
@@ -73,16 +65,11 @@ struct AlinaAvatarView: View {
             }
         }
         .contentShape(Rectangle())
-        .highPriorityGesture(moveGesture)
         .simultaneousGesture(zoomGesture)
         .simultaneousGesture(rotationGesture)
         .simultaneousGesture(TapGesture().onEnded { onTap() })
         .task {
             pinchStartScale = savedZoomScale
-            dragStartOffsetX = savedOffsetX
-            dragStartOffsetY = savedOffsetY
-            liveOffsetX = savedOffsetX
-            liveOffsetY = savedOffsetY
             loader.onLog = onLog
             loader.load()
         }
@@ -139,12 +126,19 @@ private struct AlinaRealityView: UIViewRepresentable {
     let offsetX: Float
     let offsetY: Float
     let onLog: (String) -> Void
+    let onMoveStarted: () -> Void
+    let onMoveEnded: (Float, Float) -> Void
 
     func makeUIView(context: Context) -> ARView {
         logDeferred("[ALINA DEBUG] makeUIView entered")
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
         attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
+        context.coordinator.installMoveGesture(
+            on: view,
+            onStarted: onMoveStarted,
+            onEnded: onMoveEnded
+        )
         return view
     }
 
@@ -354,7 +348,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.currentOffsetY = offsetY
     }
 
-    final class Coordinator {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var currentEntity: Entity?
         var animationController: AnimationPlaybackController?
         var lastIsSpeaking = false
@@ -369,5 +363,76 @@ private struct AlinaRealityView: UIViewRepresentable {
         var currentOffsetY: Float = 0
         var didLogLayout = false
         var didLogUpdate = false
+        private var moveStartPoint: CGPoint?
+        private var moveStartAnchorPosition: SIMD3<Float>?
+        private var onMoveStarted: (() -> Void)?
+        private var onMoveEnded: ((Float, Float) -> Void)?
+
+        func installMoveGesture(
+            on view: ARView,
+            onStarted: @escaping () -> Void,
+            onEnded: @escaping (Float, Float) -> Void
+        ) {
+            onMoveStarted = onStarted
+            onMoveEnded = onEnded
+            let gesture = UILongPressGestureRecognizer(
+                target: self,
+                action: #selector(handleMoveGesture(_:))
+            )
+            gesture.minimumPressDuration = 0.30
+            gesture.allowableMovement = 1000
+            gesture.cancelsTouchesInView = false
+            gesture.delegate = self
+            view.addGestureRecognizer(gesture)
+        }
+
+        @objc private func handleMoveGesture(_ gesture: UILongPressGestureRecognizer) {
+            guard let view = gesture.view else { return }
+            switch gesture.state {
+            case .began:
+                guard let anchor = rotationPivot else { return }
+                moveStartPoint = gesture.location(in: view)
+                moveStartAnchorPosition = anchor.position
+                onMoveStarted?()
+            case .changed:
+                guard let anchor = rotationPivot,
+                      let startPoint = moveStartPoint,
+                      let startPosition = moveStartAnchorPosition else { return }
+                let point = gesture.location(in: view)
+                let dx = Float(point.x - startPoint.x) * 0.005
+                let dy = Float(point.y - startPoint.y) * -0.005
+                anchor.position = startPosition + SIMD3<Float>(dx, dy, 0)
+            case .ended:
+                finishMove(commit: true)
+            case .cancelled, .failed:
+                finishMove(commit: false)
+            default:
+                break
+            }
+        }
+
+        private func finishMove(commit: Bool) {
+            guard let anchor = rotationPivot,
+                  let startPosition = moveStartAnchorPosition else {
+                onMoveEnded?(currentOffsetX, currentOffsetY)
+                return
+            }
+            if !commit {
+                anchor.position = startPosition
+            }
+            let offset = anchor.position - baseAnchorPosition
+            currentOffsetX = offset.x
+            currentOffsetY = offset.y
+            onMoveEnded?(currentOffsetX, currentOffsetY)
+            moveStartPoint = nil
+            moveStartAnchorPosition = nil
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
     }
 }
