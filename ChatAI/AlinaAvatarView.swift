@@ -76,14 +76,18 @@ private final class AlinaAvatarLoader: ObservableObject {
                     entity.availableAnimations + entity.children.flatMap(collect)
                 }
                 let animations = collect(model)
-                onLog?("[ALINA] loaded; animations=\(animations.count); playback remains disabled pending clip inspection")
-                for (index, animation) in animations.enumerated() {
-                    onLog?("[ALINA ANIMATION] index=\(index), name=\(animation.name ?? "unnamed")")
-                }
-                onLog?("[ALINA DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
                 model.stopAllAnimations()
                 entity = model
                 status = "Alina đã sẵn sàng"
+                onLog?("[ALINA] loaded; animations=\(animations.count); playback remains disabled pending clip inspection")
+                for start in stride(from: 0, to: animations.count, by: 10) {
+                    let end = min(start + 10, animations.count)
+                    let names = (start..<end).map { index in
+                        "\(index): \(animations[index].name ?? "unnamed")"
+                    }.joined(separator: " | ")
+                    onLog?("[ALINA ANIMATIONS] \(names)")
+                }
+                onLog?("[ALINA DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
             } catch {
                 status = "Lỗi nạp Alina: \(error.localizedDescription)"
                 onLog?("[ALINA ERROR] load failed: \(error)")
