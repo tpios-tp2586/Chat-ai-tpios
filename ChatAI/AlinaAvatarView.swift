@@ -216,35 +216,57 @@ private struct AlinaRealityView: UIViewRepresentable {
         view.scene.addAnchor(anchor)
 
         if coordinator.animationController == nil {
-            if let skin = findEntity(named: "skin0", in: model),
-               skin.availableAnimations.indices.contains(20) {
-                let clip = skin.availableAnimations[20]
-                let controller = skin.playAnimation(clip, transitionDuration: 0.25, startsPaused: false)
-                coordinator.animationController = controller
-                logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=20; name=\(clip.name ?? "unnamed"); duration=\(controller.duration); playing=\(controller.isPlaying); valid=\(controller.isValid)")
-                let callback = onLog
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    guard let current = coordinator.animationController else {
-                        callback("[ALINA ANIMATION TEST] controller missing at +0.5s")
-                        return
+            if let skin = findEntity(named: "skin0", in: model) {
+                logAnimationInventory(for: skin)
+
+                // Diagnostic A/B test: play the first imported TempMotion clip,
+                // not the default subtree animation previously tested at skin0#20.
+                let testClipIndex = 0
+                if skin.availableAnimations.indices.contains(testClipIndex) {
+                    let clip = skin.availableAnimations[testClipIndex]
+                    let definition = clip.definition
+                    let controller = skin.playAnimation(clip, transitionDuration: 0.25, startsPaused: false)
+                    coordinator.animationController = controller
+                    let controllerEntity = controller.entity
+                    logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=\(testClipIndex); name=\(clip.name ?? "unnamed"); duration=\(controller.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); controllerEntity=\(controllerEntity?.name ?? "nil"); controllerTargetsSkin=\(controllerEntity === skin); playing=\(controller.isPlaying); valid=\(controller.isValid)")
+                    let callback = onLog
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        guard let current = coordinator.animationController else {
+                            callback("[ALINA ANIMATION TEST] controller missing at +0.5s")
+                            return
+                        }
+                        callback("[ALINA ANIMATION TEST] +0.5s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
                     }
-                    callback("[ALINA ANIMATION TEST] +0.5s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    guard let current = coordinator.animationController else {
-                        callback("[ALINA ANIMATION TEST] controller missing at +2.0s")
-                        return
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        guard let current = coordinator.animationController else {
+                            callback("[ALINA ANIMATION TEST] controller missing at +2.0s")
+                            return
+                        }
+                        callback("[ALINA ANIMATION TEST] +2.0s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
                     }
-                    callback("[ALINA ANIMATION TEST] +2.0s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
+                } else {
+                    logDeferred("[ALINA ANIMATION TEST] skin0#\(testClipIndex) unavailable; count=\(skin.availableAnimations.count)")
                 }
             } else {
-                logDeferred("[ALINA ANIMATION TEST] skin0#20 unavailable after scene attach")
+                logDeferred("[ALINA ANIMATION TEST] skin0 entity not found after scene attach")
             }
         }
 
         applyZoom(zoomScale, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
+    }
+
+    private func logAnimationInventory(for skin: Entity) {
+        for (index, animation) in skin.availableAnimations.enumerated() {
+            let definition = animation.definition
+            var details = "[ALINA ANIMATION INVENTORY] skin0#\(index) name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))"
+            if let sampled = definition as? SampledAnimation {
+                let jointPreview = sampled.jointNames.prefix(12).joined(separator: ",")
+                details += "; joints=\(sampled.jointNames.count) [\(jointPreview)]; rotation=\(sampled.isRotationAnimated); translation=\(sampled.isTranslationAnimated); scale=\(sampled.isScaleAnimated)"
+            }
+            logDeferred(details)
+        }
     }
 
     private func findEntity(named name: String, in root: Entity) -> Entity? {
