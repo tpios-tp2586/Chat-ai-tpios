@@ -33,7 +33,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            LilyAvatarView(onLog: { log in
+                            AlinaAvatarView(onLog: { log in
                                 addDiagnostic(log)
                             }, onTap: {
                                 toggleConversation()
@@ -92,7 +92,7 @@ struct CompanionChatView: View {
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
-                    // Speech updates this status label only; Lily is currently displayed without facial animation.
+                    // Speech updates this status label only; Alina is currently displayed without facial animation.
                     if emotion == .idle || emotion == .listening || emotion == .thinking {
                         emotion = .speaking
                     }
@@ -171,7 +171,7 @@ struct CompanionChatView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Log chẩn đoán Chat Voice").font(.headline)
-                Text("Ghi trạng thái giọng nói và tải mô hình Lily. Không ghi API key.")
+                Text("Ghi trạng thái giọng nói và tải mô hình Alina. Không ghi API key.")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView {
                     Text(diagnosticLogs.joined(separator: "\n"))
@@ -224,7 +224,7 @@ struct CompanionChatView: View {
 
     private var controls: some View {
         HStack(spacing: 10) {
-            TextField("Nhập tin nhắn cho Lily…", text: $typedMessage, axis: .vertical)
+            TextField("Nhập tin nhắn cho Alina…", text: $typedMessage, axis: .vertical)
                 .font(.subheadline)
                 .lineLimit(1...4)
                 .padding(.horizontal, 14)
@@ -258,7 +258,7 @@ struct CompanionChatView: View {
         guard liveManager.sendText(text) else {
             message = liveManager.state == .connecting
                 ? "Gemini Live đang kết nối, anh chờ một chút nhé."
-                : "Anh chạm vào Lily để kết nối Gemini Live trước nhé."
+                : "Anh chạm vào Alina để kết nối Gemini Live trước nhé."
             addDiagnostic("[TEXT] Chưa gửi: Gemini Live chưa ở trạng thái kết nối")
             return
         }
