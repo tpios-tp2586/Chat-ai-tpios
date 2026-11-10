@@ -199,7 +199,7 @@ private struct LilyRealityView: UIViewRepresentable {
 
         // Anchor at mid-body height so full body is centered in viewport
         let midBodyY: Float = (1.3 / 2.0)
-        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY + 0.15, -2.8))
+        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY + 0.35, -2.8))
         let zoomPivot = Entity()
         zoomPivot.addChild(model)
         model.position = coordinator.basePosition
