@@ -182,9 +182,10 @@ private struct AlinaRealityView: UIViewRepresentable {
         logDeferred("[ALINA DEBUG] pre-fit world bounds center=\(worldBounds.center), extents=\(worldBounds.extents)")
         logDeferred("[ALINA DEBUG] pre-fit local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
 
-        // Scale model to fit 1.6 units tall, place feet at Y=0, center anchor at mid-body
+        // Slightly enlarge the fitted body while keeping the feet at Y=0.
         let height = localBounds.extents.y
-        let baseScale: Float = (height.isFinite && height > 0.01) ? 1.3 / height : 1.0
+        let targetHeight: Float = 1.45
+        let baseScale: Float = (height.isFinite && height > 0.01) ? targetHeight / height : 1.0
         // After scaling: model bottom = localBounds.min.y * baseScale (negative), top = localBounds.max.y * baseScale
         // Shift model up so feet (min Y) sit at Y=0 relative to anchor
         let minY = localBounds.min.y * baseScale
@@ -197,9 +198,9 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.basePosition = SIMD3<Float>(modelOffsetX, modelOffsetY, modelOffsetZ)
         coordinator.currentEntity = model
 
-        // Anchor at mid-body height so full body is centered in viewport
-        let midBodyY: Float = (1.3 / 2.0)
-        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY + 0.35, -2.8))
+        // Put the model's midpoint at the viewport center; do not add an upward offset.
+        let midBodyY = targetHeight / 2.0
+        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY, -2.8))
         let zoomPivot = Entity()
         zoomPivot.addChild(model)
         model.position = coordinator.basePosition
