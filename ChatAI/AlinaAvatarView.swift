@@ -29,7 +29,7 @@ struct AlinaAvatarView: View {
         LongPressGesture(minimumDuration: 0.30)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
-                guard case .second(true, let drag) = value else { return }
+                guard case .second(true, let drag?) = value else { return }
                 isMovingAvatar = true
                 savedOffsetX = min(max(dragStartOffsetX + Double(drag.translation.width) * 0.005, -1.2), 1.2)
                 savedOffsetY = min(max(dragStartOffsetY - Double(drag.translation.height) * 0.005, -1.2), 1.2)
