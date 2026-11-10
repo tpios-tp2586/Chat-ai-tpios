@@ -94,6 +94,11 @@ struct SettingsView: View {
 
                     settingsSection("AI MEMORY", icon: .memory) {
                         settingToggle("AI Memory", isOn: $autoMemory, icon: .memory)
+                        NavigationLink {
+                            ProfileSettingsView()
+                        } label: {
+                            settingRowLabel("Hồ sơ người dùng", value: "Thông tin dài hạn", icon: .memory)
+                        }
                     }
 
                     Text("API key được lưu trong Keychain của máy và chỉ dùng với provider tương ứng.")
@@ -200,109 +205,144 @@ struct SettingsView: View {
 
 struct PersonaSettingsView: View {
     @AppStorage("live_persona") private var selectedPrompt = LivePersona.defaultText
+    @AppStorage("live_persona_id") private var selectedRoleID = "Lily mỏ hỗn"
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @State private var draftRoleID = "Lily mỏ hỗn"
     @State private var draftPrompt = ""
     @State private var didSave = false
 
-    private var theme: ChatAITheme {
-        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
-    }
+    private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Chọn vai diễn để tự điền prompt, sau đó chỉnh sửa theo ý anh và nhấn Lưu. Prompt đã lưu được dùng chung cho chat chữ và Chat Voice.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    Text("Chọn từng vai để nạp prompt riêng, chỉnh sửa nội dung rồi nhấn Lưu. Mỗi vai giữ prompt độc lập và dùng chung cho chat chữ lẫn Chat Voice.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
 
                     Text("VAI DIỄN CÓ SẴN")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
+                        .font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)
 
                     ForEach(LivePersona.rolePresets) { preset in
                         Button {
-                            draftPrompt = preset.text
+                            draftRoleID = preset.id
+                            draftPrompt = LivePersona.prompt(for: preset.id)
                             didSave = false
                         } label: {
-                            HStack(spacing: 12) {
-                                Text(preset.id)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(.primary)
+                            HStack {
+                                Text(preset.id).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
                                 Spacer()
-                                if draftPrompt == preset.text {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(theme.accent)
+                                if draftRoleID == preset.id {
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.accent)
                                 }
                             }
                             .padding(14)
-                            .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(theme.accent.opacity(draftPrompt == preset.text ? 0.55 : 0.18), lineWidth: 1)
-                            }
+                            .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.accent.opacity(draftRoleID == preset.id ? 0.55 : 0.18)))
                         }
                         .buttonStyle(.plain)
                     }
 
-                    Text("PROMPT CỦA VAI DIỄN")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
+                    Text("PROMPT — \(draftRoleID.uppercased())")
+                        .font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary).padding(.top, 8)
 
                     TextEditor(text: $draftPrompt)
-                        .font(.system(size: 14))
-                        .scrollContentBackground(.hidden)
-                        .padding(10)
-                        .frame(minHeight: 190)
-                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(theme.accent.opacity(0.22), lineWidth: 1)
-                        }
+                        .font(.system(size: 14)).scrollContentBackground(.hidden).padding(10)
+                        .frame(minHeight: 210)
+                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.accent.opacity(0.22)))
 
-                    Text("Anh có thể tự viết prompt mới hoặc sửa nội dung của vai diễn có sẵn.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                    Text("Prompt chỉ áp dụng cho vai đang chọn. Sửa vai khác không làm mất nội dung đã lưu.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 18)
+                .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 18)
             }
 
             Button {
                 let prompt = draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !prompt.isEmpty else { return }
+                LivePersona.savePrompt(prompt, for: draftRoleID)
+                selectedRoleID = draftRoleID
                 selectedPrompt = prompt
-                draftPrompt = prompt
                 didSave = true
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: didSave ? "checkmark.circle.fill" : "square.and.arrow.down.fill")
-                    Text(didSave ? "Đã lưu vai diễn" : "Lưu vai diễn")
+                    Text(didSave ? "Đã lưu \(draftRoleID)" : "Lưu vai diễn")
                 }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                .frame(maxWidth: .infinity).padding(.vertical, 14)
+                .background(theme.accent, in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
             .disabled(draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .opacity(draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 14).padding(.vertical, 10)
             .background(ChatAIThemeBackground(theme: theme))
         }
         .background { ChatAIThemeBackground(theme: theme) }
-        .navigationTitle("Vai diễn AI")
-        .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(.dark)
-        .tint(theme.accent)
+        .navigationTitle("Vai diễn AI").navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark).tint(theme.accent)
         .onAppear {
-            draftPrompt = selectedPrompt
+            if LivePersona.rolePresets.contains(where: { $0.text == selectedPrompt }) {
+                selectedRoleID = LivePersona.rolePresets.first(where: { $0.text == selectedPrompt })?.id ?? selectedRoleID
+            }
+            draftRoleID = selectedRoleID
+            draftPrompt = LivePersona.prompt(for: selectedRoleID)
+            if draftPrompt == LivePersona.defaultText, selectedPrompt != LivePersona.defaultText {
+                draftPrompt = selectedPrompt
+            }
+        }
+    }
+}
+
+struct ProfileSettingsView: View {
+    @ObservedObject private var history = HistoryManager.shared
+    @State private var editingItem: MemoryItem?
+    @State private var draft = ""
+
+    var body: some View {
+        List {
+            if history.profileItems.isEmpty {
+                Text("Chưa có thông tin hồ sơ. AI sẽ tự tách những thông tin dài hạn như cách xưng hô, công việc, sở thích và dự án khi AI Memory được bật.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            ForEach(history.profileItems) { item in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(item.content).font(.body)
+                    Text("Hồ sơ dài hạn").font(.caption).foregroundStyle(.secondary)
+                }
+                .swipeActions {
+                    Button(role: .destructive) { history.deleteProfile(item) } label: { Label("Xóa", systemImage: "trash") }
+                    Button { editingItem = item; draft = item.content } label: { Label("Sửa", systemImage: "pencil") }
+                        .tint(.blue)
+                }
+            }
+        }
+        .navigationTitle("Hồ sơ người dùng").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Thêm") { editingItem = nil; draft = "" }
+            }
+        }
+        .sheet(isPresented: Binding(get: { editingItem != nil || !draft.isEmpty }, set: { if !$0 { editingItem = nil; draft = "" } })) {
+            NavigationStack {
+                Form {
+                    TextEditor(text: $draft).frame(minHeight: 140)
+                }
+                .navigationTitle("Chỉnh sửa hồ sơ")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Hủy") { editingItem = nil; draft = "" } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Lưu") {
+                            if let item = editingItem { history.updateProfile(item, content: draft) }
+                            else { history.addProfile(draft) }
+                            editingItem = nil; draft = ""
+                        }
+                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
         }
     }
 }
