@@ -201,52 +201,109 @@ struct SettingsView: View {
 struct PersonaSettingsView: View {
     @AppStorage("live_persona") private var selectedPrompt = LivePersona.defaultText
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+    @State private var draftPrompt = ""
+    @State private var didSave = false
 
     private var theme: ChatAITheme {
         ChatAITheme(rawValue: selectedTheme) ?? .firePremium
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Chọn một vai diễn. Prompt được lưu và dùng chung cho chat chữ lẫn Chat Voice.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 4)
+        VStack(spacing: 0) {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Chọn vai diễn để tự điền prompt, sau đó chỉnh sửa theo ý anh và nhấn Lưu. Prompt đã lưu được dùng chung cho chat chữ và Chat Voice.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
 
-                ForEach(LivePersona.rolePresets) { preset in
-                    Button {
-                        selectedPrompt = preset.text
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text(preset.id)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if selectedPrompt == preset.text {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(theme.accent)
+                    Text("VAI DIỄN CÓ SẴN")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+
+                    ForEach(LivePersona.rolePresets) { preset in
+                        Button {
+                            draftPrompt = preset.text
+                            didSave = false
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(preset.id)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if draftPrompt == preset.text {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(theme.accent)
+                                }
+                            }
+                            .padding(14)
+                            .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(theme.accent.opacity(draftPrompt == preset.text ? 0.55 : 0.18), lineWidth: 1)
                             }
                         }
-                        .padding(15)
+                        .buttonStyle(.plain)
+                    }
+
+                    Text("PROMPT CỦA VAI DIỄN")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+
+                    TextEditor(text: $draftPrompt)
+                        .font(.system(size: 14))
+                        .scrollContentBackground(.hidden)
+                        .padding(10)
+                        .frame(minHeight: 190)
                         .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(theme.accent.opacity(selectedPrompt == preset.text ? 0.55 : 0.18), lineWidth: 1)
+                                .stroke(theme.accent.opacity(0.22), lineWidth: 1)
                         }
-                    }
-                    .buttonStyle(.plain)
+
+                    Text("Anh có thể tự viết prompt mới hoặc sửa nội dung của vai diễn có sẵn.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
             }
+
+            Button {
+                let prompt = draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !prompt.isEmpty else { return }
+                selectedPrompt = prompt
+                draftPrompt = prompt
+                didSave = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: didSave ? "checkmark.circle.fill" : "square.and.arrow.down.fill")
+                    Text(didSave ? "Đã lưu vai diễn" : "Lưu vai diễn")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(theme.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
             .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 22)
+            .padding(.top, 10)
+            .padding(.bottom, 10)
+            .background(ChatAIThemeBackground(theme: theme))
         }
         .background { ChatAIThemeBackground(theme: theme) }
         .navigationTitle("Vai diễn AI")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .tint(theme.accent)
+        .onAppear {
+            draftPrompt = selectedPrompt
+        }
     }
 }
 
