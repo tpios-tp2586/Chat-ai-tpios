@@ -14,6 +14,7 @@ struct AlinaAvatarView: View {
     @State private var pinchStartScale = 1.0
     @State private var dragStartOffsetX = 0.0
     @State private var dragStartOffsetY = 0.0
+    @State private var isMovingAvatar = false
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
@@ -23,22 +24,33 @@ struct AlinaAvatarView: View {
             .onEnded { _ in pinchStartScale = savedZoomScale }
     }
 
+    // Hold Alina briefly, then drag to move her. A normal horizontal swipe rotates her.
     private var moveGesture: some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged {
-                savedOffsetX = min(max(dragStartOffsetX + Double($0.translation.width) * 0.005, -1.2), 1.2)
-                savedOffsetY = min(max(dragStartOffsetY - Double($0.translation.height) * 0.005, -1.2), 1.2)
+        LongPressGesture(minimumDuration: 0.30)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard case .second(true, let drag?) = value else { return }
+                isMovingAvatar = true
+                savedOffsetX = min(max(dragStartOffsetX + Double(drag.translation.width) * 0.005, -1.2), 1.2)
+                savedOffsetY = min(max(dragStartOffsetY - Double(drag.translation.height) * 0.005, -1.2), 1.2)
             }
             .onEnded { _ in
                 dragStartOffsetX = savedOffsetX
                 dragStartOffsetY = savedOffsetY
+                isMovingAvatar = false
             }
     }
 
     private var rotationGesture: some Gesture {
-        RotationGesture()
-            .onChanged { rotationY = dragStartRotation + Float($0.radians) }
-            .onEnded { _ in dragStartRotation = rotationY }
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                guard !isMovingAvatar,
+                      abs(value.translation.width) > abs(value.translation.height) else { return }
+                rotationY = dragStartRotation + Float(value.translation.width) * 0.01
+            }
+            .onEnded { _ in
+                dragStartRotation = rotationY
+            }
     }
 
     var body: some View {
@@ -241,7 +253,10 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         // Put the model's midpoint at the viewport center; do not add an upward offset.
         let midBodyY = targetHeight / 2.0
-        let anchorPosition = SIMD3<Float>(0, -midBodyY - targetHeight * 0.48 - 0.10, -2.8)
+        // Raise Alina by 2% of the fitted height (positive Y is upward in RealityKit).
+        let baseAnchorY = -midBodyY - targetHeight * 0.50 - 0.10
+        let upwardAdjustment = targetHeight * 0.02
+        let anchorPosition = SIMD3<Float>(0, baseAnchorY + upwardAdjustment, -2.8)
         let anchor = AnchorEntity(world: anchorPosition)
         coordinator.baseAnchorPosition = anchorPosition
         let zoomPivot = Entity()
