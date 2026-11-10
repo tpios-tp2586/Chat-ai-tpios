@@ -56,7 +56,6 @@ private final class AlinaAvatarLoader: ObservableObject {
     @Published var entity: Entity?
     @Published var status = "Đang nạp Alina…"
     var onLog: ((String) -> Void)?
-    private var animationController: AnimationPlaybackController?
     private var loaded = false
 
     func load() {
@@ -73,26 +72,18 @@ private final class AlinaAvatarLoader: ObservableObject {
         Task { @MainActor in
             do {
                 let model = try await Entity.load(contentsOf: url)
-                var animationEntries: [(path: String, owner: Entity, localIndex: Int, animation: AnimationResource)] = []
-                func collect(_ node: Entity, path: String) {
-                    for (index, animation) in node.availableAnimations.enumerated() {
-                        animationEntries.append((path, node, index, animation))
-                    }
-                    for (index, child) in node.children.enumerated() {
-                        collect(child, path: "\(path)/\(index):\(child.name)")
+                var animationCount = 0
+                func collect(_ node: Entity) {
+                    animationCount += node.availableAnimations.count
+                    for child in node.children {
+                        collect(child)
                     }
                 }
-                collect(model, path: "root")
+                collect(model)
                 model.stopAllAnimations()
                 entity = model
                 status = "Alina đã sẵn sàng"
-                onLog?("[ALINA] loaded; animations=\(animationEntries.count); playback test=default subtree animation")
-                if let testClip = animationEntries.first(where: { $0.owner.name == "skin0" && $0.localIndex == 20 }) {
-                    animationController = testClip.owner.playAnimation(testClip.animation, transitionDuration: 0.25)
-                    onLog?("[ALINA ANIMATION TEST] started default subtree animation on skin0#20; playing=\(animationController?.isPlaying ?? false)")
-                } else {
-                    onLog?("[ALINA ANIMATION TEST] unable to find skin0#20; playback not started")
-                }
+                onLog?("[ALINA] loaded; animations=\(animationCount); playback test=default subtree animation (after attach)")
                 onLog?("[ALINA DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
             } catch {
                 status = "Lỗi nạp Alina: \(error.localizedDescription)"
@@ -223,9 +214,45 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.zoomPivot = zoomPivot
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
+
+        if coordinator.animationController == nil {
+            if let skin = findEntity(named: "skin0", in: model),
+               skin.availableAnimations.indices.contains(20) {
+                let clip = skin.availableAnimations[20]
+                let controller = skin.playAnimation(clip, transitionDuration: 0.25, startsPaused: false)
+                coordinator.animationController = controller
+                logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=20; name=\(clip.name ?? "unnamed"); duration=\(controller.duration); playing=\(controller.isPlaying); valid=\(controller.isValid)")
+                let callback = onLog
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    guard let current = coordinator.animationController else {
+                        callback("[ALINA ANIMATION TEST] controller missing at +0.5s")
+                        return
+                    }
+                    callback("[ALINA ANIMATION TEST] +0.5s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    guard let current = coordinator.animationController else {
+                        callback("[ALINA ANIMATION TEST] controller missing at +2.0s")
+                        return
+                    }
+                    callback("[ALINA ANIMATION TEST] +2.0s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
+                }
+            } else {
+                logDeferred("[ALINA ANIMATION TEST] skin0#20 unavailable after scene attach")
+            }
+        }
+
         applyZoom(zoomScale, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
+    }
+
+    private func findEntity(named name: String, in root: Entity) -> Entity? {
+        if root.name == name { return root }
+        for child in root.children {
+            if let match = findEntity(named: name, in: child) { return match }
+        }
+        return nil
     }
 
     private func applyZoom(_ zoom: Float, coordinator: Coordinator) {
@@ -241,6 +268,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
     final class Coordinator {
         var currentEntity: Entity?
+        var animationController: AnimationPlaybackController?
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
