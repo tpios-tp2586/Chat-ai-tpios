@@ -11,7 +11,7 @@ workflows:
           set -euo pipefail
           test -s project.yml
           test -s IMG_0290.png
-          for MODEL in Lily Alina; do
+          for MODEL in Alina; do
             FILE="ChatAI/Resources/${MODEL}.usdz"
             test -s "$FILE"
             unzip -tq "$FILE"
@@ -61,7 +61,7 @@ workflows:
           set -euo pipefail
           APP_PATH="build/Build/Products/Debug-iphoneos/ChatAI.app"
           test -d "$APP_PATH"
-          for MODEL in Lily Alina; do
+          for MODEL in Alina; do
             FILE="$APP_PATH/${MODEL}.usdz"
             test -s "$FILE"
             unzip -tq "$FILE"
@@ -69,7 +69,7 @@ workflows:
           done
           {
             echo "MODEL RESOURCE CHECK: PASS"
-            ls -lh "$APP_PATH/Lily.usdz" "$APP_PATH/Alina.usdz"
+            ls -lh "$APP_PATH/Alina.usdz"
           } | tee model_resource_check.txt
 
     artifacts:
@@ -93,12 +93,12 @@ workflows:
       - name: Install XcodeGen
         script: brew install xcodegen
 
-      - name: Validate Lily model resource
+      - name: Validate Alina model resource
         script: |
           set -euo pipefail
-          test -s ChatAI/Resources/Lily.usdz
-          unzip -tq ChatAI/Resources/Lily.usdz
-          echo "OK: Lily.usdz is present in app resources ($(wc -c < ChatAI/Resources/Lily.usdz) bytes)"
+          test -s ChatAI/Resources/Alina.usdz
+          unzip -tq ChatAI/Resources/Alina.usdz
+          echo "OK: Alina.usdz is present in app resources ($(wc -c < ChatAI/Resources/Alina.usdz) bytes)"
 
       - name: Generate app icon
         script: |
