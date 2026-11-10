@@ -1,79 +1,6 @@
 workflows:
-  ios-model-check:
-    name: Chat AI - Model Resource Check (No IPA)
-    max_build_duration: 45
-    environment:
-      xcode: 16.4
-      cocoapods: default
-    scripts:
-      - name: Check project files and Alina USDZ
-        script: |
-          set -euo pipefail
-          test -s project.yml
-          test -s IMG_0290.png
-          FILE="ChatAI/Resources/Alina.usdz"
-          test -s "$FILE"
-          unzip -tq "$FILE"
-          echo "OK: $FILE ($(wc -c < "$FILE") bytes)"
-
-      - name: Install XcodeGen
-        script: brew install xcodegen
-
-      - name: Generate app icon
-        script: |
-          ICON_DIR="ChatAI/Assets.xcassets/AppIcon.appiconset"
-          mkdir -p "$ICON_DIR"
-          sips -s format png --resampleHeightWidth 1024 1024 IMG_0290.png --out "$ICON_DIR/icon-1024.png"
-          sips -z 40 40   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-20@2x.png"
-          sips -z 60 60   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-20@3x.png"
-          sips -z 58 58   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@2x.png"
-          sips -z 87 87   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-29@3x.png"
-          sips -z 80 80   "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@2x.png"
-          sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-40@3x.png"
-          sips -z 120 120 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@2x.png"
-          sips -z 180 180 "$ICON_DIR/icon-1024.png" --out "$ICON_DIR/icon-60@3x.png"
-
-      - name: Generate Xcode project
-        script: xcodegen generate
-
-      - name: Compile iOS app (no IPA packaging)
-        script: |
-          set -o pipefail
-          xcodebuild \
-            -project ChatAI.xcodeproj \
-            -scheme ChatAI \
-            -configuration Debug \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tee build_output.txt
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "=== BUILD ERRORS ==="
-            grep -A 5 "error:" build_output.txt || tail -100 build_output.txt
-            exit 1
-          fi
-
-      - name: Verify Alina USDZ was copied into app bundle
-        script: |
-          set -euo pipefail
-          APP_PATH="build/Build/Products/Debug-iphoneos/ChatAI.app"
-          test -d "$APP_PATH"
-          FILE="$APP_PATH/Alina.usdz"
-          test -s "$FILE"
-          unzip -tq "$FILE"
-          echo "OK in app bundle: Alina.usdz ($(wc -c < "$FILE") bytes)"
-          {
-            echo "MODEL RESOURCE CHECK: PASS"
-            ls -lh "$APP_PATH/Alina.usdz"
-          } | tee model_resource_check.txt
-
-    artifacts:
-      - build_output.txt
-      - model_resource_check.txt
-
   ios-unsigned:
-    name: Chat AI TPiOS - Build IPA
+    name: Chat AI TPiOS - IPA only
     max_build_duration: 60
     environment:
       xcode: 16.4
@@ -81,7 +8,7 @@ workflows:
     scripts:
       - name: Check required source files
         script: |
-          set -e
+          set -euo pipefail
           test -s project.yml
           test -s IMG_0290.png
           echo "Required project and icon files are present."
@@ -113,7 +40,7 @@ workflows:
       - name: Generate Xcode project
         script: xcodegen generate
 
-      - name: Build app (unsigned)
+      - name: Build app (unsigned Release)
         script: |
           set -o pipefail
           xcodebuild \
@@ -131,17 +58,20 @@ workflows:
             exit 1
           fi
 
-      - name: Package IPA
+      - name: Package and verify IPA
         script: |
+          set -euo pipefail
           APP_PATH="build/Build/Products/Release-iphoneos/ChatAI.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "ERROR: App not found at $APP_PATH"
-            ls -la build/Build/Products/Release-iphoneos/ || echo "Products folder not found"
-            exit 1
-          fi
+          test -d "$APP_PATH"
+          rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
-          zip -qr "chat-ai-tpios-$BUILD_NUMBER.ipa" Payload
+          IPA_PATH="chat-ai-tpios-$BUILD_NUMBER.ipa"
+          rm -f "$IPA_PATH"
+          zip -qr "$IPA_PATH" Payload
+          test -s "$IPA_PATH"
+          unzip -tq "$IPA_PATH"
+          echo "IPA READY: $IPA_PATH ($(wc -c < "$IPA_PATH") bytes)"
 
     artifacts:
       - chat-ai-tpios-*.ipa
