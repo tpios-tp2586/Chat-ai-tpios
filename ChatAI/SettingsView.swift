@@ -22,10 +22,14 @@ struct SettingsView: View {
     @AppStorage("selectedProvider") private var selectedProviderRaw = AIProviderKind.openAI.rawValue
     @AppStorage("voiceGender") private var voiceGenderRaw = VoiceGender.female.rawValue
     @AppStorage("autoMemoryV2") private var autoMemory = false
+    @AppStorage("live_persona") private var selectedPersonaPrompt = LivePersona.defaultText
     @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
     @AppStorage(ChatAIThemeStore.accentKey) private var customAccentHex = ""
 
     private var theme: ChatAITheme { ChatAITheme(rawValue: selectedTheme) ?? .firePremium }
+    private var selectedPersonaTitle: String {
+        LivePersona.presets.first(where: { $0.text == selectedPersonaPrompt })?.id ?? "Tùy chỉnh"
+    }
     private var currentModel: String {
         switch AIProviderKind(rawValue: selectedProviderRaw) ?? .openAI {
         case .openAI: return openAIModel
@@ -63,6 +67,14 @@ struct SettingsView: View {
                             settingRowLabel("Model AI", value: currentModel, icon: .provider)
                         }
                         settingToggle("Tự động đọc to câu trả lời", isOn: $autoSpeakReplies, icon: .voice)
+                    }
+
+                    settingsSection("VAI DIỄN AI", icon: .companion) {
+                        NavigationLink {
+                            PersonaSettingsView()
+                        } label: {
+                            settingRowLabel("Chọn vai diễn", value: selectedPersonaTitle, icon: .companion)
+                        }
                     }
 
                     settingsSection("GIAO DIỆN", icon: .settings) {
@@ -183,6 +195,58 @@ struct SettingsView: View {
         KeychainHelper.save(deepseekKey, forKey: AIProviderKind.deepseek.keychainKey)
         KeychainHelper.save(groqKey, forKey: AIProviderKind.groq.keychainKey)
         dismiss()
+    }
+}
+
+struct PersonaSettingsView: View {
+    @AppStorage("live_persona") private var selectedPrompt = LivePersona.defaultText
+    @AppStorage(ChatAIThemeStore.storageKey) private var selectedTheme = ChatAITheme.firePremium.rawValue
+
+    private var theme: ChatAITheme {
+        ChatAITheme(rawValue: selectedTheme) ?? .firePremium
+    }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Chọn một vai diễn. Prompt được lưu và dùng chung cho chat chữ lẫn Chat Voice.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 4)
+
+                ForEach(LivePersona.rolePresets) { preset in
+                    Button {
+                        selectedPrompt = preset.text
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(preset.id)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if selectedPrompt == preset.text {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(theme.accent)
+                            }
+                        }
+                        .padding(15)
+                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(theme.accent.opacity(selectedPrompt == preset.text ? 0.55 : 0.18), lineWidth: 1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 22)
+        }
+        .background { ChatAIThemeBackground(theme: theme) }
+        .navigationTitle("Vai diễn AI")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+        .tint(theme.accent)
     }
 }
 
