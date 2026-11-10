@@ -33,7 +33,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AlinaAvatarView(onLog: { log in
+                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, onLog: { log in
                                 addDiagnostic(log)
                             }, onTap: {
                                 toggleConversation()
