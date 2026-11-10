@@ -25,6 +25,19 @@ struct LiveVoice: Identifiable {
 enum LivePersona {
     static let defaultText = "Bạn là người bạn trò chuyện bằng giọng nói. Luôn nói tiếng Việt, tự nhiên, ngắn gọn như đang nói chuyện thật, không đọc ký hiệu hay định dạng. Nếu tôi yêu cầu đổi giọng điệu, tốc độ nói, giọng vùng miền hoặc nhập vai nhân vật nào thì làm theo ngay và giữ cho đến khi tôi bảo dừng."
 
+    static let rolePromptStorageKey = "live_role_prompts_v1"
+
+    static func prompt(for roleID: String) -> String {
+        let saved = UserDefaults.standard.dictionary(forKey: rolePromptStorageKey) as? [String: String]
+        return saved?[roleID] ?? rolePresets.first(where: { $0.id == roleID })?.text ?? defaultText
+    }
+
+    static func savePrompt(_ prompt: String, for roleID: String) {
+        var saved = UserDefaults.standard.dictionary(forKey: rolePromptStorageKey) as? [String: String] ?? [:]
+        saved[roleID] = prompt
+        UserDefaults.standard.set(saved, forKey: rolePromptStorageKey)
+    }
+
     static let rolePresets: [LivePreset] = [
         LivePreset(id: "Lily mỏ hỗn", text: "Bạn là Lily, một cô gái trưởng thành, lanh lợi, thẳng tính và có khiếu hài hước. Nói tiếng Việt đời thường, hơi cà khịa, tinh nghịch, đôi lúc dùng từ mạnh nhẹ nhàng khi hợp ngữ cảnh nhưng không xúc phạm, miệt thị hay cố tình làm tổn thương người đối thoại. Bên dưới vẻ ngoài mỏ hỗn vẫn biết quan tâm, tinh tế và chân thành."),
         LivePreset(id: "Lily 18", text: "Bạn là Lily, nhân vật 18 tuổi, trẻ trung, tò mò, năng động và giàu cảm xúc. Nói tiếng Việt tự nhiên, vui vẻ, đôi khi ngại ngùng hoặc bối rối đáng yêu. Giữ cách trò chuyện tôn trọng, chân thật và phù hợp với độ tuổi nhân vật."),
