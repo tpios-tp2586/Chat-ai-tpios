@@ -182,17 +182,24 @@ private struct LilyRealityView: UIViewRepresentable {
         logDeferred("[LILY DEBUG] pre-fit world bounds center=\(worldBounds.center), extents=\(worldBounds.extents)")
         logDeferred("[LILY DEBUG] pre-fit local bounds center=\(localBounds.center), extents=\(localBounds.extents)")
 
-        // Match Ara's fitting method: measure in model-local space and normalize to 1.6 units.
+        // Scale model to fit 1.6 units tall, place feet at Y=0, center anchor at mid-body
         let height = localBounds.extents.y
-        let importedRootScale = model.scale
-        let baseScale: Float = (height.isFinite && height > 0) ? 1.6 / height : 1
-        logDeferred("[LILY SCALE] localHeight=\(height), targetHeight=1.6, baseScale=\(baseScale), importedRootScale=\(importedRootScale), savedZoom=\(zoomScale)")
+        let baseScale: Float = (height.isFinite && height > 0.01) ? 1.6 / height : 1.0
+        // After scaling: model bottom = localBounds.min.y * baseScale (negative), top = localBounds.max.y * baseScale
+        // Shift model up so feet (min Y) sit at Y=0 relative to anchor
+        let minY = localBounds.min.y * baseScale
+        let modelOffsetY: Float = -minY  // moves feet to 0
+        // Center horizontally
+        let modelOffsetX: Float = -localBounds.center.x * baseScale
+        let modelOffsetZ: Float = -localBounds.center.z * baseScale
+
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
-        coordinator.basePosition = -localBounds.center * baseScale
+        coordinator.basePosition = SIMD3<Float>(modelOffsetX, modelOffsetY, modelOffsetZ)
         coordinator.currentEntity = model
 
-        let anchorPosition = SIMD3<Float>(0, 0, -2.8)
-        let anchor = AnchorEntity(world: anchorPosition)
+        // Anchor at mid-body height so full body is centered in viewport
+        let midBodyY: Float = (1.6 / 2.0)  // half of 1.6m scaled height
+        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY, -2.8))
         let zoomPivot = Entity()
         zoomPivot.addChild(model)
         model.position = coordinator.basePosition
@@ -205,8 +212,7 @@ private struct LilyRealityView: UIViewRepresentable {
         model.stopAllAnimations()
         applyZoom(zoomScale, coordinator: coordinator)
         applyRotation(rotationY, coordinator: coordinator)
-
-        logDeferred("[LILY DEBUG] applied transform: modelPosition=\(model.position), modelScale=\(model.scale), zoomPivotScale=\(zoomPivot.scale), anchorPosition=\(anchorPosition), viewport=\(view.bounds.size)")
+        logDeferred("[LILY SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
     }
 
     private func applyZoom(_ zoom: Float, coordinator: Coordinator) {
