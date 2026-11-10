@@ -21,6 +21,7 @@ final class ChatViewModel: ObservableObject {
     @AppStorage("autoSpeakReplies") var autoSpeakReplies: Bool = false
     @AppStorage("voiceGender")     var voiceGenderRaw: String = VoiceGender.female.rawValue
     @AppStorage("autoMemoryV2")    var autoMemory: Bool = false
+    @AppStorage("live_persona")    private var personaPrompt: String = LivePersona.defaultText
 
     var voiceGender: VoiceGender { VoiceGender(rawValue: voiceGenderRaw) ?? .female }
     var onSpeakReply: ((String, VoiceGender) -> Void)?
@@ -232,9 +233,11 @@ final class ChatViewModel: ObservableObject {
     private func fetchReply() async throws -> String {
         let key = KeychainHelper.read(forKey: selectedProvider.keychainKey) ?? ""
         var history = messages
+        var systemPrompts = [LivePersona.systemPrompt(for: personaPrompt)]
         if let memoryPrompt = HistoryManager.shared.memorySystemPrompt {
-            history.insert(ChatMessage(role: .system, content: memoryPrompt), at: 0)
+            systemPrompts.append(memoryPrompt)
         }
+        history.insert(ChatMessage(role: .system, content: systemPrompts.joined(separator: "\n\n")), at: 0)
         switch selectedProvider {
         case .openAI:    return try await openAIService.sendMessage(history: history, apiKey: key, model: openAIModel)
         case .anthropic: return try await anthropicService.sendMessage(history: history, apiKey: key, model: anthropicModel)
