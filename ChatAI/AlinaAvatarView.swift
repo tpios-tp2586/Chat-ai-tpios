@@ -215,7 +215,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         // Put the model's midpoint at the viewport center; do not add an upward offset.
         let midBodyY = targetHeight / 2.0
-        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY - targetHeight * 0.30 - 0.10, -2.8))
+        let anchor = AnchorEntity(world: SIMD3<Float>(0, -midBodyY - targetHeight * 0.40 - 0.10, -2.8))
         let zoomPivot = Entity()
         zoomPivot.addChild(model)
         model.position = coordinator.basePosition
