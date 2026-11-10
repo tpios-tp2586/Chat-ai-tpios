@@ -72,20 +72,27 @@ private final class AlinaAvatarLoader: ObservableObject {
         Task { @MainActor in
             do {
                 let model = try await Entity.load(contentsOf: url)
-                func collect(_ entity: Entity) -> [AnimationResource] {
-                    entity.availableAnimations + entity.children.flatMap(collect)
+                var animationEntries: [(path: String, ownerName: String, localIndex: Int, animation: AnimationResource)] = []
+                func collect(_ node: Entity, path: String) {
+                    for (index, animation) in node.availableAnimations.enumerated() {
+                        animationEntries.append((path, node.name, index, animation))
+                    }
+                    for (index, child) in node.children.enumerated() {
+                        collect(child, path: "\(path)/\(index):\(child.name)")
+                    }
                 }
-                let animations = collect(model)
+                collect(model, path: "root")
                 model.stopAllAnimations()
                 entity = model
                 status = "Alina đã sẵn sàng"
-                onLog?("[ALINA] loaded; animations=\(animations.count); playback remains disabled pending clip inspection")
-                for start in stride(from: 0, to: animations.count, by: 10) {
-                    let end = min(start + 10, animations.count)
-                    let names = (start..<end).map { index in
-                        "\(index): \(animations[index].name ?? "unnamed")"
+                onLog?("[ALINA] loaded; animations=\(animationEntries.count); playback remains disabled pending owner mapping")
+                for start in stride(from: 0, to: animationEntries.count, by: 5) {
+                    let end = min(start + 5, animationEntries.count)
+                    let entries = (start..<end).map { index in
+                        let entry = animationEntries[index]
+                        return "\(index)@\(entry.path)#\(entry.localIndex)=\(entry.animation.name ?? "unnamed")"
                     }.joined(separator: " | ")
-                    onLog?("[ALINA ANIMATIONS] \(names)")
+                    onLog?("[ALINA ANIMATION MAP] \(entries)")
                 }
                 onLog?("[ALINA DEBUG] publishing root entity; name=\(model.name), children=\(model.children.count), enabled=\(model.isEnabled)")
             } catch {
