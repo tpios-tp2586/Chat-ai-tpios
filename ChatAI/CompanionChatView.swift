@@ -217,8 +217,9 @@ struct CompanionChatView: View {
     private func addDiagnostic(_ line: String) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         diagnosticLogs.append("[\(timestamp)] \(line)")
-        if diagnosticLogs.count > 150 {
-            diagnosticLogs.removeFirst(diagnosticLogs.count - 150)
+        while diagnosticLogs.count > 150 {
+            let removableIndex = diagnosticLogs.firstIndex { !$0.contains("[ALINA ANIMATION AUDIT]") } ?? 0
+            diagnosticLogs.remove(at: removableIndex)
         }
     }
 
