@@ -6,6 +6,7 @@ import UIKit
 struct AlinaAvatarView: View {
     let isSpeaking: Bool
     let greetingRequest: Int
+    let axisTestRequest: (Int, SIMD3<Float>, Float) // joint, axis, angle
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -15,6 +16,7 @@ struct AlinaAvatarView: View {
     @AppStorage("alina_avatar_position_y_v1") private var savedOffsetY = 0.0
     @State private var pinchStartScale = 1.0
     @State private var isMovingAvatar = false
+    @State private var axisTestRequest: (Int, SIMD3<Float>, Float) = (-1, .zero, 0)
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
@@ -43,6 +45,7 @@ struct AlinaAvatarView: View {
                     entity: entity,
                     isSpeaking: isSpeaking,
                     greetingRequest: greetingRequest,
+                    axisTestRequest: axisTestRequest,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
@@ -124,6 +127,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     let entity: Entity
     let isSpeaking: Bool
     let greetingRequest: Int
+    let axisTestRequest: (Int, SIMD3<Float>, Float)
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
@@ -182,6 +186,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             }
             if context.coordinator.currentOffsetX != offsetX || context.coordinator.currentOffsetY != offsetY {
                 applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: context.coordinator)
+            }
+            if axisTestRequest.0 >= 0 {
+                runAxisTest(jointIndex: axisTestRequest.0, axis: axisTestRequest.1, angle: axisTestRequest.2, coordinator: context.coordinator)
             }
         }
     }
@@ -559,7 +566,56 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
     }
 
-    private func findEntity(named name: String, in root: Entity) -> Entity? {
+    func runAxisTest(jointIndex: Int, axis: SIMD3<Float>, angle: Float, coordinator: Coordinator) {
+        guard let rig = coordinator.rigEntity,
+              let baseline = coordinator.bindPoseTransforms,
+              jointIndex < baseline.count else {
+            onLog("[ALINA RIG AUDIT] axis test skipped: rig not ready")
+            return
+        }
+        // Stop any existing speech gesture
+        coordinator.speechGestureController?.stop()
+        coordinator.speechGestureEntity = nil
+
+        var target = baseline
+        let q = simd_quatf(angle: angle * .pi / 180, axis: simd_normalize(axis))
+        target[jointIndex].rotation = simd_normalize(baseline[jointIndex].rotation * q)
+
+        var def = FromToByAnimation<JointTransforms>()
+        def.jointNames = rig.jointNames
+        def.isScaleAnimated = false
+        def.isTranslationAnimated = false
+        def.isRotationAnimated = true
+        def.fromValue = JointTransforms(baseline)
+        def.toValue = JointTransforms(target)
+        def.duration = 0.8
+        def.timing = .easeInOut
+        def.repeatMode = .autoReverse
+        def.blendLayer = 120
+        def.fillMode = .none
+        def.bindTarget = .jointTransforms
+
+        guard let resource = try? AnimationResource.generate(with: def) else {
+            onLog("[ALINA RIG AUDIT] axis test resource failed")
+            return
+        }
+        coordinator.speechGestureEntity = rig
+        coordinator.speechGestureOriginalTransforms = baseline
+        coordinator.speechGestureController = rig.playAnimation(
+            resource, transitionDuration: 0.1,
+            blendLayerOffset: 0, separateAnimatedValue: true, startsPaused: false
+        )
+        onLog("[ALINA RIG AUDIT] axis test: joint=\(jointIndex) axis=(\(axis.x),\(axis.y),\(axis.z)) angle=\(angle)deg")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak coordinator] in
+            coordinator?.speechGestureController?.stop()
+            rig.jointTransforms = baseline
+            coordinator?.speechGestureController = nil
+            coordinator?.speechGestureEntity = nil
+        }
+    }
+
+        private func findEntity(named name: String, in root: Entity) -> Entity? {
         if root.name == name { return root }
         for child in root.children {
             if let match = findEntity(named: name, in: child) { return match }
