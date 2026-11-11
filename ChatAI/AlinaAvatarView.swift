@@ -264,6 +264,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.baseScale = SIMD3<Float>(repeating: baseScale)
         coordinator.basePosition = SIMD3<Float>(modelOffsetX, modelOffsetY, modelOffsetZ)
         coordinator.currentEntity = model
+        coordinator.lastIsSpeaking = isSpeaking
 
         // Put the model's midpoint at the viewport center; do not add an upward offset.
         let midBodyY = targetHeight / 2.0
