@@ -18,12 +18,25 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
+    @State private var axisTestStep = 0  // 0=off, 1=j77X, 2=j77Y, 3=j77Z, 4=j49X, 5=j49Y, 6=j49Z
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
     @State private var selectedDiagnosticText = ""
 
+
+    private var axisTestParams: (Int, SIMD3<Float>, Float) {
+        switch axisTestStep {
+        case 1: return (77, SIMD3<Float>(1,0,0), 25)
+        case 2: return (77, SIMD3<Float>(0,1,0), 25)
+        case 3: return (77, SIMD3<Float>(0,0,1), 25)
+        case 4: return (49, SIMD3<Float>(1,0,0), 25)
+        case 5: return (49, SIMD3<Float>(0,1,0), 25)
+        case 6: return (49, SIMD3<Float>(0,0,1), 25)
+        default: return (-1, .zero, 0)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -35,7 +48,11 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, greetingRequest: greetingRequest, onLog: { log in
+                            AlinaAvatarView(
+                                isSpeaking: liveManager.aiSpeaking,
+                                greetingRequest: greetingRequest,
+                                axisTestRequest: axisTestParams,
+                                onLog: { log in
                                 addDiagnostic(log)
                             }, onTap: {
                                 toggleConversation()
@@ -210,6 +227,25 @@ struct CompanionChatView: View {
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
                     }
                     .buttonStyle(.bordered)
+                }
+                // Axis test buttons
+                Text("Test axis (joint 77 = tay phải, joint 49 = tay trái)")
+                    .font(.caption).foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach([
+                        (1, "J77 +X", 77, SIMD3<Float>(1,0,0), Float(25)),
+                        (2, "J77 +Y", 77, SIMD3<Float>(0,1,0), Float(25)),
+                        (3, "J77 +Z", 77, SIMD3<Float>(0,0,1), Float(25)),
+                        (4, "J49 +X", 49, SIMD3<Float>(1,0,0), Float(25)),
+                        (5, "J49 +Y", 49, SIMD3<Float>(0,1,0), Float(25)),
+                        (6, "J49 +Z", 49, SIMD3<Float>(0,0,1), Float(25)),
+                    ], id: \.0) { step, label, joint, axis, angle in
+                        Button(label) {
+                            axisTestStep = step
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(axisTestStep == step ? .blue : .gray)
+                    }
                 }
             }.padding()
                 .navigationTitle("Log Chat Voice")
