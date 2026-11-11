@@ -181,6 +181,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     private func logDeferred(_ message: String) {
         // Keep only the one-pass animation audit and actionable playback/load diagnostics.
         guard message.hasPrefix("[ALINA ANIMATION AUDIT]") ||
+              message.hasPrefix("[ALINA RIG AUDIT]") ||
               message.hasPrefix("[ALINA ANIMATION TEST]") ||
               message.hasPrefix("[ALINA ERROR]") else { return }
         let callback = onLog
@@ -276,6 +277,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         if coordinator.animationController == nil {
             if let skin = findEntity(named: "skin0", in: model) {
                 logAnimationInventory(in: model)
+                logRigControlReadiness(for: skin)
 
                 // Diagnostic A/B test: play the first imported TempMotion clip,
                 // not the default subtree animation previously tested at skin0#20.
@@ -301,6 +303,40 @@ private struct AlinaRealityView: UIViewRepresentable {
         applyRotation(rotationY, coordinator: coordinator)
         applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: coordinator)
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
+    }
+
+    private func logRigControlReadiness(for skin: Entity) {
+        let runtimeType = String(reflecting: type(of: skin))
+        guard let modelEntity = skin as? ModelEntity else {
+            logDeferred("[ALINA RIG AUDIT] owner=skin0;runtimeType=\(runtimeType);isModelEntity=false")
+            if let sampled = skin.availableAnimations.first?.definition as? SampledAnimation<JointTransforms> {
+                logJointNames(sampled.jointNames, source: "sampledAnimation")
+            }
+            return
+        }
+
+        let runtimeNames = modelEntity.jointNames
+        let runtimeTransforms = modelEntity.jointTransforms
+        logDeferred("[ALINA RIG AUDIT] owner=skin0;runtimeType=\(runtimeType);isModelEntity=true;runtimeJoints=\(runtimeNames.count);runtimeTransforms=\(runtimeTransforms.count)")
+
+        if let sampled = skin.availableAnimations.first?.definition as? SampledAnimation<JointTransforms> {
+            let sampledNames = sampled.jointNames
+            logDeferred("[ALINA RIG AUDIT] sampledJoints=\(sampledNames.count);runtimeNamesMatchSample=\(runtimeNames == sampledNames)")
+            logJointNames(sampledNames, source: "sampledAnimation")
+        } else {
+            logDeferred("[ALINA RIG AUDIT] no sampled JointTransforms definition available on skin0")
+        }
+    }
+
+    private func logJointNames(_ names: [String], source: String) {
+        let chunkSize = 18
+        for start in stride(from: 0, to: names.count, by: chunkSize) {
+            let end = min(start + chunkSize, names.count)
+            let entries = names[start..<end].enumerated().map { offset, name in
+                "\(start + offset)=\(name)"
+            }.joined(separator: " | ")
+            logDeferred("[ALINA RIG AUDIT] \(source) joints \(start)-\(end - 1): \(entries)")
+        }
     }
 
     private func logAnimationInventory(in root: Entity) {
