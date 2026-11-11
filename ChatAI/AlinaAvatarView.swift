@@ -6,7 +6,6 @@ import UIKit
 struct AlinaAvatarView: View {
     let isSpeaking: Bool
     let greetingRequest: Int
-    let speechGestureRequest: Int
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -44,7 +43,6 @@ struct AlinaAvatarView: View {
                     entity: entity,
                     isSpeaking: isSpeaking,
                     greetingRequest: greetingRequest,
-                    speechGestureRequest: speechGestureRequest,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
@@ -126,7 +124,6 @@ private struct AlinaRealityView: UIViewRepresentable {
     let entity: Entity
     let isSpeaking: Bool
     let greetingRequest: Int
-    let speechGestureRequest: Int
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
@@ -163,21 +160,13 @@ private struct AlinaRealityView: UIViewRepresentable {
             if context.coordinator.lastIsSpeaking != isSpeaking {
                 if isSpeaking {
                     restoreGreetingWave(coordinator: context.coordinator)
+                    if let rig = context.coordinator.rigEntity {
+                        runSpeechGesture(on: rig, baselineTransforms: context.coordinator.bindPoseTransforms, coordinator: context.coordinator)
+                    }
                 } else {
                     restoreSpeechGesture(coordinator: context.coordinator)
                 }
                 context.coordinator.lastIsSpeaking = isSpeaking
-            }
-            if speechGestureRequest != context.coordinator.lastSpeechGestureRequest {
-                context.coordinator.lastSpeechGestureRequest = speechGestureRequest
-                if isSpeaking, let rig = context.coordinator.rigEntity {
-                    runSpeechGesture(
-                        request: speechGestureRequest,
-                        on: rig,
-                        baselineTransforms: context.coordinator.bindPoseTransforms,
-                        coordinator: context.coordinator
-                    )
-                }
             }
             if greetingRequest != context.coordinator.lastGreetingRequest {
                 context.coordinator.lastGreetingRequest = greetingRequest
@@ -306,15 +295,6 @@ private struct AlinaRealityView: UIViewRepresentable {
             logDeferred("[ALINA RIG AUDIT] skin0 entity not found; gesture control unavailable")
         }
 
-        coordinator.lastSpeechGestureRequest = speechGestureRequest
-        if isSpeaking, speechGestureRequest > 0, let rig = coordinator.rigEntity {
-            runSpeechGesture(
-                request: speechGestureRequest,
-                on: rig,
-                baselineTransforms: coordinator.bindPoseTransforms,
-                coordinator: coordinator
-            )
-        }
 
         if greetingRequest != coordinator.lastGreetingRequest {
             coordinator.lastGreetingRequest = greetingRequest
@@ -400,7 +380,6 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     private func runSpeechGesture(
-        request: Int,
         on modelEntity: ModelEntity,
         baselineTransforms: [Transform]?,
         coordinator: Coordinator
@@ -430,9 +409,9 @@ private struct AlinaRealityView: UIViewRepresentable {
         definition.isRotationAnimated = true
         definition.fromValue = JointTransforms(originalTransforms)
         definition.toValue = JointTransforms(targetTransforms)
-        definition.duration = 1.15
+        definition.duration = 2.0
         definition.timing = .easeInOut
-        definition.repeatMode = .none
+        definition.repeatMode = .autoReverse
         definition.blendLayer = 110
         definition.fillMode = .none
         definition.bindTarget = .jointTransforms
@@ -446,12 +425,12 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.speechGestureOriginalTransforms = originalTransforms
         coordinator.speechGestureController = modelEntity.playAnimation(
             resource,
-            transitionDuration: 0.18,
+            transitionDuration: 0.25,
             blendLayerOffset: 0,
             separateAnimatedValue: true,
             startsPaused: false
         )
-        logDeferred("[ALINA RIG AUDIT] coordinated speech gesture started; verifiedArmJoints=49,77; angle=6deg; duration=1.15s")
+        logDeferred("[ALINA RIG AUDIT] coordinated speech gesture loop started; verifiedArmJoints=49,77; angle=6deg; halfCycle=2.0s")
     }
 
     private func restoreSpeechGesture(coordinator: Coordinator) {
@@ -612,7 +591,6 @@ private struct AlinaRealityView: UIViewRepresentable {
         var speechGestureController: AnimationPlaybackController?
         weak var speechGestureEntity: ModelEntity?
         var speechGestureOriginalTransforms: [Transform]?
-        var lastSpeechGestureRequest = 0
         weak var rigEntity: ModelEntity?
         var bindPoseTransforms: [Transform]?
         var lastGreetingRequest = 0
