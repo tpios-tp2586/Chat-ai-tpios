@@ -277,6 +277,8 @@ private struct AlinaRealityView: UIViewRepresentable {
             if let skin = findEntity(named: "skin0", in: model) {
                 // AN-03 inventory is complete; collect only the rig data needed for AN-04.
                 logRigControlReadiness(for: skin)
+                // Capture the asset's original bind pose before the imported clip is applied.
+                let baselineTransforms = (skin as? ModelEntity)?.jointTransforms
 
                 // Diagnostic A/B test: play the first imported TempMotion clip,
                 // not the default subtree animation previously tested at skin0#20.
@@ -285,8 +287,7 @@ private struct AlinaRealityView: UIViewRepresentable {
                     let clip = skin.availableAnimations[testClipIndex]
                     let definition = clip.definition
                     let loopingClip = clip.repeat(duration: .infinity)
-                    // Avoid an idle cross-fade changing the pose before AN-04 captures its baseline.
-                    let controller = skin.playAnimation(loopingClip, transitionDuration: isSpeaking ? 0.25 : 0, startsPaused: !isSpeaking)
+                    let controller = skin.playAnimation(loopingClip, transitionDuration: 0.25, startsPaused: !isSpeaking)
                     coordinator.animationController = controller
                     coordinator.lastIsSpeaking = isSpeaking
                     let controllerEntity = controller.entity
@@ -294,7 +295,7 @@ private struct AlinaRealityView: UIViewRepresentable {
                 } else {
                     logDeferred("[ALINA ANIMATION TEST] skin0#\(testClipIndex) unavailable; count=\(skin.availableAnimations.count)")
                 }
-                runSingleJointProbe(on: skin, isSpeaking: isSpeaking, coordinator: coordinator)
+                runSingleJointProbe(on: skin, baselineTransforms: baselineTransforms, isSpeaking: isSpeaking, coordinator: coordinator)
             } else {
                 logDeferred("[ALINA ANIMATION TEST] skin0 entity not found after scene attach")
             }
@@ -330,17 +331,19 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     // Temporary AN-04 proof: animate one indexed joint while the imported full-body clip is paused.
-    private func runSingleJointProbe(on skin: Entity, isSpeaking: Bool, coordinator: Coordinator) {
+    private func runSingleJointProbe(on skin: Entity, baselineTransforms: [Transform]?, isSpeaking: Bool, coordinator: Coordinator) {
         let jointIndex = 49
         guard !isSpeaking,
               let modelEntity = skin as? ModelEntity,
-              modelEntity.jointNames.indices.contains(jointIndex),
-              modelEntity.jointTransforms.indices.contains(jointIndex) else {
+              let originalTransforms = baselineTransforms,
+              originalTransforms.count == modelEntity.jointNames.count,
+              originalTransforms.indices.contains(jointIndex) else {
             logDeferred("[ALINA RIG AUDIT] single-joint probe skipped; speaking=\(isSpeaking); modelEntity=\(skin is ModelEntity)")
             return
         }
 
-        let originalTransforms = modelEntity.jointTransforms
+        // Start and restore from the pre-animation bind pose, not a possibly sampled clip pose.
+        modelEntity.jointTransforms = originalTransforms
         let jointNames = modelEntity.jointNames
         let jointName = jointNames[jointIndex]
         let original = originalTransforms[jointIndex]
@@ -369,7 +372,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.jointProbeController = controller
         coordinator.jointProbeEntity = modelEntity
         coordinator.jointProbeOriginalTransforms = originalTransforms
-        logDeferred("[ALINA RIG AUDIT] single-joint probe started; index=\(jointIndex); name=\(jointName); angle=15deg; duration=0.65; importedAnimationPaused=true")
+        logDeferred("[ALINA RIG AUDIT] single-joint probe started; index=\(jointIndex); name=\(jointName); angle=15deg; duration=0.65; baseline=pre-animation bind pose; importedAnimationPaused=true")
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) { [weak coordinator] in
             guard let coordinator,
