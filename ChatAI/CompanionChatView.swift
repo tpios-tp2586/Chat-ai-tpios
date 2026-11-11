@@ -17,6 +17,7 @@ struct CompanionChatView: View {
     }
 
     @State private var emotion: CompanionEmotion = .idle
+    @State private var greetingRequest = 0
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -34,7 +35,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, onLog: { log in
+                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, greetingRequest: greetingRequest, onLog: { log in
                                 addDiagnostic(log)
                             }, onTap: {
                                 toggleConversation()
@@ -296,6 +297,7 @@ struct CompanionChatView: View {
     private func toggleConversation() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if liveManager.state == .idle {
+            greetingRequest += 1
             addDiagnostic("[VOICE] Avatar tapped: starting voice conversation")
             startLive()
         } else {
