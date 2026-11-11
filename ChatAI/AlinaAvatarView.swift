@@ -158,6 +158,7 @@ private struct AlinaRealityView: UIViewRepresentable {
             attach(entity, isSpeaking: isSpeaking, greetingRequest: greetingRequest, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
         } else {
             if context.coordinator.lastIsSpeaking != isSpeaking {
+                context.coordinator.lastIsSpeaking = isSpeaking
                 if isSpeaking {
                     restoreGreetingWave(coordinator: context.coordinator)
                     if let rig = context.coordinator.rigEntity {
@@ -166,7 +167,6 @@ private struct AlinaRealityView: UIViewRepresentable {
                 } else {
                     restoreSpeechGesture(coordinator: context.coordinator)
                 }
-                context.coordinator.lastIsSpeaking = isSpeaking
             }
             if greetingRequest != context.coordinator.lastGreetingRequest {
                 context.coordinator.lastGreetingRequest = greetingRequest
@@ -291,6 +291,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             coordinator.rigEntity = modelEntity
             coordinator.bindPoseTransforms = modelEntity?.jointTransforms
             logDeferred("[ALINA RIG AUDIT] verified bind pose captured; imported TempMotion playback disabled")
+            if isSpeaking, let rig = coordinator.rigEntity {
+                runSpeechGesture(on: rig, baselineTransforms: coordinator.bindPoseTransforms, coordinator: coordinator)
+            }
         } else {
             logDeferred("[ALINA RIG AUDIT] skin0 entity not found; gesture control unavailable")
         }
