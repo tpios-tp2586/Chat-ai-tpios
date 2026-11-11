@@ -178,3 +178,11 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - **Preserved:** Gemini Live audio/transcription, greeting trigger, Chibi, framing, zoom, position controls, and log copy/clear.
 - **Validation:** Source-only. No build/device test was run. This correction is intended to remove the sequential arm motion and imported-clip interference; visual quality and bind-pose restoration still require one user-run build.
 - **Next:** Verify both arms move together subtly during AI speech and return to rest after speech. Facial expressions remain a separate follow-up requiring verified face controls.
+
+
+## AN-06 — speech gesture cadence correction (2026-11-11)
+- **User device result:** During AI speech, both arms moved up/down quickly twice, then stayed still for the remainder of the response.
+- **Source cause:** The controller was one-shot (repeatMode none, duration 1.15s) and depended on transcript character thresholds (35 characters initially, then 48 additional characters). It could therefore produce only a small number of short gestures during a long spoken response.
+- **Correction on main:** Removed transcript-threshold gesture requests. The verified bilateral arm gesture now starts on the aiSpeaking false-to-true transition, uses the same confirmed arm joints 49 and 77 and 6-degree amplitude, and runs an eased auto-reversing cycle with a 2.0s half-cycle. It is stopped and the captured bind pose restored when aiSpeaking becomes false. No idle/background loop is added.
+- **Preserved:** Gemini Live audio/transcription, greeting, Chibi, avatar framing/zoom/rotation/position, and diagnostic copy/clear controls.
+- **Validation:** Source-only; no Codemagic build or device test was run. The next single user-run build should answer whether the arms now make slow repeated gestures for the full duration of AI speech and return to the horizontal shoulder-height pose when speech ends.
