@@ -1,13 +1,65 @@
 # Chat AI TPiOS — Checkpoint
 
-- **Branch:** `main` only. Inspect current source before every edit; no new branches.
-- **App:** SwiftUI + XcodeGen (`project.yml`). Codemagic workflow: IPA-only. Never start Codemagic or GitHub Actions without explicit permission.
+## Project rules
+- **Branch:** `main` only. Inspect current source and repository state before every edit; never create or switch to another branch.
+- **App:** SwiftUI + XcodeGen (`project.yml`). Codemagic workflow: IPA-only.
+- **Build permission:** Never start Codemagic or GitHub Actions without explicit user permission. User runs Codemagic builds.
 - **Keep stable:** Text Chat, provider APIs, chat history, Gemini Live voice, Chibi/robot face, settings and theme.
-- **Chat Voice:** `CompanionChatView` loads `ChatAI/Resources/Alina.usdz` through `AlinaAvatarView`. Keep the diagnostic log and copy button.
-- **Alina framing — LOCKED:** User confirmed full body is now visible with no clipping. Do not alter fitted model height (`targetHeight = 3.20`), fit scale calculation, anchor framing formula, upward adjustment (`targetHeight * 0.20`), depth (`z = -2.8`), zoom pivot, or persisted framing offsets unless the user explicitly asks.
-- **Alina rotation — LOCKED:** User confirmed rotation is working well. Preserve the current horizontal drag rotation gesture and sensitivity (`0.01`); do not change it while working on movement.
-- **Alina movement:** Hold for 0.30s, then drag. Current implementation uses a native `UILongPressGestureRecognizer` and updates the RealityKit anchor directly during the gesture; persist offsets only when the gesture ends. Test on device for smoothness before further changes.
-- **Alina animation research:** Inventory traverses the full Entity hierarchy and logs owner/path plus animation metadata. For `skin0`, diagnostics also inspect `SampledAnimation<JointTransforms>` frame count, joint names, frame interval, joints that move relative to the first frame, and exact duplicate frame data across clips. This is diagnostic only: playback still tests `skin0` clip 0 as a loop while AI speaks. Do not infer semantic actions from clip names; classify from frame data and visual playback before designing context states.
-- **Alina scope:** Full-body skeletal/body animation first; facial rig and lip-sync are not required yet. Keep chatbot, API, chat history, and voice pipeline unchanged.
-- **Build/output:** IPA-only. User runs Codemagic; never trigger a build without permission.
-- **Engineering:** Minimal changes, no unnecessary dependencies, no changes to Chibi or unrelated chat/voice paths.
+- **Engineering:** Minimal changes, no unnecessary dependencies, no unrelated cleanup or refactoring.
+- **Diagnostics:** Inspect existing logs and saved results before requesting another test. Add only diagnostics needed to answer a specific unresolved question; do not repeat known hierarchy/frame inventories.
+
+## Progress rules — mandatory
+This file is the source of truth for project progress.
+- Every work item must have a status, objective, acceptance criteria, test/evidence, result, and next action.
+- Allowed statuses: `NOT STARTED`, `IN PROGRESS`, `BLOCKED`, `DONE`.
+- Mark an item `DONE` only after its acceptance criteria are met and the result is supported by a test, log, source inspection, or explicit user confirmation.
+- A completed item is locked. Do not repeat its tests or change its implementation unless a new defect, regression, or explicit user request justifies reopening it.
+- A test must answer a named question. Do not run exploratory tests without recording the question and expected decision.
+- After each test, record the date, exact test, evidence/log reference, outcome, conclusion, and next action here before moving on.
+- After a code change, test only the changed behavior and directly affected regression paths. Do not rerun unrelated completed tests.
+- Never mark work done merely because code was edited or a build succeeded. Completion requires behavior-level verification.
+- At each handoff, report: completed, current item, blockers, and the single next step.
+
+## Alina — scope and locked decisions
+
+### Completed and locked
+| ID | Work item | Status | Acceptance evidence / decision |
+|---|---|---|---|
+| AL-01 | Full-body framing and visible size | DONE | User confirmed Alina is fully visible. Lock current framing; do not retune without a new defect/request. |
+| AL-02 | Rotation | DONE | User confirmed rotation works. Preserve horizontal drag sensitivity `0.01`. |
+| AL-03 | Position / move gesture | DONE | User confirmed current movement is acceptable. Preserve 0.30s hold + drag and direct anchor updates. |
+| AL-04 | Zoom | DONE | Current pinch zoom and persisted setting are accepted. Preserve key `alina_avatar_zoom_scale_v1` and clamp 0.7...4.5. |
+| AL-05 | Animation playback start/stop | DONE | Three prior device tests confirmed: still after load, moves while AI speaks, stops when AI finishes. Do not repeat these tests. |
+
+### Locked implementation values
+- Model: `ChatAI/Resources/Alina.usdz`; view implementation: `ChatAI/AlinaAvatarView.swift`.
+- Framing: `targetHeight = 3.20`; preserve fit-scale calculation, anchor framing formula, upward adjustment `targetHeight * 0.20`, and depth `z = -2.8`.
+- Zoom: preserve zoom pivot and persisted key `alina_avatar_zoom_scale_v1`, clamp 0.7...4.5.
+- Position: preserve persisted keys `alina_avatar_position_x_v1` and `alina_avatar_position_y_v1`.
+- Rotation: preserve horizontal drag sensitivity `0.01`.
+- Move gesture: preserve 0.30s hold and current direct RealityKit anchor update.
+- Playback: currently plays `skin0` clip 0 as a loop while `isSpeaking` is true and pauses when false. Start/stop behavior is verified; semantic quality and animation selection are not yet approved.
+
+### Animation investigation and implementation plan
+| ID | Work item | Status | Objective and acceptance criteria | Test / evidence already available | Next action |
+|---|---|---|---|---|---|
+| AN-01 | Inventory sampled clips `skin0#0–#18` | DONE | Determine whether entries contain distinct sampled frame data. | Existing logs: each has 2717 frames, 101 joints, 0.008333334s frame interval, 81 moving joints; #1–#18 report exact duplicate of #0. One shared sampled motion is evidenced, not 19 unique actions. | Do not request or re-run these frame logs. |
+| AN-02 | Inspect `AnimationGroup #19/#20` | IN PROGRESS | Read group structure and determine whether either contains independent child animations or merely references the same sampled motion. | Existing logs identify both as `RealityFoundation.AnimationGroup`; current inspector reports unsupported definition. | Research the actual RealityKit API and inspect the existing SDK/source before proposing a narrowly scoped diagnostic. No production playback changes yet. |
+| AN-03 | Build a unique-animation catalogue | NOT STARTED | List only distinct playable motions, their owners/targets, duration and source definition. No duplicate entries counted as separate actions. | Depends on AN-02. | Proceed after AN-02 is resolved. |
+| AN-04 | Visually classify motion semantics | NOT STARTED | Identify which unique motions visibly correspond to idle, listening, thinking, speaking, reacting/emphasis, or determine that the asset lacks a required motion. | Requires a controlled visual test of each unique candidate; names alone are not proof. | Prepare one test matrix after AN-03; do not replay duplicates. |
+| AN-05 | Design context-to-animation rules | NOT STARTED | Define state transitions, priority, interruption and return-to-idle behavior; avoid meaningless repeated loops. | Requires AN-04 results. | Agree on the mapping before coding. |
+| AN-06 | Implement animation controller | NOT STARTED | Implement only approved mappings using existing assets/APIs; preserve chat, API, history and Gemini Live voice behavior. | No implementation approved yet. | Make minimal source changes after AN-05 approval. |
+| AN-07 | Verify integrated animation behavior | NOT STARTED | Confirm each state, transitions, interruption, no unwanted motion at idle, and no regressions to speaking start/stop. | Test only new controller behavior and directly affected paths; prior AL-05 evidence remains valid unless implementation changes that path. | User runs the authorized Codemagic/device test; record results here. |
+
+## Test record
+Append a concise entry after each new test. Do not overwrite prior evidence.
+| Date | Work ID | Question / test | Evidence reference | Result / conclusion | Next action |
+|---|---|---|---|---|---|
+| 2026-11-11 | AN-01 | Compare sampled frame data for `skin0#0–#18`. | Chat logs supplied by user in Alina investigation conversation. | All sampled frame data are exact duplicates of #0; not 19 distinct motions. | Locked; no retest. |
+| 2026-11-11 | AN-02 | Inspect animation group definitions #19/#20. | Existing diagnostic logs: `unsupportedDefinition=RealityFoundation.AnimationGroup`. | Structure unresolved; no conclusion about child animations yet. | Inspect actual API/SDK and propose targeted diagnostic only. |
+| Previously confirmed | AL-05 | Verify playback at load, while speaking, and after speaking ends. | Three device tests explicitly confirmed by user. | All three behaviors pass. | Locked; no retest unless playback code changes or regression appears. |
+
+## Build and release
+- IPA-only output.
+- User runs Codemagic. Never trigger builds or GitHub Actions without explicit permission.
+- Do not add ZIP artifacts.
