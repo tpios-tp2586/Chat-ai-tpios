@@ -330,59 +330,81 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
     }
 
-    // Temporary AN-04 proof: animate one indexed joint while the imported full-body clip is paused.
+    // One-pass AN-05 sweep: test every joint except the two already-confirmed arm controls.
     private func runSingleJointProbe(on skin: Entity, baselineTransforms: [Transform]?, isSpeaking: Bool, coordinator: Coordinator) {
-        let jointIndex = 77
         guard !isSpeaking,
               let modelEntity = skin as? ModelEntity,
               let originalTransforms = baselineTransforms,
-              originalTransforms.count == modelEntity.jointNames.count,
-              originalTransforms.indices.contains(jointIndex) else {
-            logDeferred("[ALINA RIG AUDIT] single-joint probe skipped; speaking=\(isSpeaking); modelEntity=\(skin is ModelEntity)")
+              originalTransforms.count == modelEntity.jointNames.count else {
+            logDeferred("[ALINA RIG AUDIT] body sweep skipped; speaking=\(isSpeaking); modelEntity=\(skin is ModelEntity)")
             return
         }
 
-        // Start and restore from the pre-animation bind pose, not a possibly sampled clip pose.
-        modelEntity.jointTransforms = originalTransforms
         let jointNames = modelEntity.jointNames
-        let jointName = jointNames[jointIndex]
-        let original = originalTransforms[jointIndex]
-        var targetTransforms = originalTransforms
-        let rotationDelta = simd_quatf(angle: .pi / 12, axis: SIMD3<Float>(0, 0, 1))
-        targetTransforms[jointIndex].rotation = simd_normalize(original.rotation * rotationDelta)
-
-        var definition = FromToByAnimation<JointTransforms>()
-        definition.name = "AlinaSingleJointProbe"
-        definition.jointNames = jointNames
-        definition.isScaleAnimated = false
-        definition.isTranslationAnimated = false
-        definition.isRotationAnimated = true
-        definition.fromValue = JointTransforms(originalTransforms)
-        definition.toValue = JointTransforms(targetTransforms)
-        definition.duration = 0.65
-        definition.blendLayer = 100
-        definition.fillMode = .none
-        definition.bindTarget = .jointTransforms
-
-        guard let animationResource = try? AnimationResource.generate(with: definition) else {
-            logDeferred("[ALINA RIG AUDIT] single-joint probe resource generation failed")
-            return
-        }
-        let controller = modelEntity.playAnimation(animationResource, transitionDuration: 0.05, blendLayerOffset: 0, separateAnimatedValue: true, startsPaused: false)
-        coordinator.jointProbeController = controller
+        let indices = jointNames.indices.filter { $0 != 49 && $0 != 77 }
+        coordinator.jointProbeSequenceID += 1
+        let sequenceID = coordinator.jointProbeSequenceID
         coordinator.jointProbeEntity = modelEntity
         coordinator.jointProbeOriginalTransforms = originalTransforms
-        logDeferred("[ALINA RIG AUDIT] single-joint probe started; index=\(jointIndex); name=\(jointName); angle=15deg; duration=0.65; baseline=pre-animation bind pose; importedAnimationPaused=true")
+        modelEntity.jointTransforms = originalTransforms
+        logDeferred("[ALINA RIG AUDIT] body sweep started; joints=\(indices.count); excludes=49,77; perJoint=0.16s; baseline=pre-animation bind pose")
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) { [weak coordinator] in
-            guard let coordinator,
-                  coordinator.jointProbeController === controller else { return }
-            restoreSingleJointProbe(coordinator: coordinator)
-            logDeferred("[ALINA RIG AUDIT] single-joint probe finished; original transforms restored")
+        func runStep(_ step: Int) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.22) { [weak coordinator] in
+                guard let coordinator,
+                      coordinator.jointProbeSequenceID == sequenceID,
+                      coordinator.jointProbeEntity === modelEntity else { return }
+
+                coordinator.jointProbeController?.stop()
+                modelEntity.jointTransforms = originalTransforms
+
+                guard step < indices.count else {
+                    coordinator.jointProbeController = nil
+                    coordinator.jointProbeEntity = nil
+                    coordinator.jointProbeOriginalTransforms = nil
+                    logDeferred("[ALINA RIG AUDIT] body sweep finished; tested=\(indices.count); original transforms restored")
+                    return
+                }
+
+                let jointIndex = indices[step]
+                var targetTransforms = originalTransforms
+                let delta = simd_quatf(angle: .pi / 12, axis: SIMD3<Float>(0, 0, 1))
+                targetTransforms[jointIndex].rotation = simd_normalize(originalTransforms[jointIndex].rotation * delta)
+
+                var definition = FromToByAnimation<JointTransforms>()
+                definition.name = "AlinaBodyJointSweep"
+                definition.jointNames = jointNames
+                definition.isScaleAnimated = false
+                definition.isTranslationAnimated = false
+                definition.isRotationAnimated = true
+                definition.fromValue = JointTransforms(originalTransforms)
+                definition.toValue = JointTransforms(targetTransforms)
+                definition.duration = 0.16
+                definition.blendLayer = 100
+                definition.fillMode = .none
+                definition.bindTarget = .jointTransforms
+
+                guard let resource = try? AnimationResource.generate(with: definition) else {
+                    logDeferred("[ALINA RIG AUDIT] body sweep resource generation failed; index=\(jointIndex)")
+                    runStep(step + 1)
+                    return
+                }
+                coordinator.jointProbeController = modelEntity.playAnimation(
+                    resource,
+                    transitionDuration: 0.02,
+                    blendLayerOffset: 0,
+                    separateAnimatedValue: true,
+                    startsPaused: false
+                )
+                runStep(step + 1)
+            }
         }
+
+        runStep(0)
     }
 
     private func restoreSingleJointProbe(coordinator: Coordinator) {
+        coordinator.jointProbeSequenceID += 1
         coordinator.jointProbeController?.stop()
         if let entity = coordinator.jointProbeEntity,
            let transforms = coordinator.jointProbeOriginalTransforms {
@@ -582,6 +604,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         var jointProbeController: AnimationPlaybackController?
         weak var jointProbeEntity: ModelEntity?
         var jointProbeOriginalTransforms: [Transform]?
+        var jointProbeSequenceID = 0
         var lastIsSpeaking = false
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
