@@ -180,9 +180,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
     private func logDeferred(_ message: String) {
         // Keep only the one-pass animation audit and actionable playback/load diagnostics.
-        guard message.hasPrefix("[ALINA ANIMATION AUDIT]") ||
-              message.hasPrefix("[ALINA RIG AUDIT]") ||
-              message.hasPrefix("[ALINA ANIMATION TEST]") ||
+        guard message.hasPrefix("[ALINA RIG AUDIT]") ||
               message.hasPrefix("[ALINA ERROR]") else { return }
         let callback = onLog
         DispatchQueue.main.async {
@@ -276,7 +274,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         if coordinator.animationController == nil {
             if let skin = findEntity(named: "skin0", in: model) {
-                logAnimationInventory(in: model)
+                // AN-03 inventory is complete; collect only the rig data needed for AN-04.
                 logRigControlReadiness(for: skin)
 
                 // Diagnostic A/B test: play the first imported TempMotion clip,
