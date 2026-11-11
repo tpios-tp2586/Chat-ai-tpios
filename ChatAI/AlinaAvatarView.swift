@@ -321,6 +321,51 @@ private struct AlinaRealityView: UIViewRepresentable {
                 logDeferred("[ALINA ANIMATION INVENTORY] owner=\(node.name); path=\(path); clip=\(index); name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))")
             }
 
+            if node.name == "skin0" {
+                var previousClips: [(index: Int, frames: [JointTransforms], jointNames: [String], frameInterval: Float)] = []
+
+                for (index, animation) in node.availableAnimations.enumerated() {
+                    guard let sampled = animation.definition as? SampledAnimation<JointTransforms> else {
+                        logDeferred("[ALINA CLIP DATA] skin0#\(index); unsupportedDefinition=\(String(reflecting: type(of: animation.definition)))")
+                        continue
+                    }
+
+                    let frames = sampled.frames
+                    let jointNames = sampled.jointNames
+                    var movingJointNames: [String] = []
+
+                    if let firstFrame = frames.first, frames.count > 1 {
+                        for jointIndex in 0..<min(jointNames.count, firstFrame.count) {
+                            let initial = firstFrame[jointIndex]
+                            var maxTranslation: Float = 0
+                            var maxRotation: Float = 0
+
+                            for frame in frames.dropFirst() where jointIndex < frame.count {
+                                let transform = frame[jointIndex]
+                                maxTranslation = max(maxTranslation, simd_length(transform.translation - initial.translation))
+                                let rotationDot = min(max(abs(simd_dot(initial.rotation, transform.rotation)), 0), 1)
+                                maxRotation = max(maxRotation, 2 * acos(rotationDot))
+                            }
+
+                            if maxTranslation > 0.0001 || maxRotation > 0.001 {
+                                movingJointNames.append(jointNames[jointIndex])
+                            }
+                        }
+                    }
+
+                    let duplicateIndex = previousClips.first {
+                        $0.frames == frames &&
+                        $0.jointNames == jointNames &&
+                        $0.frameInterval == sampled.frameInterval
+                    }?.index
+                    let duplicateLabel = duplicateIndex.map { String($0) } ?? "none"
+                    let examples = movingJointNames.prefix(8).joined(separator: ",")
+
+                    logDeferred("[ALINA CLIP DATA] skin0#\(index); frames=\(frames.count); joints=\(jointNames.count); frameInterval=\(sampled.frameInterval); movingJoints=\(movingJointNames.count); examples=\(examples); exactDuplicateOf=\(duplicateLabel)")
+                    previousClips.append((index, frames, jointNames, sampled.frameInterval))
+                }
+            }
+
             for (index, child) in node.children.enumerated() {
                 visit(child, path: "\(path)/\(index):\(child.name)")
             }
