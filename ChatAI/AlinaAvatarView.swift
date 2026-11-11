@@ -340,20 +340,21 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
 
         let originalTransforms = modelEntity.jointTransforms
-        let jointName = modelEntity.jointNames[jointIndex]
+        let jointNames = modelEntity.jointNames
+        let jointName = jointNames[jointIndex]
         let original = originalTransforms[jointIndex]
-        var target = original
+        var targetTransforms = originalTransforms
         let rotationDelta = simd_quatf(angle: .pi / 12, axis: SIMD3<Float>(0, 0, 1))
-        target.rotation = simd_normalize(original.rotation * rotationDelta)
+        targetTransforms[jointIndex].rotation = simd_normalize(original.rotation * rotationDelta)
 
         var definition = FromToByAnimation<JointTransforms>()
         definition.name = "AlinaSingleJointProbe"
-        definition.jointNames = [jointName]
+        definition.jointNames = jointNames
         definition.isScaleAnimated = false
         definition.isTranslationAnimated = false
         definition.isRotationAnimated = true
-        definition.fromValue = JointTransforms([original])
-        definition.toValue = JointTransforms([target])
+        definition.fromValue = JointTransforms(originalTransforms)
+        definition.toValue = JointTransforms(targetTransforms)
         definition.duration = 0.65
         definition.blendLayer = 100
         definition.fillMode = .forwards
