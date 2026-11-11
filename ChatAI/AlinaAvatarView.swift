@@ -16,7 +16,6 @@ struct AlinaAvatarView: View {
     @AppStorage("alina_avatar_position_y_v1") private var savedOffsetY = 0.0
     @State private var pinchStartScale = 1.0
     @State private var isMovingAvatar = false
-    @State private var axisTestRequest: (Int, SIMD3<Float>, Float) = (-1, .zero, 0)
     @State private var rotationY: Float = 0
     @State private var dragStartRotation: Float = 0
 
