@@ -337,7 +337,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
     }
 
-    private func logJointHierarchy(_ names: [String], transforms: JointTransforms) {
+    private func logJointHierarchy(_ names: [String], transforms: [Transform]) {
         var indexByPath: [String: Int] = [:]
         for (index, name) in names.enumerated() {
             indexByPath[name] = index
