@@ -97,6 +97,7 @@ struct CompanionChatView: View {
             }
             if speaking {
                 handleLatestTranscript()
+                updateSpeechGestureRequest()
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
