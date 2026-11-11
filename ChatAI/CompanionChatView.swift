@@ -238,7 +238,7 @@ struct CompanionChatView: View {
         guard liveManager.aiSpeaking,
               let line = liveManager.lines.last,
               line.role == .assistant,
-              let boundary = line.text.lastIndex(where: { ".!?。！？\\n".contains($0) }) else {
+              let boundary = line.text.lastIndex(where: { ".!?。！？\n".contains($0) }) else {
             return
         }
 
