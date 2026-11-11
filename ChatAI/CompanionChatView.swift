@@ -18,8 +18,6 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
-    @State private var speechGestureRequest = 0
-    @State private var lastGestureText = ""
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -37,7 +35,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, greetingRequest: greetingRequest, speechGestureRequest: speechGestureRequest, onLog: { log in
+                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, greetingRequest: greetingRequest, onLog: { log in
                                 addDiagnostic(log)
                             }, onTap: {
                                 toggleConversation()
@@ -88,16 +86,11 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.lines.last?.text) { _ in
             handleLatestTranscript()
-            updateSpeechGestureRequest()
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
-            if !speaking {
-                lastGestureText = ""
-            }
             if speaking {
                 handleLatestTranscript()
-                updateSpeechGestureRequest()
             }
             withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
                 if speaking {
@@ -233,22 +226,6 @@ struct CompanionChatView: View {
         withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
             emotion = line.role == .user ? .listening : emotionForAssistantText(line.text)
         }
-    }
-
-    private func updateSpeechGestureRequest() {
-        guard liveManager.aiSpeaking,
-              let line = liveManager.lines.last,
-              line.role == .assistant else {
-            return
-        }
-
-        let transcript = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let addedCharacters = transcript.count - lastGestureText.count
-        let threshold = lastGestureText.isEmpty ? 35 : 48
-        guard addedCharacters >= threshold else { return }
-
-        lastGestureText = transcript
-        speechGestureRequest += 1
     }
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
