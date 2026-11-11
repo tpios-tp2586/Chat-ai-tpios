@@ -179,8 +179,9 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     private func logDeferred(_ message: String) {
-        // Only forward the inventory needed for the current investigation; suppress verbose frame diagnostics.
-        guard message.hasPrefix("[ALINA ANIMATION INVENTORY]") else { return }
+        // Forward only the compact inventory and sampled-clip comparison needed for AN-03.
+        guard message.hasPrefix("[ALINA ANIMATION INVENTORY]") ||
+              message.hasPrefix("[ALINA CLIP DATA]") else { return }
         let callback = onLog
         DispatchQueue.main.async {
             callback(message)
@@ -303,9 +304,14 @@ private struct AlinaRealityView: UIViewRepresentable {
 
     private func logAnimationInventory(in root: Entity) {
         func visit(_ node: Entity, path: String) {
-            for (index, animation) in node.availableAnimations.enumerated() {
-                let definition = animation.definition
-                logDeferred("[ALINA ANIMATION INVENTORY] owner=\(node.name); path=\(path); clip=\(index); name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))")
+            let animations = node.availableAnimations
+            if !animations.isEmpty {
+                let definitions = Set(animations.map { animation -> String in
+                    let definition = animation.definition
+                    return "name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); type=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))"
+                })
+                let summary = definitions.sorted().joined(separator: " || ")
+                logDeferred("[ALINA ANIMATION INVENTORY] owner=\(node.name); path=\(path); clipCount=\(animations.count); uniqueDefinitions=\(definitions.count); definitions=\(summary)")
             }
 
             if node.name == "skin0" {
