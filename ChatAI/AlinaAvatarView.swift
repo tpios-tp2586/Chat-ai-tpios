@@ -346,7 +346,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             }
 
             uniqueSampleCount += 1
-            uniqueSamples.append((Int(label.split(separator: "#").last ?? "") ?? -1, frames, jointNames, sample.frameInterval))
+            let clipIndex = label.split(separator: "#").dropFirst().first
+                .map { Int($0.split(separator: ".").first ?? "") ?? -1 } ?? -1
+            uniqueSamples.append((clipIndex, frames, jointNames, sample.frameInterval))
             let examples = movingJointNames.prefix(8).joined(separator: ",")
             clipSummaries.append("\(label):UNIQUE;frames=\(frames.count);joints=\(jointNames.count);interval=\(sample.frameInterval);moving=\(movingJointNames.count);examples=\(examples)")
         }
