@@ -359,7 +359,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         definition.fillMode = .forwards
         definition.bindTarget = .transform
 
-        let controller = modelEntity.playAnimation(definition.create(), transitionDuration: 0.05)
+        let controller = modelEntity.playAnimation(definition.create(), transitionDuration: 0.05, startsPaused: false)
         coordinator.jointProbeController = controller
         coordinator.jointProbeEntity = modelEntity
         coordinator.jointProbeOriginalTransforms = originalTransforms
