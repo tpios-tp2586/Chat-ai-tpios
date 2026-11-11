@@ -19,7 +19,7 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
     @State private var speechGestureRequest = 0
-    @State private var lastGestureSentence = ""
+    @State private var lastGestureText = ""
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -93,7 +93,7 @@ struct CompanionChatView: View {
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
             if !speaking {
-                lastGestureSentence = ""
+                lastGestureText = ""
             }
             if speaking {
                 handleLatestTranscript()
@@ -237,19 +237,16 @@ struct CompanionChatView: View {
     private func updateSpeechGestureRequest() {
         guard liveManager.aiSpeaking,
               let line = liveManager.lines.last,
-              line.role == .assistant,
-              let boundary = line.text.lastIndex(where: { ".!?。！？\n".contains($0) }) else {
+              line.role == .assistant else {
             return
         }
 
-        let completedSentence = String(line.text[...boundary])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !completedSentence.isEmpty,
-              completedSentence != lastGestureSentence else {
-            return
-        }
+        let transcript = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let addedCharacters = transcript.count - lastGestureText.count
+        let threshold = lastGestureText.isEmpty ? 35 : 48
+        guard addedCharacters >= threshold else { return }
 
-        lastGestureSentence = completedSentence
+        lastGestureText = transcript
         speechGestureRequest += 1
     }
 
