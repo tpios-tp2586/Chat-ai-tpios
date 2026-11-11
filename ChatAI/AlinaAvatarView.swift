@@ -320,7 +320,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         if let sampled = skin.availableAnimations.first?.definition as? SampledAnimation<JointTransforms> {
             let sampledNames = sampled.jointNames
             logDeferred("[ALINA RIG AUDIT] sampledJoints=\(sampledNames.count);runtimeNamesMatchSample=\(runtimeNames == sampledNames)")
-            logJointNames(sampledNames, source: "sampledAnimation")
+            logJointHierarchy(sampledNames, transforms: runtimeTransforms)
         } else {
             logDeferred("[ALINA RIG AUDIT] no sampled JointTransforms definition available on skin0")
         }
@@ -334,6 +334,40 @@ private struct AlinaRealityView: UIViewRepresentable {
                 "\(start + offset)=\(name)"
             }.joined(separator: " | ")
             logDeferred("[ALINA RIG AUDIT] \(source) joints \(start)-\(end - 1): \(entries)")
+        }
+    }
+
+    private func logJointHierarchy(_ names: [String], transforms: JointTransforms) {
+        var indexByPath: [String: Int] = [:]
+        for (index, name) in names.enumerated() {
+            indexByPath[name] = index
+        }
+
+        let entries = names.enumerated().map { index, name in
+            let components = name.split(separator: "/")
+            var parentIndex: Int?
+            if components.count > 1 {
+                for ancestorLength in stride(from: components.count - 1, through: 1, by: -1) {
+                    let ancestor = components.prefix(ancestorLength).joined(separator: "/")
+                    if let candidate = indexByPath[ancestor] {
+                        parentIndex = candidate
+                        break
+                    }
+                }
+            }
+
+            let parent = parentIndex.map { String($0) } ?? "root"
+            let translation = index < transforms.count
+                ? String(describing: transforms[index].translation)
+                : "missing"
+            return "\(index):\(name)<-\(parent)@d\(components.count - 1);t=\(translation)"
+        }
+
+        let chunkSize = 18
+        for start in stride(from: 0, to: entries.count, by: chunkSize) {
+            let end = min(start + chunkSize, entries.count)
+            let chunk = entries[start..<end].joined(separator: " | ")
+            logDeferred("[ALINA RIG AUDIT] hierarchy joints \(start)-\(end - 1): \(chunk)")
         }
     }
 
