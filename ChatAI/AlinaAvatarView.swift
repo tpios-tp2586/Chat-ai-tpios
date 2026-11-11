@@ -163,9 +163,7 @@ private struct AlinaRealityView: UIViewRepresentable {
             if context.coordinator.lastIsSpeaking != isSpeaking {
                 if isSpeaking {
                     restoreGreetingWave(coordinator: context.coordinator)
-                    context.coordinator.animationController?.resume()
                 } else {
-                    context.coordinator.animationController?.pause()
                     restoreSpeechGesture(coordinator: context.coordinator)
                 }
                 context.coordinator.lastIsSpeaking = isSpeaking
@@ -299,32 +297,13 @@ private struct AlinaRealityView: UIViewRepresentable {
         view.scene.anchors.removeAll()
         view.scene.addAnchor(anchor)
 
-        if coordinator.animationController == nil {
-            if let skin = findEntity(named: "skin0", in: model) {
-                // Preserve the verified bind pose before the imported speaking clip is applied.
-                let modelEntity = skin as? ModelEntity
-                let baselineTransforms = modelEntity?.jointTransforms
-                coordinator.rigEntity = modelEntity
-                coordinator.bindPoseTransforms = baselineTransforms
-
-                // Diagnostic A/B test: play the first imported TempMotion clip,
-                // not the default subtree animation previously tested at skin0#20.
-                let testClipIndex = 0
-                if skin.availableAnimations.indices.contains(testClipIndex) {
-                    let clip = skin.availableAnimations[testClipIndex]
-                    let definition = clip.definition
-                    let loopingClip = clip.repeat(duration: .infinity)
-                    let controller = skin.playAnimation(loopingClip, transitionDuration: 0.25, startsPaused: !isSpeaking)
-                    coordinator.animationController = controller
-                    coordinator.lastIsSpeaking = isSpeaking
-                    let controllerEntity = controller.entity
-                    logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=\(testClipIndex); name=\(clip.name ?? "unnamed"); duration=\(controller.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); controllerEntity=\(controllerEntity?.name ?? "nil"); controllerTargetsSkin=\(controllerEntity === skin); playing=\(controller.isPlaying); valid=\(controller.isValid)")
-                } else {
-                    logDeferred("[ALINA ANIMATION TEST] skin0#\(testClipIndex) unavailable; count=\(skin.availableAnimations.count)")
-                }
-            } else {
-                logDeferred("[ALINA ANIMATION TEST] skin0 entity not found after scene attach")
-            }
+        if let skin = findEntity(named: "skin0", in: model) {
+            let modelEntity = skin as? ModelEntity
+            coordinator.rigEntity = modelEntity
+            coordinator.bindPoseTransforms = modelEntity?.jointTransforms
+            logDeferred("[ALINA RIG AUDIT] verified bind pose captured; imported TempMotion playback disabled")
+        } else {
+            logDeferred("[ALINA RIG AUDIT] skin0 entity not found; gesture control unavailable")
         }
 
         coordinator.lastSpeechGestureRequest = speechGestureRequest
@@ -428,19 +407,20 @@ private struct AlinaRealityView: UIViewRepresentable {
     ) {
         guard coordinator.lastIsSpeaking,
               let originalTransforms = baselineTransforms,
-              originalTransforms.count == modelEntity.jointNames.count else {
+              originalTransforms.count == modelEntity.jointNames.count,
+              modelEntity.jointNames.indices.contains(49),
+              modelEntity.jointNames.indices.contains(77) else {
             return
         }
 
         restoreSpeechGesture(coordinator: coordinator)
-        let jointIndex = request.isMultiple(of: 2) ? 77 : 49
-        guard modelEntity.jointNames.indices.contains(jointIndex) else { return }
-
         var targetTransforms = originalTransforms
-        let lift = simd_quatf(angle: .pi / 18, axis: SIMD3<Float>(0, 0, 1))
-        targetTransforms[jointIndex].rotation = simd_normalize(
-            originalTransforms[jointIndex].rotation * lift
-        )
+        let lift = simd_quatf(angle: .pi / 30, axis: SIMD3<Float>(0, 0, 1))
+        for jointIndex in [49, 77] {
+            targetTransforms[jointIndex].rotation = simd_normalize(
+                originalTransforms[jointIndex].rotation * lift
+            )
+        }
 
         var definition = FromToByAnimation<JointTransforms>()
         definition.name = "AlinaSpeechGesture"
@@ -471,7 +451,7 @@ private struct AlinaRealityView: UIViewRepresentable {
             separateAnimatedValue: true,
             startsPaused: false
         )
-        logDeferred("[ALINA RIG AUDIT] speech gesture started; verifiedArmJoint=\(jointIndex); angle=10deg; duration=1.15s")
+        logDeferred("[ALINA RIG AUDIT] coordinated speech gesture started; verifiedArmJoints=49,77; angle=6deg; duration=1.15s")
     }
 
     private func restoreSpeechGesture(coordinator: Coordinator) {
@@ -625,7 +605,6 @@ private struct AlinaRealityView: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var currentEntity: Entity?
-        var animationController: AnimationPlaybackController?
         var greetingWaveController: AnimationPlaybackController?
         weak var greetingWaveEntity: ModelEntity?
         var greetingWaveOriginalTransforms: [Transform]?
