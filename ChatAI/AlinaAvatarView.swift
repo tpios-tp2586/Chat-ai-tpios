@@ -179,9 +179,10 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     private func logDeferred(_ message: String) {
-        // Forward only the compact inventory and sampled-clip comparison needed for AN-03.
-        guard message.hasPrefix("[ALINA ANIMATION INVENTORY]") ||
-              message.hasPrefix("[ALINA CLIP DATA]") else { return }
+        // Keep only the one-pass animation audit and actionable playback/load diagnostics.
+        guard message.hasPrefix("[ALINA ANIMATION AUDIT]") ||
+              message.hasPrefix("[ALINA ANIMATION TEST]") ||
+              message.hasPrefix("[ALINA ERROR]") else { return }
         let callback = onLog
         DispatchQueue.main.async {
             callback(message)
@@ -303,84 +304,96 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     private func logAnimationInventory(in root: Entity) {
+        var ownerSummaries: [String] = []
+        var clipSummaries: [String] = []
+        var uniqueSamples: [(index: Int, frames: [JointTransforms], jointNames: [String], frameInterval: Float)] = []
+        var duplicateCount = 0
+        var uniqueSampleCount = 0
+        var groupCount = 0
+        var unsupportedCount = 0
+
+        func recordSample(_ sample: SampledAnimation<JointTransforms>, label: String) {
+            let frames = sample.frames
+            let jointNames = sample.jointNames
+            let duplicateIndex = uniqueSamples.first {
+                $0.frames == frames &&
+                $0.jointNames == jointNames &&
+                $0.frameInterval == sample.frameInterval
+            }?.index
+
+            if let duplicateIndex {
+                duplicateCount += 1
+                clipSummaries.append("\(label):duplicateOf=\(duplicateIndex);frames=\(frames.count);joints=\(jointNames.count)")
+                return
+            }
+
+            var movingJointNames: [String] = []
+            if let firstFrame = frames.first, frames.count > 1 {
+                for jointIndex in 0..<min(jointNames.count, firstFrame.count) {
+                    let initial = firstFrame[jointIndex]
+                    var maxTranslation: Float = 0
+                    var maxRotation: Float = 0
+                    for frame in frames.dropFirst() where jointIndex < frame.count {
+                        let transform = frame[jointIndex]
+                        maxTranslation = max(maxTranslation, simd_length(transform.translation - initial.translation))
+                        let dot = min(max(abs(simd_dot(initial.rotation, transform.rotation)), 0), 1)
+                        maxRotation = max(maxRotation, 2 * acos(dot))
+                    }
+                    if maxTranslation > 0.0001 || maxRotation > 0.001 {
+                        movingJointNames.append(jointNames[jointIndex])
+                    }
+                }
+            }
+
+            uniqueSampleCount += 1
+            uniqueSamples.append((Int(label.split(separator: "#").last ?? "") ?? -1, frames, jointNames, sample.frameInterval))
+            let examples = movingJointNames.prefix(8).joined(separator: ",")
+            clipSummaries.append("\(label):UNIQUE;frames=\(frames.count);joints=\(jointNames.count);interval=\(sample.frameInterval);moving=\(movingJointNames.count);examples=\(examples)")
+        }
+
+        func inspectGroup(_ group: AnimationGroup, label: String, depth: Int) {
+            groupCount += 1
+            clipSummaries.append("\(label):GROUP;name=\(group.name);children=\(group.group.count);duration=\(group.duration)")
+            for (childIndex, child) in group.group.enumerated() {
+                let childLabel = "\(label).child#\(childIndex)"
+                if let sampled = child as? SampledAnimation<JointTransforms> {
+                    recordSample(sampled, label: childLabel)
+                } else if let nested = child as? AnimationGroup, depth < 4 {
+                    inspectGroup(nested, label: childLabel, depth: depth + 1)
+                } else {
+                    unsupportedCount += 1
+                    clipSummaries.append("\(childLabel):type=\(String(reflecting: type(of: child)));target=\(String(reflecting: child.bindTarget))")
+                }
+            }
+        }
+
         func visit(_ node: Entity, path: String) {
             let animations = node.availableAnimations
             if !animations.isEmpty {
-                let definitions = Set(animations.map { animation -> String in
+                let definitions = Set(animations.map { animation in
                     let definition = animation.definition
-                    return "name=\(animation.name ?? "unnamed"); duration=\(definition.duration); target=\(String(reflecting: definition.bindTarget)); type=\(String(reflecting: type(of: definition))); blendLayer=\(definition.blendLayer); speed=\(definition.speed); delay=\(definition.delay); repeatMode=\(String(reflecting: definition.repeatMode))"
+                    return "\(animation.name ?? "unnamed")|\(definition.duration)|\(String(reflecting: definition.bindTarget))|\(String(reflecting: type(of: definition)))|\(definition.blendLayer)"
                 })
-                let summary = definitions.sorted().joined(separator: " || ")
-                logDeferred("[ALINA ANIMATION INVENTORY] owner=\(node.name); path=\(path); clipCount=\(animations.count); uniqueDefinitions=\(definitions.count); definitions=\(summary)")
+                ownerSummaries.append("\(path){clips=\(animations.count),uniqueDefinitions=\(definitions.count)}")
             }
 
             if node.name == "skin0" {
-                var previousClips: [(index: Int, frames: [JointTransforms], jointNames: [String], frameInterval: Float)] = []
-
-                for (index, animation) in node.availableAnimations.enumerated() {
-                    guard let sampled = animation.definition as? SampledAnimation<JointTransforms> else {
-                        if let group = animation.definition as? AnimationGroup {
-                            func inspectGroup(_ definition: AnimationGroup, label: String, depth: Int) {
-                                logDeferred("[ALINA CLIP DATA] \(label); groupName=\(definition.name); childCount=\(definition.group.count); duration=\(definition.duration); bindTarget=\(String(reflecting: definition.bindTarget))")
-
-                                for (childIndex, child) in definition.group.enumerated() {
-                                    let childLabel = "\(label).child#\(childIndex)"
-                                    logDeferred("[ALINA CLIP DATA] \(childLabel); type=\(String(reflecting: type(of: child))); name=\(child.name); duration=\(child.duration); bindTarget=\(String(reflecting: child.bindTarget)); delay=\(child.delay); offset=\(child.offset); speed=\(child.speed)")
-
-                                    if let nestedGroup = child as? AnimationGroup, depth < 4 {
-                                        inspectGroup(nestedGroup, label: childLabel, depth: depth + 1)
-                                    } else if let childSample = child as? SampledAnimation<JointTransforms> {
-                                        let duplicateIndex = previousClips.first {
-                                            $0.frames == childSample.frames &&
-                                            $0.jointNames == childSample.jointNames &&
-                                            $0.frameInterval == childSample.frameInterval
-                                        }?.index
-                                        let duplicateLabel = duplicateIndex.map { String($0) } ?? "none"
-                                        logDeferred("[ALINA CLIP DATA] \(childLabel); sampledJointFrames=\(childSample.frames.count); joints=\(childSample.jointNames.count); frameInterval=\(childSample.frameInterval); exactDuplicateOfSkin0=\(duplicateLabel)")
-                                    }
-                                }
-                            }
-
-                            inspectGroup(group, label: "skin0#\(index)", depth: 0)
-                        } else {
-                            logDeferred("[ALINA CLIP DATA] skin0#\(index); unsupportedDefinition=\(String(reflecting: type(of: animation.definition)))")
-                        }
-                        continue
+                // AN-01/02 already proved skin0#0–#20 are exact duplicates of #0.
+                // Seed #0 as the comparison baseline without repeating the completed frame audit.
+                if let baseline = animations.first?.definition as? SampledAnimation<JointTransforms> {
+                    uniqueSamples.append((0, baseline.frames, baseline.jointNames, baseline.frameInterval))
+                }
+                clipSummaries.append("priorEvidence:#0-#20=duplicateOf#0(AN-01/02;notRecomputed)")
+                for (index, animation) in animations.enumerated() where index >= 21 {
+                    let label = "skin0#\(index)"
+                    if let sampled = animation.definition as? SampledAnimation<JointTransforms> {
+                        recordSample(sampled, label: label)
+                    } else if let group = animation.definition as? AnimationGroup {
+                        inspectGroup(group, label: label, depth: 0)
+                    } else {
+                        unsupportedCount += 1
+                        clipSummaries.append("\(label):unsupported=\(String(reflecting: type(of: animation.definition)));target=\(String(reflecting: animation.definition.bindTarget))")
                     }
-
-                    let frames = sampled.frames
-                    let jointNames = sampled.jointNames
-                    var movingJointNames: [String] = []
-
-                    if let firstFrame = frames.first, frames.count > 1 {
-                        for jointIndex in 0..<min(jointNames.count, firstFrame.count) {
-                            let initial = firstFrame[jointIndex]
-                            var maxTranslation: Float = 0
-                            var maxRotation: Float = 0
-
-                            for frame in frames.dropFirst() where jointIndex < frame.count {
-                                let transform = frame[jointIndex]
-                                maxTranslation = max(maxTranslation, simd_length(transform.translation - initial.translation))
-                                let rotationDot = min(max(abs(simd_dot(initial.rotation, transform.rotation)), 0), 1)
-                                maxRotation = max(maxRotation, 2 * acos(rotationDot))
-                            }
-
-                            if maxTranslation > 0.0001 || maxRotation > 0.001 {
-                                movingJointNames.append(jointNames[jointIndex])
-                            }
-                        }
-                    }
-
-                    let duplicateIndex = previousClips.first {
-                        $0.frames == frames &&
-                        $0.jointNames == jointNames &&
-                        $0.frameInterval == sampled.frameInterval
-                    }?.index
-                    let duplicateLabel = duplicateIndex.map { String($0) } ?? "none"
-                    let examples = movingJointNames.prefix(8).joined(separator: ",")
-
-                    logDeferred("[ALINA CLIP DATA] skin0#\(index); frames=\(frames.count); joints=\(jointNames.count); frameInterval=\(sampled.frameInterval); movingJoints=\(movingJointNames.count); examples=\(examples); exactDuplicateOf=\(duplicateLabel)")
-                    previousClips.append((index, frames, jointNames, sampled.frameInterval))
                 }
             }
 
@@ -390,6 +403,12 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
 
         visit(root, path: "root:\(root.name)")
+        logDeferred("[ALINA ANIMATION AUDIT] hierarchyOwners=\(ownerSummaries.joined(separator: " "))")
+        logDeferred("[ALINA ANIMATION AUDIT] skin0Count=\(findEntity(named: "skin0", in: root)?.availableAnimations.count ?? 0); priorVerified=#0-#20=>#0; newlyScanned=#21+; uniqueSampled=\(uniqueSampleCount); duplicates=\(duplicateCount); groups=\(groupCount); unsupported=\(unsupportedCount)")
+        for start in stride(from: 0, to: clipSummaries.count, by: 5) {
+            let end = min(start + 5, clipSummaries.count)
+            logDeferred("[ALINA ANIMATION AUDIT] clips \(start + 1)-\(end): \(clipSummaries[start..<end].joined(separator: " | "))")
+        }
     }
 
     private func findEntity(named name: String, in root: Entity) -> Entity? {
