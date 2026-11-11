@@ -21,6 +21,7 @@ struct CompanionChatView: View {
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
+    @State private var selectedDiagnosticText = ""
 
 
     var body: some View {
@@ -178,25 +179,33 @@ struct CompanionChatView: View {
                 Text("Chỉ giữ log cần cho kiểm tra rig Alina và lỗi tải model. Nội dung hiển thị và sao chép dùng chung một nguồn.")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView {
-                    Text(diagnosticLogText)
-                        .font(.system(.caption, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled).padding(12)
+                    SelectableDiagnosticText(text: diagnosticLogText, selectedText: $selectedDiagnosticText)
+                        .padding(12)
                         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 }
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Button {
                         UIPasteboard.general.string = diagnosticLogText
                     } label: {
-                        Label("Sao chép log", systemImage: "doc.on.doc")
+                        Label("Copy tất cả", systemImage: "doc.on.doc")
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
                     }
                     .buttonStyle(.borderedProminent)
 
+                    Button {
+                        UIPasteboard.general.string = selectedDiagnosticText
+                    } label: {
+                        Label("Copy đoạn chọn", systemImage: "text.quote")
+                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(selectedDiagnosticText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
                     Button(role: .destructive) {
                         diagnosticLogs.removeAll()
+                        selectedDiagnosticText = ""
                     } label: {
-                        Label("Xóa log", systemImage: "trash")
+                        Label("Xóa", systemImage: "trash")
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
                     }
                     .buttonStyle(.bordered)
@@ -338,4 +347,57 @@ struct CompanionChatView: View {
 private enum CompanionEmotion {
     case idle, listening, thinking, speaking, happy, surprised, confused, sad, angry, sleepy
 
+}
+
+private struct SelectableDiagnosticText: UIViewRepresentable {
+    let text: String
+    @Binding var selectedText: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selectedText: $selectedText)
+    }
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
+        view.delegate = context.coordinator
+        view.isEditable = false
+        view.isSelectable = true
+        view.isScrollEnabled = false
+        view.backgroundColor = .clear
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.font = UIFont.monospacedSystemFont(ofSize: UIFont.smallSystemFontSize, weight: .regular)
+        view.text = text
+        return view
+    }
+
+    func updateUIView(_ view: UITextView, context: Context) {
+        if view.text != text {
+            view.text = text
+            selectedText = ""
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        let width = proposal.width ?? 320
+        return uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        @Binding var selectedText: String
+
+        init(selectedText: Binding<String>) {
+            _selectedText = selectedText
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            let range = textView.selectedRange
+            guard range.location != NSNotFound, range.length > 0,
+                  let selectedRange = Range(range, in: textView.text) else {
+                selectedText = ""
+                return
+            }
+            selectedText = String(textView.text[selectedRange])
+        }
+    }
 }
