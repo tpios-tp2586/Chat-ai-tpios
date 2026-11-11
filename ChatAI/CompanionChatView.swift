@@ -167,25 +167,40 @@ struct CompanionChatView: View {
         .padding(.bottom, 8)
     }
 
+    private var diagnosticLogText: String {
+        diagnosticLogs.joined(separator: "\n")
+    }
+
     private var diagnosticLogSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Log chẩn đoán Chat Voice").font(.headline)
-                Text("Ghi trạng thái giọng nói và tải mô hình Alina. Không ghi API key.")
+                Text("Chỉ giữ log cần cho kiểm tra rig Alina và lỗi tải model. Nội dung hiển thị và sao chép dùng chung một nguồn.")
                     .font(.caption).foregroundStyle(.secondary)
                 ScrollView {
-                    Text(diagnosticLogs.joined(separator: "\n"))
+                    Text(diagnosticLogText)
                         .font(.system(.caption, design: .monospaced))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled).padding(12)
                         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 }
-                Button {
-                    UIPasteboard.general.string = diagnosticLogs.joined(separator: "\n")
-                } label: {
-                    Label("Sao chép log", systemImage: "doc.on.doc")
-                        .frame(maxWidth: .infinity).padding(.vertical, 12)
-                }.buttonStyle(.borderedProminent)
+                HStack(spacing: 10) {
+                    Button {
+                        UIPasteboard.general.string = diagnosticLogText
+                    } label: {
+                        Label("Sao chép log", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button(role: .destructive) {
+                        diagnosticLogs.removeAll()
+                    } label: {
+                        Label("Xóa log", systemImage: "trash")
+                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }.padding()
                 .navigationTitle("Log Chat Voice")
                 .navigationBarTitleDisplayMode(.inline)
@@ -215,12 +230,13 @@ struct CompanionChatView: View {
     }
 
     private func addDiagnostic(_ line: String) {
+        let isRequiredLog = line.hasPrefix("[ALINA RIG AUDIT]") ||
+            line.hasPrefix("[ALINA ERROR]") ||
+            line.hasPrefix("[INFO]")
+        guard isRequiredLog else { return }
+
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         diagnosticLogs.append("[\(timestamp)] \(line)")
-        while diagnosticLogs.count > 150 {
-            let removableIndex = diagnosticLogs.firstIndex { !$0.contains("[ALINA ANIMATION AUDIT]") } ?? 0
-            diagnosticLogs.remove(at: removableIndex)
-        }
     }
 
     private var controls: some View {
