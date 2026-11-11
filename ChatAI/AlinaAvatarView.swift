@@ -313,7 +313,32 @@ private struct AlinaRealityView: UIViewRepresentable {
 
                 for (index, animation) in node.availableAnimations.enumerated() {
                     guard let sampled = animation.definition as? SampledAnimation<JointTransforms> else {
-                        logDeferred("[ALINA CLIP DATA] skin0#\(index); unsupportedDefinition=\(String(reflecting: type(of: animation.definition)))")
+                        if let group = animation.definition as? AnimationGroup {
+                            func inspectGroup(_ definition: AnimationGroup, label: String, depth: Int) {
+                                logDeferred("[ALINA CLIP DATA] \(label); groupName=\(definition.name); childCount=\(definition.group.count); duration=\(definition.duration); bindTarget=\(String(reflecting: definition.bindTarget))")
+
+                                for (childIndex, child) in definition.group.enumerated() {
+                                    let childLabel = "\(label).child#\(childIndex)"
+                                    logDeferred("[ALINA CLIP DATA] \(childLabel); type=\(String(reflecting: type(of: child))); name=\(child.name); duration=\(child.duration); bindTarget=\(String(reflecting: child.bindTarget)); delay=\(child.delay); offset=\(child.offset); speed=\(child.speed)")
+
+                                    if let nestedGroup = child as? AnimationGroup, depth < 4 {
+                                        inspectGroup(nestedGroup, label: childLabel, depth: depth + 1)
+                                    } else if let childSample = child as? SampledAnimation<JointTransforms> {
+                                        let duplicateIndex = previousClips.first {
+                                            $0.frames == childSample.frames &&
+                                            $0.jointNames == childSample.jointNames &&
+                                            $0.frameInterval == childSample.frameInterval
+                                        }?.index
+                                        let duplicateLabel = duplicateIndex.map { String($0) } ?? "none"
+                                        logDeferred("[ALINA CLIP DATA] \(childLabel); sampledJointFrames=\(childSample.frames.count); joints=\(childSample.jointNames.count); frameInterval=\(childSample.frameInterval); exactDuplicateOfSkin0=\(duplicateLabel)")
+                                    }
+                                }
+                            }
+
+                            inspectGroup(group, label: "skin0#\(index)", depth: 0)
+                        } else {
+                            logDeferred("[ALINA CLIP DATA] skin0#\(index); unsupportedDefinition=\(String(reflecting: type(of: animation.definition)))")
+                        }
                         continue
                     }
 
