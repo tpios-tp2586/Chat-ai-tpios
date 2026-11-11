@@ -350,7 +350,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         logDeferred("[ALINA RIG AUDIT] body sweep started; joints=\(indices.count); excludes=49,77; perJoint=0.16s; baseline=pre-animation bind pose")
 
         func runStep(_ step: Int) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.22) { [weak coordinator] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak coordinator] in
                 guard let coordinator,
                       coordinator.jointProbeSequenceID == sequenceID,
                       coordinator.jointProbeEntity === modelEntity else { return }
