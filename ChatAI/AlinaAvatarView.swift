@@ -6,6 +6,7 @@ import UIKit
 struct AlinaAvatarView: View {
     let isSpeaking: Bool
     let greetingRequest: Int
+    let speechGestureRequest: Int
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -43,6 +44,7 @@ struct AlinaAvatarView: View {
                     entity: entity,
                     isSpeaking: isSpeaking,
                     greetingRequest: greetingRequest,
+                    speechGestureRequest: speechGestureRequest,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
@@ -124,6 +126,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     let entity: Entity
     let isSpeaking: Bool
     let greetingRequest: Int
+    let speechGestureRequest: Int
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
@@ -163,8 +166,20 @@ private struct AlinaRealityView: UIViewRepresentable {
                     context.coordinator.animationController?.resume()
                 } else {
                     context.coordinator.animationController?.pause()
+                    restoreSpeechGesture(coordinator: context.coordinator)
                 }
                 context.coordinator.lastIsSpeaking = isSpeaking
+            }
+            if speechGestureRequest != context.coordinator.lastSpeechGestureRequest {
+                context.coordinator.lastSpeechGestureRequest = speechGestureRequest
+                if isSpeaking, let rig = context.coordinator.rigEntity {
+                    runSpeechGesture(
+                        request: speechGestureRequest,
+                        on: rig,
+                        baselineTransforms: context.coordinator.bindPoseTransforms,
+                        coordinator: context.coordinator
+                    )
+                }
             }
             if greetingRequest != context.coordinator.lastGreetingRequest {
                 context.coordinator.lastGreetingRequest = greetingRequest
@@ -312,6 +327,16 @@ private struct AlinaRealityView: UIViewRepresentable {
             }
         }
 
+        coordinator.lastSpeechGestureRequest = speechGestureRequest
+        if isSpeaking, speechGestureRequest > 0, let rig = coordinator.rigEntity {
+            runSpeechGesture(
+                request: speechGestureRequest,
+                on: rig,
+                baselineTransforms: coordinator.bindPoseTransforms,
+                coordinator: coordinator
+            )
+        }
+
         if greetingRequest != coordinator.lastGreetingRequest {
             coordinator.lastGreetingRequest = greetingRequest
             if !isSpeaking, let rig = coordinator.rigEntity {
@@ -393,6 +418,71 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.greetingWaveController = nil
         coordinator.greetingWaveEntity = nil
         coordinator.greetingWaveOriginalTransforms = nil
+    }
+
+    private func runSpeechGesture(
+        request: Int,
+        on modelEntity: ModelEntity,
+        baselineTransforms: [Transform]?,
+        coordinator: Coordinator
+    ) {
+        guard coordinator.lastIsSpeaking,
+              let originalTransforms = baselineTransforms,
+              originalTransforms.count == modelEntity.jointNames.count else {
+            return
+        }
+
+        restoreSpeechGesture(coordinator: coordinator)
+        let jointIndex = request.isMultiple(of: 2) ? 77 : 49
+        guard modelEntity.jointNames.indices.contains(jointIndex) else { return }
+
+        var targetTransforms = originalTransforms
+        let lift = simd_quatf(angle: .pi / 18, axis: SIMD3<Float>(0, 0, 1))
+        targetTransforms[jointIndex].rotation = simd_normalize(
+            originalTransforms[jointIndex].rotation * lift
+        )
+
+        var definition = FromToByAnimation<JointTransforms>()
+        definition.name = "AlinaSpeechGesture"
+        definition.jointNames = modelEntity.jointNames
+        definition.isScaleAnimated = false
+        definition.isTranslationAnimated = false
+        definition.isRotationAnimated = true
+        definition.fromValue = JointTransforms(originalTransforms)
+        definition.toValue = JointTransforms(targetTransforms)
+        definition.duration = 1.15
+        definition.timing = .easeInOut
+        definition.repeatMode = .none
+        definition.blendLayer = 110
+        definition.fillMode = .none
+        definition.bindTarget = .jointTransforms
+
+        guard let resource = try? AnimationResource.generate(with: definition) else {
+            logDeferred("[ALINA RIG AUDIT] speech gesture resource generation failed")
+            return
+        }
+
+        coordinator.speechGestureEntity = modelEntity
+        coordinator.speechGestureOriginalTransforms = originalTransforms
+        coordinator.speechGestureController = modelEntity.playAnimation(
+            resource,
+            transitionDuration: 0.18,
+            blendLayerOffset: 0,
+            separateAnimatedValue: true,
+            startsPaused: false
+        )
+        logDeferred("[ALINA RIG AUDIT] speech gesture started; verifiedArmJoint=\(jointIndex); angle=10deg; duration=1.15s")
+    }
+
+    private func restoreSpeechGesture(coordinator: Coordinator) {
+        coordinator.speechGestureController?.stop()
+        if let entity = coordinator.speechGestureEntity,
+           let transforms = coordinator.speechGestureOriginalTransforms {
+            entity.jointTransforms = transforms
+        }
+        coordinator.speechGestureController = nil
+        coordinator.speechGestureEntity = nil
+        coordinator.speechGestureOriginalTransforms = nil
     }
 
     private func logAnimationInventory(in root: Entity) {
@@ -540,6 +630,10 @@ private struct AlinaRealityView: UIViewRepresentable {
         weak var greetingWaveEntity: ModelEntity?
         var greetingWaveOriginalTransforms: [Transform]?
         var greetingWaveSequenceID = 0
+        var speechGestureController: AnimationPlaybackController?
+        weak var speechGestureEntity: ModelEntity?
+        var speechGestureOriginalTransforms: [Transform]?
+        var lastSpeechGestureRequest = 0
         weak var rigEntity: ModelEntity?
         var bindPoseTransforms: [Transform]?
         var lastGreetingRequest = 0
