@@ -357,14 +357,14 @@ private struct AlinaRealityView: UIViewRepresentable {
         definition.toValue = JointTransforms(targetTransforms)
         definition.duration = 0.65
         definition.blendLayer = 100
-        definition.fillMode = .forwards
+        definition.fillMode = .none
         definition.bindTarget = .jointTransforms
 
         guard let animationResource = try? AnimationResource.generate(with: definition) else {
             logDeferred("[ALINA RIG AUDIT] single-joint probe resource generation failed")
             return
         }
-        let controller = modelEntity.playAnimation(animationResource, transitionDuration: 0.05, startsPaused: false)
+        let controller = modelEntity.playAnimation(animationResource, transitionDuration: 0.05, blendLayerOffset: 0, separateAnimatedValue: true, startsPaused: false)
         coordinator.jointProbeController = controller
         coordinator.jointProbeEntity = modelEntity
         coordinator.jointProbeOriginalTransforms = originalTransforms
