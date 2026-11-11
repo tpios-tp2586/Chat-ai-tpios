@@ -73,11 +73,16 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - Do not add ZIP artifacts.
 
 
-## Diagnostic log integrity — AN-04
-- The in-app Log Tool is a focused collector, not a rolling console.
-- Keep only `[ALINA RIG AUDIT]` and actionable `[ALINA ERROR]` entries for the current body-control investigation, plus the initial screen-open `[INFO]` marker.
-- Do not forward routine `[VOICE]`, `[TEXT]`, mesh dumps, layout/debug traces, or the already-completed `[ALINA ANIMATION AUDIT]` inventory.
-- Do not evict required rig-audit lines with a rolling 150-line buffer. Keep the complete current-session diagnostic set until the user clears it.
-- The visible log and copied text must read from the same `diagnosticLogText` value.
-- Keep both Copy Log and Clear Log controls. Clearing removes the same source used by display and copy.
-- AN-03 is locked and must not run again during AN-04. Only collect the rig joint mapping needed to determine selective body control.
+## Diagnostic log integrity — AN-04 (focused one-run test)
+- **Purpose:** collect only the runtime skeleton mapping needed to decide whether selective body-part control is feasible. This is not a general app/voice console.
+- **Allowed entries in the in-app Log Tool:**
+  - `[INFO]` — one screen-open marker.
+  - `[ALINA RIG AUDIT]` — runtime entity type, runtime joint/transform counts, sampled-vs-runtime joint-name match, and the indexed joint-name list (chunked).
+  - `[ALINA ERROR]` — model missing/load failure only.
+- **Everything else is excluded:** routine `[VOICE]` and `[TEXT]`, status/transcript events, mesh/node dumps, layout/gesture debug, scale/framing traces, animation playback chatter, and the already-completed `[ALINA ANIMATION AUDIT]` inventory. Do not re-enable AN-03 inventory.
+- **Retention:** no rolling 150-line eviction; retain the complete required diagnostic set for the current screen session until Clear is pressed.
+- **Copy behavior:** display and Copy All use the same log text; Copy Selected copies only the highlighted text; Clear empties the displayed/copied log and selection. Preserve all three controls.
+- **Next user test (one build only):** open Chat Voice once and wait until Alina finishes loading. Open Log Tool and verify it contains the screen-open `[INFO]` marker plus `[ALINA RIG AUDIT]` lines. Confirm there are no `[VOICE]`, `[TEXT]`, `[ALINA ANIMATION AUDIT]`, mesh, or layout/debug dumps. Test selecting a portion and using Copy Selected, then Copy All; do not clear the log before copying.
+- **Evidence to send:** preferably Copy All; it should include all `[ALINA RIG AUDIT]` lines. If the full list is lengthy, Copy Selected can send a specific range, but preserve the joint index labels so ordering is unambiguous.
+- **Acceptance:** the complete rig audit is present and copyable without unrelated noise or missing lines. Only after this passes, interpret the joint map and design one minimal selective-control experiment.
+- **Do not ask for or collect any other logs in this AN-04 run.**
