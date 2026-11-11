@@ -312,7 +312,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         var groupCount = 0
         var unsupportedCount = 0
 
-        func recordSample(_ sample: SampledAnimation<JointTransforms>, label: String) {
+        func recordSample(_ sample: SampledAnimation<JointTransforms>, label: String, duration: TimeInterval, target: String) {
             let frames = sample.frames
             let jointNames = sample.jointNames
             let duplicateIndex = uniqueSamples.first {
@@ -323,7 +323,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
             if let duplicateIndex {
                 duplicateCount += 1
-                clipSummaries.append("\(label):duplicateOf=\(duplicateIndex);frames=\(frames.count);joints=\(jointNames.count)")
+                clipSummaries.append("\(label):duplicateOf=\(duplicateIndex);duration=\(duration);target=\(target);frames=\(frames.count);joints=\(jointNames.count)")
                 return
             }
 
@@ -350,16 +350,16 @@ private struct AlinaRealityView: UIViewRepresentable {
                 .map { Int($0.split(separator: ".").first ?? "") ?? -1 } ?? -1
             uniqueSamples.append((clipIndex, frames, jointNames, sample.frameInterval))
             let examples = movingJointNames.prefix(8).joined(separator: ",")
-            clipSummaries.append("\(label):UNIQUE;frames=\(frames.count);joints=\(jointNames.count);interval=\(sample.frameInterval);moving=\(movingJointNames.count);examples=\(examples)")
+            clipSummaries.append("\(label):UNIQUE;duration=\(duration);target=\(target);frames=\(frames.count);joints=\(jointNames.count);interval=\(sample.frameInterval);moving=\(movingJointNames.count);examples=\(examples)")
         }
 
         func inspectGroup(_ group: AnimationGroup, label: String, depth: Int) {
             groupCount += 1
-            clipSummaries.append("\(label):GROUP;name=\(group.name);children=\(group.group.count);duration=\(group.duration)")
+            clipSummaries.append("\(label):GROUP;name=\(group.name);children=\(group.group.count);duration=\(group.duration);target=\(String(reflecting: group.bindTarget))")
             for (childIndex, child) in group.group.enumerated() {
                 let childLabel = "\(label).child#\(childIndex)"
                 if let sampled = child as? SampledAnimation<JointTransforms> {
-                    recordSample(sampled, label: childLabel)
+                    recordSample(sampled, label: childLabel, duration: child.duration, target: String(reflecting: child.bindTarget))
                 } else if let nested = child as? AnimationGroup, depth < 4 {
                     inspectGroup(nested, label: childLabel, depth: depth + 1)
                 } else {
@@ -374,9 +374,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             if !animations.isEmpty {
                 let definitions = Set(animations.map { animation in
                     let definition = animation.definition
-                    return "\(animation.name ?? "unnamed")|\(definition.duration)|\(String(reflecting: definition.bindTarget))|\(String(reflecting: type(of: definition)))|\(definition.blendLayer)"
+                    return "\(animation.name ?? "unnamed")|\(definition.duration)|\(String(reflecting: definition.bindTarget))|\(String(reflecting: type(of: definition)))|layer=\(definition.blendLayer)|speed=\(definition.speed)|delay=\(definition.delay)|repeat=\(String(reflecting: definition.repeatMode))"
                 })
-                ownerSummaries.append("\(path){clips=\(animations.count),uniqueDefinitions=\(definitions.count)}")
+                ownerSummaries.append("\(path){clips=\(animations.count),uniqueDefinitions=\(definitions.count),defs=\(definitions.sorted().joined(separator: "~"))}")
             }
 
             if node.name == "skin0" {
@@ -389,7 +389,7 @@ private struct AlinaRealityView: UIViewRepresentable {
                 for (index, animation) in animations.enumerated() where index >= 21 {
                     let label = "skin0#\(index)"
                     if let sampled = animation.definition as? SampledAnimation<JointTransforms> {
-                        recordSample(sampled, label: label)
+                        recordSample(sampled, label: label, duration: animation.definition.duration, target: String(reflecting: animation.definition.bindTarget))
                     } else if let group = animation.definition as? AnimationGroup {
                         inspectGroup(group, label: label, depth: 0)
                     } else {
