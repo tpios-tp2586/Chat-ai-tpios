@@ -357,7 +357,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         definition.duration = 0.65
         definition.blendLayer = 100
         definition.fillMode = .forwards
-        definition.bindTarget = .transform
+        definition.bindTarget = .jointTransforms
 
         guard let animationResource = try? AnimationResource.generate(with: definition) else {
             logDeferred("[ALINA RIG AUDIT] single-joint probe resource generation failed")
