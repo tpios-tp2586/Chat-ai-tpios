@@ -179,6 +179,8 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     private func logDeferred(_ message: String) {
+        // Keep this build's diagnostic output focused on the missing clip-frame data.
+        guard message.hasPrefix("[ALINA CLIP DATA]") else { return }
         let callback = onLog
         DispatchQueue.main.async {
             callback(message)
@@ -285,21 +287,6 @@ private struct AlinaRealityView: UIViewRepresentable {
                     coordinator.lastIsSpeaking = isSpeaking
                     let controllerEntity = controller.entity
                     logDeferred("[ALINA ANIMATION TEST] started after scene attach; owner=skin0; clipIndex=\(testClipIndex); name=\(clip.name ?? "unnamed"); duration=\(controller.duration); target=\(String(reflecting: definition.bindTarget)); definitionType=\(String(reflecting: type(of: definition))); controllerEntity=\(controllerEntity?.name ?? "nil"); controllerTargetsSkin=\(controllerEntity === skin); playing=\(controller.isPlaying); valid=\(controller.isValid)")
-                    let callback = onLog
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        guard let current = coordinator.animationController else {
-                            callback("[ALINA ANIMATION TEST] controller missing at +0.5s")
-                            return
-                        }
-                        callback("[ALINA ANIMATION TEST] +0.5s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        guard let current = coordinator.animationController else {
-                            callback("[ALINA ANIMATION TEST] controller missing at +2.0s")
-                            return
-                        }
-                        callback("[ALINA ANIMATION TEST] +2.0s playing=\(current.isPlaying); valid=\(current.isValid); complete=\(current.isComplete); time=\(current.time)/\(current.duration)")
-                    }
                 } else {
                     logDeferred("[ALINA ANIMATION TEST] skin0#\(testClipIndex) unavailable; count=\(skin.availableAnimations.count)")
                 }
