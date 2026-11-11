@@ -179,8 +179,8 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     private func logDeferred(_ message: String) {
-        // Keep this build's diagnostic output focused on the missing clip-frame data.
-        guard message.hasPrefix("[ALINA CLIP DATA]") || message.hasPrefix("[ALINA ANIMATION INVENTORY]") else { return }
+        // Only forward the inventory needed for the current investigation; suppress verbose frame diagnostics.
+        guard message.hasPrefix("[ALINA ANIMATION INVENTORY]") else { return }
         let callback = onLog
         DispatchQueue.main.async {
             callback(message)
