@@ -285,7 +285,8 @@ private struct AlinaRealityView: UIViewRepresentable {
                     let clip = skin.availableAnimations[testClipIndex]
                     let definition = clip.definition
                     let loopingClip = clip.repeat(duration: .infinity)
-                    let controller = skin.playAnimation(loopingClip, transitionDuration: 0.25, startsPaused: !isSpeaking)
+                    // Avoid an idle cross-fade changing the pose before AN-04 captures its baseline.
+                    let controller = skin.playAnimation(loopingClip, transitionDuration: isSpeaking ? 0.25 : 0, startsPaused: !isSpeaking)
                     coordinator.animationController = controller
                     coordinator.lastIsSpeaking = isSpeaking
                     let controllerEntity = controller.entity
