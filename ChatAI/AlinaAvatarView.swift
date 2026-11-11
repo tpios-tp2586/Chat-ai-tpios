@@ -332,7 +332,7 @@ private struct AlinaRealityView: UIViewRepresentable {
 
     // Temporary AN-04 proof: animate one indexed joint while the imported full-body clip is paused.
     private func runSingleJointProbe(on skin: Entity, baselineTransforms: [Transform]?, isSpeaking: Bool, coordinator: Coordinator) {
-        let jointIndex = 49
+        let jointIndex = 77
         guard !isSpeaking,
               let modelEntity = skin as? ModelEntity,
               let originalTransforms = baselineTransforms,
