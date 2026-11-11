@@ -18,6 +18,8 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
+    @State private var speechGestureRequest = 0
+    @State private var lastGestureSentence = ""
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -35,7 +37,7 @@ struct CompanionChatView: View {
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
                         ZStack {
-                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, greetingRequest: greetingRequest, onLog: { log in
+                            AlinaAvatarView(isSpeaking: liveManager.aiSpeaking, greetingRequest: greetingRequest, speechGestureRequest: speechGestureRequest, onLog: { log in
                                 addDiagnostic(log)
                             }, onTap: {
                                 toggleConversation()
@@ -86,9 +88,13 @@ struct CompanionChatView: View {
         }
         .onChange(of: liveManager.lines.last?.text) { _ in
             handleLatestTranscript()
+            updateSpeechGestureRequest()
         }
         .onChange(of: liveManager.aiSpeaking) { speaking in
             addDiagnostic("[VOICE] AI đang nói: \(speaking)")
+            if !speaking {
+                lastGestureSentence = ""
+            }
             if speaking {
                 handleLatestTranscript()
             }
@@ -226,6 +232,25 @@ struct CompanionChatView: View {
         withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
             emotion = line.role == .user ? .listening : emotionForAssistantText(line.text)
         }
+    }
+
+    private func updateSpeechGestureRequest() {
+        guard liveManager.aiSpeaking,
+              let line = liveManager.lines.last,
+              line.role == .assistant,
+              let boundary = line.text.lastIndex(where: { ".!?。！？\\n".contains($0) }) else {
+            return
+        }
+
+        let completedSentence = String(line.text[...boundary])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !completedSentence.isEmpty,
+              completedSentence != lastGestureSentence else {
+            return
+        }
+
+        lastGestureSentence = completedSentence
+        speechGestureRequest += 1
     }
 
     private func emotionForAssistantText(_ text: String) -> CompanionEmotion {
