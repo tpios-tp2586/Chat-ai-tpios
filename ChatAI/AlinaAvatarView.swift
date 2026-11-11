@@ -5,6 +5,7 @@ import UIKit
 
 struct AlinaAvatarView: View {
     let isSpeaking: Bool
+    let greetingRequest: Int
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -41,6 +42,7 @@ struct AlinaAvatarView: View {
                 AlinaRealityView(
                     entity: entity,
                     isSpeaking: isSpeaking,
+                    greetingRequest: greetingRequest,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
@@ -121,6 +123,7 @@ private final class AlinaAvatarLoader: ObservableObject {
 private struct AlinaRealityView: UIViewRepresentable {
     let entity: Entity
     let isSpeaking: Bool
+    let greetingRequest: Int
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
@@ -133,7 +136,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         logDeferred("[ALINA DEBUG] makeUIView entered")
         let view = ARView(frame: .zero, cameraMode: .nonAR, automaticallyConfigureSession: false)
         view.environment.background = .color(.clear)
-        attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
+        attach(entity, isSpeaking: isSpeaking, greetingRequest: greetingRequest, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
         context.coordinator.installMoveGesture(
             on: view,
             onStarted: onMoveStarted,
@@ -152,16 +155,22 @@ private struct AlinaRealityView: UIViewRepresentable {
             context.coordinator.didLogLayout = true
         }
         if context.coordinator.currentEntity !== entity {
-            attach(entity, isSpeaking: isSpeaking, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
+            attach(entity, isSpeaking: isSpeaking, greetingRequest: greetingRequest, zoomScale: zoomScale, rotationY: rotationY, offsetX: offsetX, offsetY: offsetY, to: view, coordinator: context.coordinator)
         } else {
             if context.coordinator.lastIsSpeaking != isSpeaking {
                 if isSpeaking {
-                    restoreSingleJointProbe(coordinator: context.coordinator)
+                    restoreGreetingWave(coordinator: context.coordinator)
                     context.coordinator.animationController?.resume()
                 } else {
                     context.coordinator.animationController?.pause()
                 }
                 context.coordinator.lastIsSpeaking = isSpeaking
+            }
+            if greetingRequest != context.coordinator.lastGreetingRequest {
+                context.coordinator.lastGreetingRequest = greetingRequest
+                if !isSpeaking, let rig = context.coordinator.rigEntity {
+                    runGreetingWave(on: rig, baselineTransforms: context.coordinator.bindPoseTransforms, coordinator: context.coordinator)
+                }
             }
             if context.coordinator.currentZoom != zoomScale {
                 applyZoom(zoomScale, coordinator: context.coordinator)
@@ -192,6 +201,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     private func attach(
         _ model: Entity,
         isSpeaking: Bool,
+        greetingRequest: Int,
         zoomScale: Float,
         rotationY: Float,
         offsetX: Float,
@@ -275,10 +285,11 @@ private struct AlinaRealityView: UIViewRepresentable {
 
         if coordinator.animationController == nil {
             if let skin = findEntity(named: "skin0", in: model) {
-                // AN-03 inventory is complete; collect only the rig data needed for AN-04.
-                logRigControlReadiness(for: skin)
-                // Capture the asset's original bind pose before the imported clip is applied.
-                let baselineTransforms = (skin as? ModelEntity)?.jointTransforms
+                // Preserve the verified bind pose before the imported speaking clip is applied.
+                let modelEntity = skin as? ModelEntity
+                let baselineTransforms = modelEntity?.jointTransforms
+                coordinator.rigEntity = modelEntity
+                coordinator.bindPoseTransforms = baselineTransforms
 
                 // Diagnostic A/B test: play the first imported TempMotion clip,
                 // not the default subtree animation previously tested at skin0#20.
@@ -295,9 +306,15 @@ private struct AlinaRealityView: UIViewRepresentable {
                 } else {
                     logDeferred("[ALINA ANIMATION TEST] skin0#\(testClipIndex) unavailable; count=\(skin.availableAnimations.count)")
                 }
-                runSingleJointProbe(on: skin, baselineTransforms: baselineTransforms, isSpeaking: isSpeaking, coordinator: coordinator)
             } else {
                 logDeferred("[ALINA ANIMATION TEST] skin0 entity not found after scene attach")
+            }
+        }
+
+        if greetingRequest != coordinator.lastGreetingRequest {
+            coordinator.lastGreetingRequest = greetingRequest
+            if !isSpeaking, let rig = coordinator.rigEntity {
+                runGreetingWave(on: rig, baselineTransforms: coordinator.bindPoseTransforms, coordinator: coordinator)
             }
         }
 
@@ -307,157 +324,74 @@ private struct AlinaRealityView: UIViewRepresentable {
         logDeferred("[ALINA SCALE] height=\(height) baseScale=\(baseScale) offsetY=\(modelOffsetY)")
     }
 
-    private func logRigControlReadiness(for skin: Entity) {
-        let runtimeType = String(reflecting: type(of: skin))
-        guard let modelEntity = skin as? ModelEntity else {
-            logDeferred("[ALINA RIG AUDIT] owner=skin0;runtimeType=\(runtimeType);isModelEntity=false")
-            if let sampled = skin.availableAnimations.first?.definition as? SampledAnimation<JointTransforms> {
-                logJointNames(sampled.jointNames, source: "sampledAnimation")
-            }
-            return
-        }
-
-        let runtimeNames = modelEntity.jointNames
-        let runtimeTransforms = modelEntity.jointTransforms
-        logDeferred("[ALINA RIG AUDIT] owner=skin0;runtimeType=\(runtimeType);isModelEntity=true;runtimeJoints=\(runtimeNames.count);runtimeTransforms=\(runtimeTransforms.count)")
-
-        if let sampled = skin.availableAnimations.first?.definition as? SampledAnimation<JointTransforms> {
-            let sampledNames = sampled.jointNames
-            logDeferred("[ALINA RIG AUDIT] sampledJoints=\(sampledNames.count);runtimeNamesMatchSample=\(runtimeNames == sampledNames)")
-            logJointHierarchy(sampledNames, transforms: runtimeTransforms)
-        } else {
-            logDeferred("[ALINA RIG AUDIT] no sampled JointTransforms definition available on skin0")
-        }
-    }
-
-    // One-pass AN-05 sweep: test every joint except the two already-confirmed arm controls.
-    private func runSingleJointProbe(on skin: Entity, baselineTransforms: [Transform]?, isSpeaking: Bool, coordinator: Coordinator) {
-        guard !isSpeaking,
-              let modelEntity = skin as? ModelEntity,
+    private func runGreetingWave(on modelEntity: ModelEntity, baselineTransforms: [Transform]?, coordinator: Coordinator) {
+        guard !coordinator.lastIsSpeaking,
               let originalTransforms = baselineTransforms,
-              originalTransforms.count == modelEntity.jointNames.count else {
-            logDeferred("[ALINA RIG AUDIT] body sweep skipped; speaking=\(isSpeaking); modelEntity=\(skin is ModelEntity)")
+              originalTransforms.count == modelEntity.jointNames.count,
+              modelEntity.jointNames.indices.contains(77) else {
+            logDeferred("[ALINA RIG AUDIT] greeting wave skipped; rig baseline or verified arm joint unavailable")
             return
         }
 
-        let jointNames = modelEntity.jointNames
-        let indices = jointNames.indices.filter { $0 != 49 && $0 != 77 }
-        coordinator.jointProbeSequenceID += 1
-        let sequenceID = coordinator.jointProbeSequenceID
-        coordinator.jointProbeEntity = modelEntity
-        coordinator.jointProbeOriginalTransforms = originalTransforms
-        modelEntity.jointTransforms = originalTransforms
-        logDeferred("[ALINA RIG AUDIT] body sweep started; joints=\(indices.count); excludes=49,77; perJoint=0.16s; baseline=pre-animation bind pose")
+        restoreGreetingWave(coordinator: coordinator)
+        var targetTransforms = originalTransforms
+        let lift = simd_quatf(angle: .pi / 12, axis: SIMD3<Float>(0, 0, 1))
+        targetTransforms[77].rotation = simd_normalize(originalTransforms[77].rotation * lift)
 
-        func runStep(_ step: Int) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak coordinator] in
-                guard let coordinator,
-                      coordinator.jointProbeSequenceID == sequenceID,
-                      coordinator.jointProbeEntity === modelEntity else { return }
+        var definition = FromToByAnimation<JointTransforms>()
+        definition.name = "AlinaGreetingWave"
+        definition.jointNames = modelEntity.jointNames
+        definition.isScaleAnimated = false
+        definition.isTranslationAnimated = false
+        definition.isRotationAnimated = true
+        definition.fromValue = JointTransforms(originalTransforms)
+        definition.toValue = JointTransforms(targetTransforms)
+        definition.duration = 0.75
+        definition.timing = .easeInOut
+        definition.repeatMode = .autoReverse
+        definition.blendLayer = 100
+        definition.fillMode = .none
+        definition.bindTarget = .jointTransforms
 
-                coordinator.jointProbeController?.stop()
-                modelEntity.jointTransforms = originalTransforms
-
-                guard step < indices.count else {
-                    coordinator.jointProbeController = nil
-                    coordinator.jointProbeEntity = nil
-                    coordinator.jointProbeOriginalTransforms = nil
-                    logDeferred("[ALINA RIG AUDIT] body sweep finished; tested=\(indices.count); original transforms restored")
-                    return
-                }
-
-                let jointIndex = indices[step]
-                var targetTransforms = originalTransforms
-                let delta = simd_quatf(angle: .pi / 12, axis: SIMD3<Float>(0, 0, 1))
-                targetTransforms[jointIndex].rotation = simd_normalize(originalTransforms[jointIndex].rotation * delta)
-
-                var definition = FromToByAnimation<JointTransforms>()
-                definition.name = "AlinaBodyJointSweep"
-                definition.jointNames = jointNames
-                definition.isScaleAnimated = false
-                definition.isTranslationAnimated = false
-                definition.isRotationAnimated = true
-                definition.fromValue = JointTransforms(originalTransforms)
-                definition.toValue = JointTransforms(targetTransforms)
-                definition.duration = 0.16
-                definition.blendLayer = 100
-                definition.fillMode = .none
-                definition.bindTarget = .jointTransforms
-
-                guard let resource = try? AnimationResource.generate(with: definition) else {
-                    logDeferred("[ALINA RIG AUDIT] body sweep resource generation failed; index=\(jointIndex)")
-                    runStep(step + 1)
-                    return
-                }
-                coordinator.jointProbeController = modelEntity.playAnimation(
-                    resource,
-                    transitionDuration: 0.02,
-                    blendLayerOffset: 0,
-                    separateAnimatedValue: true,
-                    startsPaused: false
-                )
-                runStep(step + 1)
-            }
+        guard let resource = try? AnimationResource.generate(with: definition) else {
+            logDeferred("[ALINA RIG AUDIT] greeting wave resource generation failed")
+            return
         }
 
-        runStep(0)
+        coordinator.greetingWaveSequenceID += 1
+        let sequenceID = coordinator.greetingWaveSequenceID
+        coordinator.greetingWaveEntity = modelEntity
+        coordinator.greetingWaveOriginalTransforms = originalTransforms
+        coordinator.greetingWaveController = modelEntity.playAnimation(
+            resource,
+            transitionDuration: 0.12,
+            blendLayerOffset: 0,
+            separateAnimatedValue: true,
+            startsPaused: false
+        )
+        logDeferred("[ALINA RIG AUDIT] greeting arm motion started; verifiedJoint=77; lift=15deg; easedCycle=0.75s")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak coordinator] in
+            guard let coordinator, coordinator.greetingWaveSequenceID == sequenceID else { return }
+            coordinator.greetingWaveController?.stop()
+            modelEntity.jointTransforms = originalTransforms
+            coordinator.greetingWaveController = nil
+            coordinator.greetingWaveEntity = nil
+            coordinator.greetingWaveOriginalTransforms = nil
+            logDeferred("[ALINA RIG AUDIT] greeting arm motion finished; original pose restored")
+        }
     }
 
-    private func restoreSingleJointProbe(coordinator: Coordinator) {
-        coordinator.jointProbeSequenceID += 1
-        coordinator.jointProbeController?.stop()
-        if let entity = coordinator.jointProbeEntity,
-           let transforms = coordinator.jointProbeOriginalTransforms {
+    private func restoreGreetingWave(coordinator: Coordinator) {
+        coordinator.greetingWaveSequenceID += 1
+        coordinator.greetingWaveController?.stop()
+        if let entity = coordinator.greetingWaveEntity,
+           let transforms = coordinator.greetingWaveOriginalTransforms {
             entity.jointTransforms = transforms
         }
-        coordinator.jointProbeController = nil
-        coordinator.jointProbeEntity = nil
-        coordinator.jointProbeOriginalTransforms = nil
-    }
-
-    private func logJointNames(_ names: [String], source: String) {
-        let chunkSize = 18
-        for start in stride(from: 0, to: names.count, by: chunkSize) {
-            let end = min(start + chunkSize, names.count)
-            let entries = names[start..<end].enumerated().map { offset, name in
-                "\(start + offset)=\(name)"
-            }.joined(separator: " | ")
-            logDeferred("[ALINA RIG AUDIT] \(source) joints \(start)-\(end - 1): \(entries)")
-        }
-    }
-
-    private func logJointHierarchy(_ names: [String], transforms: [Transform]) {
-        var indexByPath: [String: Int] = [:]
-        for (index, name) in names.enumerated() {
-            indexByPath[name] = index
-        }
-
-        let entries = names.enumerated().map { index, name in
-            let components = name.split(separator: "/")
-            var parentIndex: Int?
-            if components.count > 1 {
-                for ancestorLength in stride(from: components.count - 1, through: 1, by: -1) {
-                    let ancestor = components.prefix(ancestorLength).joined(separator: "/")
-                    if let candidate = indexByPath[ancestor] {
-                        parentIndex = candidate
-                        break
-                    }
-                }
-            }
-
-            let parent = parentIndex.map { String($0) } ?? "root"
-            let translation = index < transforms.count
-                ? String(describing: transforms[index].translation)
-                : "missing"
-            return "\(index):\(name)<-\(parent)@d\(components.count - 1);t=\(translation)"
-        }
-
-        let chunkSize = 18
-        for start in stride(from: 0, to: entries.count, by: chunkSize) {
-            let end = min(start + chunkSize, entries.count)
-            let chunk = entries[start..<end].joined(separator: " | ")
-            logDeferred("[ALINA RIG AUDIT] hierarchy joints \(start)-\(end - 1): \(chunk)")
-        }
+        coordinator.greetingWaveController = nil
+        coordinator.greetingWaveEntity = nil
+        coordinator.greetingWaveOriginalTransforms = nil
     }
 
     private func logAnimationInventory(in root: Entity) {
@@ -601,10 +535,13 @@ private struct AlinaRealityView: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var currentEntity: Entity?
         var animationController: AnimationPlaybackController?
-        var jointProbeController: AnimationPlaybackController?
-        weak var jointProbeEntity: ModelEntity?
-        var jointProbeOriginalTransforms: [Transform]?
-        var jointProbeSequenceID = 0
+        var greetingWaveController: AnimationPlaybackController?
+        weak var greetingWaveEntity: ModelEntity?
+        var greetingWaveOriginalTransforms: [Transform]?
+        var greetingWaveSequenceID = 0
+        weak var rigEntity: ModelEntity?
+        var bindPoseTransforms: [Transform]?
+        var lastGreetingRequest = 0
         var lastIsSpeaking = false
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
