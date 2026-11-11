@@ -169,3 +169,12 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - **Preserved:** greeting behavior, imported clip pause/resume, Gemini Live audio/transcript handling, Chibi, avatar framing/zoom/position gestures, and existing log controls.
 - **Validation:** source edits only. No Codemagic build, GitHub Actions, or device test was run. User should run one build and observe several AI sentences: one arm should make a slow, small gesture per completed sentence, alternating sides; movement must stop and return to the original pose when AI speech ends.
 - **Limit:** this is the first arm-only gesture pass. Head/neck/torso/facial semantic controls remain deferred until their exact mappings and motion direction are verified.
+
+
+## AN-06 correction after first device feedback (2026-11-11)
+- **User result:** During AI speech Alina still held both arms spread; left and right arms moved up/down sequentially; no facial expression was visible and the gestures looked wrong.
+- **Source diagnosis:** The first implementation explicitly alternated one arm per completed sentence, which explains the left-then-right sequence. In addition, the experimental imported TempMotion clip was still resumed during AI speech, so it could compete with the custom gesture overlay. Facial emotion remained UI-only and was never passed into the avatar.
+- **Correction on main:** Disabled playback of the imported TempMotion test clip while retaining the pre-animation bind-pose capture and existing startup/greeting paths. Replaced alternating single-arm movement with one coordinated, small 6-degree gesture on both verified arm joints 49 and 77. Gesture requests now use incremental transcript growth thresholds (35 characters for the first gesture, 48 additional characters thereafter), rather than requiring punctuation that Gemini may not emit until late. The gesture still stops/restores when AI speech ends. No guessed facial joint or expression mapping was added.
+- **Preserved:** Gemini Live audio/transcription, greeting trigger, Chibi, framing, zoom, position controls, and log copy/clear.
+- **Validation:** Source-only. No build/device test was run. This correction is intended to remove the sequential arm motion and imported-clip interference; visual quality and bind-pose restoration still require one user-run build.
+- **Next:** Verify both arms move together subtly during AI speech and return to rest after speech. Facial expressions remain a separate follow-up requiring verified face controls.
