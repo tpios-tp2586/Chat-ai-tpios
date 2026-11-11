@@ -156,6 +156,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         } else {
             if context.coordinator.lastIsSpeaking != isSpeaking {
                 if isSpeaking {
+                    restoreSingleJointProbe(coordinator: context.coordinator)
                     context.coordinator.animationController?.resume()
                 } else {
                     context.coordinator.animationController?.pause()
@@ -292,6 +293,7 @@ private struct AlinaRealityView: UIViewRepresentable {
                 } else {
                     logDeferred("[ALINA ANIMATION TEST] skin0#\(testClipIndex) unavailable; count=\(skin.availableAnimations.count)")
                 }
+                runSingleJointProbe(on: skin, isSpeaking: isSpeaking, coordinator: coordinator)
             } else {
                 logDeferred("[ALINA ANIMATION TEST] skin0 entity not found after scene attach")
             }
@@ -324,6 +326,62 @@ private struct AlinaRealityView: UIViewRepresentable {
         } else {
             logDeferred("[ALINA RIG AUDIT] no sampled JointTransforms definition available on skin0")
         }
+    }
+
+    // Temporary AN-04 proof: animate one indexed joint while the imported full-body clip is paused.
+    private func runSingleJointProbe(on skin: Entity, isSpeaking: Bool, coordinator: Coordinator) {
+        let jointIndex = 49
+        guard !isSpeaking,
+              let modelEntity = skin as? ModelEntity,
+              modelEntity.jointNames.indices.contains(jointIndex),
+              modelEntity.jointTransforms.indices.contains(jointIndex) else {
+            logDeferred("[ALINA RIG AUDIT] single-joint probe skipped; speaking=\(isSpeaking); modelEntity=\(skin is ModelEntity)")
+            return
+        }
+
+        let originalTransforms = modelEntity.jointTransforms
+        let jointName = modelEntity.jointNames[jointIndex]
+        let original = originalTransforms[jointIndex]
+        var target = original
+        let rotationDelta = simd_quatf(angle: .pi / 12, axis: SIMD3<Float>(0, 0, 1))
+        target.rotation = simd_normalize(original.rotation * rotationDelta)
+
+        var definition = FromToByAnimation<JointTransforms>()
+        definition.name = "AlinaSingleJointProbe"
+        definition.jointNames = [jointName]
+        definition.isScaleAnimated = false
+        definition.isTranslationAnimated = false
+        definition.isRotationAnimated = true
+        definition.fromValue = JointTransforms([original])
+        definition.toValue = JointTransforms([target])
+        definition.duration = 0.65
+        definition.blendLayer = 100
+        definition.fillMode = .forwards
+        definition.bindTarget = .transform
+
+        let controller = modelEntity.playAnimation(definition.create(), transitionDuration: 0.05)
+        coordinator.jointProbeController = controller
+        coordinator.jointProbeEntity = modelEntity
+        coordinator.jointProbeOriginalTransforms = originalTransforms
+        logDeferred("[ALINA RIG AUDIT] single-joint probe started; index=\(jointIndex); name=\(jointName); angle=15deg; duration=0.65; importedAnimationPaused=true")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) { [weak coordinator] in
+            guard let coordinator,
+                  coordinator.jointProbeController === controller else { return }
+            restoreSingleJointProbe(coordinator: coordinator)
+            logDeferred("[ALINA RIG AUDIT] single-joint probe finished; original transforms restored")
+        }
+    }
+
+    private func restoreSingleJointProbe(coordinator: Coordinator) {
+        coordinator.jointProbeController?.stop()
+        if let entity = coordinator.jointProbeEntity,
+           let transforms = coordinator.jointProbeOriginalTransforms {
+            entity.jointTransforms = transforms
+        }
+        coordinator.jointProbeController = nil
+        coordinator.jointProbeEntity = nil
+        coordinator.jointProbeOriginalTransforms = nil
     }
 
     private func logJointNames(_ names: [String], source: String) {
@@ -512,6 +570,9 @@ private struct AlinaRealityView: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var currentEntity: Entity?
         var animationController: AnimationPlaybackController?
+        var jointProbeController: AnimationPlaybackController?
+        weak var jointProbeEntity: ModelEntity?
+        var jointProbeOriginalTransforms: [Transform]?
         var lastIsSpeaking = false
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
