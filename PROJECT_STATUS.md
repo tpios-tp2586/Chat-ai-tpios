@@ -75,6 +75,8 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - Do not add ZIP artifacts.
 
 
+| 2026-11-11 | AN-04 | Compile the temporary single-joint probe. | User-provided Codemagic output: `FromToByAnimation<JointTransforms>` has no member `create()` at `AlinaAvatarView.swift:362`; unrelated `ContentView.swift` warning says local `face` can be `let`. Apple RealityKit API documents `AnimationResource.generate(with:)` as the throwing resource factory. | Build failed before the runtime probe. Replaced the unsupported `definition.create()` call with guarded `try AnimationResource.generate(with: definition)`; probe parameters, joint index, playback gating, and restore logic remain unchanged. Source-only correction; no build run by assistant. | User runs one Codemagic build. If it compiles, perform the existing idle Chat Voice probe and report only its visual result plus `[ALINA RIG AUDIT]` probe lines. |
+
 ## Diagnostic log integrity — AN-04 (single-joint probe)
 - **Purpose:** determine whether one indexed joint can be driven independently while preserving the imported full-body speaking animation.
 - **Allowed entries in the in-app Log Tool:**
