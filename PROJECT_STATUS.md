@@ -71,3 +71,13 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - IPA-only output.
 - User runs Codemagic. Never trigger builds or GitHub Actions without explicit permission.
 - Do not add ZIP artifacts.
+
+
+## Diagnostic log integrity — AN-04
+- The in-app Log Tool is a focused collector, not a rolling console.
+- Keep only `[ALINA RIG AUDIT]` and actionable `[ALINA ERROR]` entries for the current body-control investigation, plus the initial screen-open `[INFO]` marker.
+- Do not forward routine `[VOICE]`, `[TEXT]`, mesh dumps, layout/debug traces, or the already-completed `[ALINA ANIMATION AUDIT]` inventory.
+- Do not evict required rig-audit lines with a rolling 150-line buffer. Keep the complete current-session diagnostic set until the user clears it.
+- The visible log and copied text must read from the same `diagnosticLogText` value.
+- Keep both Copy Log and Clear Log controls. Clearing removes the same source used by display and copy.
+- AN-03 is locked and must not run again during AN-04. Only collect the rig joint mapping needed to determine selective body control.
