@@ -1,5 +1,6 @@
 import Combine
 import RealityKit
+import QuartzCore
 import SwiftUI
 import UIKit
 
@@ -388,69 +389,51 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.greetingWaveOriginalTransforms = nil
     }
 
-    private func runSpeechGesture(
+    private // Procedural noise-driven speech gestures
+    // Each joint oscillates with sin/cos at different frequencies and phases
+    // so movement is continuous, asymmetric, and natural-looking
+
+    // Gesture config: (jointIndex, axisX, axisY, axisZ, freqHz, amplitudeDeg, phaseOffset)
+    private let gestureConfig: [(Int, Float, Float, Float, Double, Float, Double)] = [
+        (77, 0, 0, 1, 0.80, 12.0, 0.00),   // right arm Z — main raise/lower
+        (77, 1, 0, 0, 0.50, 6.0,  0.78),   // right arm X — slight forward/back
+        (49, 0, 0, 1, 0.70, 10.0, 1.05),   // left arm Z — offset phase
+        (49, 1, 0, 0, 0.40, 5.0,  1.57),   // left arm X — slight forward/back
+    ]
+
+    func runSpeechGesture(
         on modelEntity: ModelEntity,
         baselineTransforms: [Transform]?,
         coordinator: Coordinator
     ) {
         guard coordinator.lastIsSpeaking,
               let originalTransforms = baselineTransforms,
-              originalTransforms.count == modelEntity.jointNames.count,
-              modelEntity.jointNames.indices.contains(49),
-              modelEntity.jointNames.indices.contains(77) else {
-            return
-        }
+              originalTransforms.count == modelEntity.jointNames.count else { return }
 
         restoreSpeechGesture(coordinator: coordinator)
-        var targetTransforms = originalTransforms
-        let lift = simd_quatf(angle: .pi / 30, axis: SIMD3<Float>(0, 0, 1))
-        for jointIndex in [49, 77] {
-            targetTransforms[jointIndex].rotation = simd_normalize(
-                originalTransforms[jointIndex].rotation * lift
-            )
-        }
-
-        var definition = FromToByAnimation<JointTransforms>()
-        definition.name = "AlinaSpeechGesture"
-        definition.jointNames = modelEntity.jointNames
-        definition.isScaleAnimated = false
-        definition.isTranslationAnimated = false
-        definition.isRotationAnimated = true
-        definition.fromValue = JointTransforms(originalTransforms)
-        definition.toValue = JointTransforms(targetTransforms)
-        definition.duration = 2.0
-        definition.timing = .easeInOut
-        definition.repeatMode = .autoReverse
-        definition.blendLayer = 110
-        definition.fillMode = .none
-        definition.bindTarget = .jointTransforms
-
-        guard let resource = try? AnimationResource.generate(with: definition) else {
-            logDeferred("[ALINA RIG AUDIT] speech gesture resource generation failed")
-            return
-        }
-
         coordinator.speechGestureEntity = modelEntity
         coordinator.speechGestureOriginalTransforms = originalTransforms
-        coordinator.speechGestureController = modelEntity.playAnimation(
-            resource,
-            transitionDuration: 0.25,
-            blendLayerOffset: 0,
-            separateAnimatedValue: true,
-            startsPaused: false
-        )
-        logDeferred("[ALINA RIG AUDIT] coordinated speech gesture loop started; verifiedArmJoints=49,77; angle=6deg; halfCycle=2.0s")
+        coordinator.speechStartTime = CACurrentMediaTime()
+
+        let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.speechGestureTick))
+        displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
+        displayLink.add(to: .main, forMode: .common)
+        coordinator.speechDisplayLink = displayLink
+        logDeferred("[ALINA SPEECH] procedural gesture started")
     }
 
     private func restoreSpeechGesture(coordinator: Coordinator) {
-        coordinator.speechGestureController?.stop()
+        coordinator.speechDisplayLink?.invalidate()
+        coordinator.speechDisplayLink = nil
         if let entity = coordinator.speechGestureEntity,
            let transforms = coordinator.speechGestureOriginalTransforms {
             entity.jointTransforms = transforms
         }
+        coordinator.speechGestureController?.stop()
         coordinator.speechGestureController = nil
         coordinator.speechGestureEntity = nil
         coordinator.speechGestureOriginalTransforms = nil
+        coordinator.speechStartTime = 0
     }
 
     private func logAnimationInventory(in root: Entity) {
