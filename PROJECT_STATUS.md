@@ -221,3 +221,11 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - Diagnostic-only source change: commit 8b634b5 logs only the verified joint paths and original local rotations/translations for indices 49 and 77 under the existing [ALINA RIG AUDIT] prefix. No movement, voice, animation, framing, or interaction behavior was changed by this diagnostic.
 - Validation: source inspection only. No compile, Codemagic, GitHub Actions, or device test was run by the assistant.
 - Next test: user runs one build and shares only the two [ALINA RIG AUDIT] arm joint lines. Use those exact paths/transforms to design the neutral rest pose; do not guess angles or add more random motion.
+
+
+## AN-06 — Rig test panel separation (2026-11-12)
+- User direction: move the joint-test controls out of the diagnostic log sheet and place them in a dedicated visible area outside Alina's render region, so the avatar remains visible during joint tests. Keep the diagnostic log focused on logs and its copy/clear controls.
+- Source changes on main: CompanionChatView.swift now renders a compact six-button joint test panel below the avatar and above the status card. The log sheet no longer contains the joint-test controls. AlinaAvatarView.swift receives a monotonically increasing request ID so tapping the same axis again triggers exactly one test rather than rerunning on every SwiftUI update. Joint tests are disabled while Alina is speaking; the existing 25-degree axis probes and 3-second restore behavior are preserved.
+- Preserved: diagnostic log display, Copy All, Copy Selected, Clear, Alina rendering, voice/chat pipeline, greeting, framing, zoom, rotation, position, Chibi, and all existing avatar behavior outside the one-shot test trigger.
+- Validation: source inspection and targeted string-level consistency checks only. No Xcode compile, Codemagic build, GitHub Actions, or device test was run.
+- Next action: user runs one Codemagic build, checks that the test panel is outside the avatar area and Alina remains visible while selecting each axis; send only the visual result and any [ALINA RIG AUDIT] axis test line. Do not request full logs.
