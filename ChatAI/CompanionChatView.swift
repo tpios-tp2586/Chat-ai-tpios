@@ -19,7 +19,11 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
     @State private var armChainTestRequestID = 0
-    @State private var armChainTestStatus = "Sẵn sàng kiểm tra"
+    @State private var armChainTestAction = "next"
+    @State private var armChainTestStatus = "Chọn khớp tiếp để bắt đầu"
+    @State private var armChainPoseA: UIImage?
+    @State private var armChainPoseB: UIImage?
+    @State private var showArmChainComparison = false
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -40,19 +44,19 @@ struct CompanionChatView: View {
                             isSpeaking: liveManager.aiSpeaking,
                             greetingRequest: greetingRequest,
                             armChainTestRequestID: armChainTestRequestID,
+                            armChainTestAction: armChainTestAction,
                             onLog: { line in
                                 addDiagnostic(line)
-                                if line.contains("arm-chain active;") {
+                                if line.contains("A/B selected;") || line.contains("A/B pose ") ||
+                                   line.contains("A/B pose restored") || line.contains("A/B test skipped") {
                                     armChainTestStatus = line
-                                } else if line.contains("arm-chain test finished") {
-                                    armChainTestStatus = "Hoàn tất — tư thế đã phục hồi"
-                                } else if line.contains("arm-chain test cancelled") {
-                                    armChainTestStatus = "Đã dừng — tư thế đã phục hồi"
-                                } else if line.contains("arm-chain test started") {
-                                    armChainTestStatus = "Đang kiểm tra từng khớp…"
-                                } else if line.contains("arm-chain test skipped") {
-                                    armChainTestStatus = "Không tìm thấy nhánh khớp phù hợp"
+                                } else if line.contains("A/B test cancelled") {
+                                    armChainTestStatus = "Đã dừng — tư thế gốc đã phục hồi"
                                 }
+                            },
+                            onPoseSnapshot: { label, image in
+                                if label == "A" { armChainPoseA = image }
+                                if label == "B" { armChainPoseB = image }
                             },
                             onTap: { toggleConversation() }
                         )
@@ -182,30 +186,51 @@ struct CompanionChatView: View {
     private var rigTestPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("KIỂM TRA CHUỖI KHỚP TAY")
+                Text("A/B TEST CHUỖI KHỚP TAY")
                     .font(.caption.weight(.bold))
                 Spacer()
-                Text(liveManager.aiSpeaking ? "Tạm khóa khi Alina nói" : "Tách từng khớp con để quan sát")
+                Text(liveManager.aiSpeaking ? "Tạm khóa khi Alina nói" : "Chụp tư thế gốc và tư thế thử")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
             Text(armChainTestStatus)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .lineLimit(2)
 
-            Button {
-                armChainTestRequestID += 1
-            } label: {
-                Label("Kiểm tra lần lượt khớp con hai tay", systemImage: "hand.raised")
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+            HStack(spacing: 6) {
+                Button { requestArmChainTest("next") } label: {
+                    Label("Khớp tiếp", systemImage: "arrow.right")
+                }
+                Button { requestArmChainTest("a") } label: {
+                    Label("A · Gốc", systemImage: "a.circle")
+                }
+                Button { requestArmChainTest("b") } label: {
+                    Label("B · Thử", systemImage: "b.circle")
+                }
             }
             .buttonStyle(.bordered)
             .tint(activeTheme.accent)
-            .disabled(liveManager.aiSpeaking)
+            .font(.caption.weight(.semibold))
+
+            HStack(spacing: 6) {
+                Button { showArmChainComparison = true } label: {
+                    Label("So sánh A/B", systemImage: "rectangle.split.2x1")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(armChainPoseA == nil || armChainPoseB == nil)
+
+                Button { requestArmChainTest("restore") } label: {
+                    Label("Khôi phục", systemImage: "arrow.uturn.backward")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+            .tint(activeTheme.accent)
+            .font(.caption.weight(.semibold))
         }
+        .disabled(liveManager.aiSpeaking)
         .padding(10)
         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
@@ -213,6 +238,55 @@ struct CompanionChatView: View {
                 .stroke(activeTheme.accent.opacity(0.18), lineWidth: 1)
         }
         .padding(.horizontal, 16)
+        .sheet(isPresented: $showArmChainComparison) {
+            NavigationStack {
+                VStack(spacing: 12) {
+                    HStack(alignment: .top, spacing: 8) {
+                        armChainPoseCard(title: "A · Tư thế gốc", image: armChainPoseA)
+                        armChainPoseCard(title: "B · Tư thế thử", image: armChainPoseB)
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+                .padding()
+                .navigationTitle("So sánh tư thế A/B")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Đóng") { showArmChainComparison = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func armChainPoseCard(title: String, image: UIImage?) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 300)
+                    .background(Color.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
+            } else {
+                ContentUnavailableView("Chưa có ảnh", systemImage: "photo")
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 300)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func requestArmChainTest(_ action: String) {
+        armChainTestAction = action
+        if action == "next" {
+            armChainPoseA = nil
+            armChainPoseB = nil
+        }
+        armChainTestRequestID += 1
     }
 
     private var diagnosticLogText: String {
