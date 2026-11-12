@@ -648,6 +648,31 @@ private struct AlinaRealityView: UIViewRepresentable {
         var currentOffsetY: Float = 0
         var didLogLayout = false
         var didLogUpdate = false
+        var speechDisplayLink: CADisplayLink?
+        var speechStartTime: Double = 0
+        let gestureConfig: [(Int, Float, Float, Float, Double, Float, Double)] = [
+            (77, 0, 0, 1, 0.80, 12.0, 0.00),
+            (77, 1, 0, 0, 0.50,  6.0, 0.78),
+            (49, 0, 0, 1, 0.70, 10.0, 1.05),
+            (49, 1, 0, 0, 0.40,  5.0, 1.57),
+        ]
+
+        @objc func speechGestureTick() {
+            guard let entity = speechGestureEntity,
+                  let baseline = speechGestureOriginalTransforms,
+                  baseline.count == entity.jointNames.count else { return }
+            let t = CACurrentMediaTime() - speechStartTime
+            var transforms = baseline
+            for (jointIdx, ax, ay, az, freq, ampDeg, phase) in gestureConfig {
+                guard jointIdx < baseline.count else { continue }
+                let angle = Float(sin(t * freq * 2 * .pi + phase)) * (ampDeg * .pi / 180)
+                let axis = simd_normalize(SIMD3<Float>(ax, ay, az))
+                let q = simd_quatf(angle: angle, axis: axis)
+                transforms[jointIdx].rotation = simd_normalize(baseline[jointIdx].rotation * q)
+            }
+            entity.jointTransforms = transforms
+        }
+
         private var moveStartPoint: CGPoint?
         private var moveStartAnchorPosition: SIMD3<Float>?
         private var onMoveStarted: (() -> Void)?
