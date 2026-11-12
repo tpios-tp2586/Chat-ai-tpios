@@ -240,3 +240,10 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - **Validation:** source changes only. No Xcode compile, Codemagic build, GitHub Actions, or device test was run.
 - **User test:** run one build, tap the arm-chain test once, and observe which arm segment moves at each pulse. Report the visible segment sequence; send only [ALINA RIG AUDIT] arm-chain lines if the sequence does not start, stop, or restore correctly.
 - **Acceptance:** each candidate joint produces one localized, distinguishable movement; no simultaneous/random motion; the original pose is restored at completion or interruption. Do not mark mapped until the user identifies the visible segments.
+
+
+## AN-06 — arm-chain test observability adjustment (2026-11-12)
+- Each isolated joint now remains in its one-second eased pulse, making the visible segment easier to identify.
+- The panel shows the currently active joint index and side in real time; the diagnostic log retains the matching path groups.
+- No new joint mapping is inferred by source code. User visual confirmation remains required.
+- Source-only follow-up. No compile or device test was run.
