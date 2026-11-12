@@ -430,6 +430,11 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.speechGestureEntity = nil
         coordinator.speechGestureOriginalTransforms = nil
         coordinator.speechStartTime = 0
+        coordinator.speechGestureNextAt = 0
+        coordinator.speechGestureActionStart = 0
+        coordinator.speechGestureActionDuration = 0
+        coordinator.speechGestureMotions.removeAll()
+        coordinator.speechGestureLastKey = nil
     }
     private func logAnimationInventory(in root: Entity) {
         var ownerSummaries: [String] = []
@@ -659,9 +664,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             if now >= speechGestureNextAt {
                 let joint = Bool.random() ? 77 : 49
                 var axisIndex = Int.random(in: 0...2)
-                let key = "\\(joint)-\\(axisIndex)"
+                let key = "\(joint)-\(axisIndex)"
                 if key == speechGestureLastKey { axisIndex = (axisIndex + 1) % 3 }
-                speechGestureLastKey = "\\(joint)-\\(axisIndex)"
+                speechGestureLastKey = "\(joint)-\(axisIndex)"
 
                 let axes: [SIMD3<Float>] = [
                     SIMD3<Float>(1, 0, 0), // X: forward/back
