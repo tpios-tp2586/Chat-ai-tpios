@@ -272,9 +272,15 @@ struct CompanionChatView: View {
                     .frame(height: 300)
                     .background(Color.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
             } else {
-                ContentUnavailableView("Chưa có ảnh", systemImage: "photo")
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 300)
+                VStack(spacing: 8) {
+                    Image(systemName: "photo")
+                        .font(.title2)
+                    Text("Chưa có ảnh")
+                        .font(.caption)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 300)
+                .background(Color.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
