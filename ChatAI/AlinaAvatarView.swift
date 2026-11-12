@@ -389,18 +389,8 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.greetingWaveOriginalTransforms = nil
     }
 
-    // Procedural noise-driven speech gestures
-    // Each joint oscillates with sin/cos at different frequencies and phases
-    // so movement is continuous, asymmetric, and natural-looking
-
-    // Gesture config: (jointIndex, axisX, axisY, axisZ, freqHz, amplitudeDeg, phaseOffset)
-    private let gestureConfig: [(Int, Float, Float, Float, Double, Float, Double)] = [
-        (77, 0, 0, 1, 0.80, 12.0, 0.00),   // right arm Z — main raise/lower
-        (77, 1, 0, 0, 0.50, 6.0,  0.78),   // right arm X — slight forward/back
-        (49, 0, 0, 1, 0.70, 10.0, 1.05),   // left arm Z — offset phase
-        (49, 1, 0, 0, 0.40, 5.0,  1.57),   // left arm X — slight forward/back
-    ]
-
+    // Discrete, eased speech gestures using the user-confirmed local axes:
+    // X = arm forward/back, Y = hand rotation, Z = arm raise/lower.
     func runSpeechGesture(
         on modelEntity: ModelEntity,
         baselineTransforms: [Transform]?,
@@ -408,18 +398,22 @@ private struct AlinaRealityView: UIViewRepresentable {
     ) {
         guard coordinator.lastIsSpeaking,
               let originalTransforms = baselineTransforms,
-              originalTransforms.count == modelEntity.jointNames.count else { return }
+              originalTransforms.count == modelEntity.jointNames.count,
+              originalTransforms.indices.contains(49),
+              originalTransforms.indices.contains(77) else { return }
 
         restoreSpeechGesture(coordinator: coordinator)
         coordinator.speechGestureEntity = modelEntity
         coordinator.speechGestureOriginalTransforms = originalTransforms
         coordinator.speechStartTime = CACurrentMediaTime()
+        coordinator.speechGestureNextAt = coordinator.speechStartTime + Double.random(in: 0.4...0.9)
+        coordinator.speechGestureLastKey = nil
 
         let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.speechGestureTick))
         displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
         displayLink.add(to: .main, forMode: .common)
         coordinator.speechDisplayLink = displayLink
-        logDeferred("[ALINA SPEECH] procedural gesture started")
+        logDeferred("[ALINA RIG AUDIT] discrete speech gestures started")
     }
 
     private func restoreSpeechGesture(coordinator: Coordinator) {
@@ -650,25 +644,61 @@ private struct AlinaRealityView: UIViewRepresentable {
         var didLogUpdate = false
         var speechDisplayLink: CADisplayLink?
         var speechStartTime: Double = 0
-        let gestureConfig: [(Int, Float, Float, Float, Double, Float, Double)] = [
-            (77, 0, 0, 1, 0.80, 12.0, 0.00),
-            (77, 1, 0, 0, 0.50,  6.0, 0.78),
-            (49, 0, 0, 1, 0.70, 10.0, 1.05),
-            (49, 1, 0, 0, 0.40,  5.0, 1.57),
-        ]
+        var speechGestureNextAt: Double = 0
+        var speechGestureActionStart: Double = 0
+        var speechGestureActionDuration: Double = 0
+        var speechGestureMotions: [(jointIndex: Int, axis: SIMD3<Float>, amplitude: Float)] = []
+        var speechGestureLastKey: String?
 
         @objc func speechGestureTick() {
             guard let entity = speechGestureEntity,
                   let baseline = speechGestureOriginalTransforms,
                   baseline.count == entity.jointNames.count else { return }
-            let t = CACurrentMediaTime() - speechStartTime
+
+            let now = CACurrentMediaTime()
+            if now >= speechGestureNextAt {
+                let joint = Bool.random() ? 77 : 49
+                var axisIndex = Int.random(in: 0...2)
+                let key = "\\(joint)-\\(axisIndex)"
+                if key == speechGestureLastKey { axisIndex = (axisIndex + 1) % 3 }
+                speechGestureLastKey = "\\(joint)-\\(axisIndex)"
+
+                let axes: [SIMD3<Float>] = [
+                    SIMD3<Float>(1, 0, 0), // X: forward/back
+                    SIMD3<Float>(0, 1, 0), // Y: hand rotation
+                    SIMD3<Float>(0, 0, 1)  // Z: raise/lower
+                ]
+                func amplitude(for axis: Int) -> Float {
+                    let range: ClosedRange<Float> = axis == 1 ? 3...5 : (axis == 0 ? 4...7 : 5...8)
+                    return Float.random(in: range) * (Bool.random() ? 1 : -1)
+                }
+
+                speechGestureMotions = [(joint, axes[axisIndex], amplitude(for: axisIndex))]
+                if Double.random(in: 0...1) < 0.22 {
+                    let otherJoint = joint == 77 ? 49 : 77
+                    let otherAxis = Int.random(in: 0...2)
+                    speechGestureMotions.append((otherJoint, axes[otherAxis], amplitude(for: otherAxis) * 0.7))
+                }
+
+                speechGestureActionStart = now
+                speechGestureActionDuration = Double.random(in: 0.55...0.9)
+                speechGestureNextAt = now + speechGestureActionDuration + Double.random(in: 0.9...2.1)
+            }
+
             var transforms = baseline
-            for (jointIdx, ax, ay, az, freq, ampDeg, phase) in gestureConfig {
-                guard jointIdx < baseline.count else { continue }
-                let angle = Float(sin(t * freq * 2 * .pi + phase)) * (ampDeg * .pi / 180)
-                let axis = simd_normalize(SIMD3<Float>(ax, ay, az))
-                let q = simd_quatf(angle: angle, axis: axis)
-                transforms[jointIdx].rotation = simd_normalize(baseline[jointIdx].rotation * q)
+            let progress = min(max((now - speechGestureActionStart) / max(speechGestureActionDuration, 0.001), 0), 1)
+            if !speechGestureMotions.isEmpty && progress < 1 {
+                let halfProgress = Float(progress < 0.5 ? progress * 2 : (1 - progress) * 2)
+                let eased = halfProgress * halfProgress * (3 - 2 * halfProgress)
+                for motion in speechGestureMotions where baseline.indices.contains(motion.jointIndex) {
+                    let angle = motion.amplitude * eased * .pi / 180
+                    let rotation = simd_quatf(angle: angle, axis: motion.axis)
+                    transforms[motion.jointIndex].rotation = simd_normalize(
+                        baseline[motion.jointIndex].rotation * rotation
+                    )
+                }
+            } else if progress >= 1 {
+                speechGestureMotions.removeAll()
             }
             entity.jointTransforms = transforms
         }
