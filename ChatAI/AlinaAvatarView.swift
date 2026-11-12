@@ -8,6 +8,7 @@ struct AlinaAvatarView: View {
     let isSpeaking: Bool
     let greetingRequest: Int
     let axisTestRequest: (Int, SIMD3<Float>, Float) // joint, axis, angle
+    let axisTestRequestID: Int
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -46,6 +47,7 @@ struct AlinaAvatarView: View {
                     isSpeaking: isSpeaking,
                     greetingRequest: greetingRequest,
                     axisTestRequest: axisTestRequest,
+                    axisTestRequestID: axisTestRequestID,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
@@ -128,6 +130,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     let isSpeaking: Bool
     let greetingRequest: Int
     let axisTestRequest: (Int, SIMD3<Float>, Float)
+    let axisTestRequestID: Int
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
@@ -187,8 +190,11 @@ private struct AlinaRealityView: UIViewRepresentable {
             if context.coordinator.currentOffsetX != offsetX || context.coordinator.currentOffsetY != offsetY {
                 applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: context.coordinator)
             }
-            if axisTestRequest.0 >= 0 {
-                runAxisTest(jointIndex: axisTestRequest.0, axis: axisTestRequest.1, angle: axisTestRequest.2, coordinator: context.coordinator)
+            if axisTestRequestID != context.coordinator.lastAxisTestRequestID {
+                context.coordinator.lastAxisTestRequestID = axisTestRequestID
+                if axisTestRequest.0 >= 0 {
+                    runAxisTest(jointIndex: axisTestRequest.0, axis: axisTestRequest.1, angle: axisTestRequest.2, coordinator: context.coordinator)
+                }
             }
         }
     }
@@ -555,7 +561,8 @@ private struct AlinaRealityView: UIViewRepresentable {
     }
 
     func runAxisTest(jointIndex: Int, axis: SIMD3<Float>, angle: Float, coordinator: Coordinator) {
-        guard let rig = coordinator.rigEntity,
+        guard !coordinator.lastIsSpeaking,
+              let rig = coordinator.rigEntity,
               let baseline = coordinator.bindPoseTransforms,
               jointIndex < baseline.count else {
             onLog("[ALINA RIG AUDIT] axis test skipped: rig not ready")
@@ -641,6 +648,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         weak var rigEntity: ModelEntity?
         var bindPoseTransforms: [Transform]?
         var lastGreetingRequest = 0
+        var lastAxisTestRequestID = 0
         var lastIsSpeaking = false
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
