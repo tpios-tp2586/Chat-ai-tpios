@@ -427,7 +427,9 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.speechDisplayLink = nil
         if let entity = coordinator.speechGestureEntity,
            let transforms = coordinator.speechGestureOriginalTransforms {
-            entity.jointTransforms = transforms
+            if let me = entity as? ModelEntity {
+                me.jointTransforms = transforms
+            }
         }
         coordinator.speechGestureController?.stop()
         coordinator.speechGestureController = nil
@@ -435,7 +437,6 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.speechGestureOriginalTransforms = nil
         coordinator.speechStartTime = 0
     }
-
     private func logAnimationInventory(in root: Entity) {
         var ownerSummaries: [String] = []
         var clipSummaries: [String] = []
