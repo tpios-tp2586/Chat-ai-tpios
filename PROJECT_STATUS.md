@@ -197,3 +197,9 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - **Likely next investigation for Claude:** Do not merely tune the repeat interval or amplitude. Reassess whether a continuous symmetric auto-reverse loop is appropriate at all. Inspect the exact animation definition, baseline pose, joint local axes and direction, how RealityKit blends the jointTransforms animation, and how the arm gesture should be selected/timed from conversational intent. Design distinct short, non-repetitive gestures with pauses and asymmetric timing rather than constant simultaneous bobbing. Use only verified joints until mappings are proven. First inspect latest `main` source and this checkpoint before edits.
 - **Constraints remain:** Work on `main` only; minimal changes; no new branches; no Codemagic/GitHub Actions without explicit permission; preserve Gemini Live, chatbot/history/API, greeting, Chibi, framing, zoom, position, and log copy/clear. No idle/background animation yet.
 - **Handoff state:** User is stopping this assistant's implementation attempts and will ask Claude to continue. Do not make further avatar behavior edits unless the user explicitly asks to resume here.
+
+## Alina compile fix — duplicate access modifier (2026-11-12)
+- **Build error:** `AlinaAvatarView.swift` had a stray `private` modifier immediately before the procedural speech-gesture comment, followed by the actual `private let gestureConfig` declaration. Swift reported `duplicate modifier` at the declaration.
+- **Fix on `main`:** Removed only the stray `private` before the comment. The `gestureConfig` declaration and all gesture behavior remain unchanged.
+- **Source commit:** `8c2845325b167372d5d0fcb496d829e4737c77e3`.
+- **Verification:** Fetched the updated source from `main` and confirmed the comment is now ordinary documentation and `gestureConfig` retains its single `private` modifier. No build, Codemagic run, GitHub Actions, or device test was performed.
