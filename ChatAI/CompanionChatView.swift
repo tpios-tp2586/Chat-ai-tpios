@@ -18,26 +18,13 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
-    @State private var axisTestStep = 0
-    @State private var axisTestRequestID = 0
+    @State private var armChainTestRequestID = 0
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
     @State private var diagnosticLogs: [String] = ["[INFO] Mở màn hình Chat Voice"]
     @State private var selectedDiagnosticText = ""
 
-
-    private var axisTestParams: (Int, SIMD3<Float>, Float) {
-        switch axisTestStep {
-        case 1: return (77, SIMD3<Float>(1,0,0), 25)
-        case 2: return (77, SIMD3<Float>(0,1,0), 25)
-        case 3: return (77, SIMD3<Float>(0,0,1), 25)
-        case 4: return (49, SIMD3<Float>(1,0,0), 25)
-        case 5: return (49, SIMD3<Float>(0,1,0), 25)
-        case 6: return (49, SIMD3<Float>(0,0,1), 25)
-        default: return (-1, .zero, 0)
-        }
-    }
 
     var body: some View {
         ZStack {
@@ -51,8 +38,7 @@ struct CompanionChatView: View {
                         AlinaAvatarView(
                             isSpeaking: liveManager.aiSpeaking,
                             greetingRequest: greetingRequest,
-                            axisTestRequest: axisTestParams,
-                            axisTestRequestID: axisTestRequestID,
+                            armChainTestRequestID: armChainTestRequestID,
                             onLog: { addDiagnostic($0) },
                             onTap: { toggleConversation() }
                         )
@@ -180,33 +166,27 @@ struct CompanionChatView: View {
     }
 
     private var rigTestPanel: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("KIỂM TRA KHỚP")
+                Text("KIỂM TRA CHUỖI KHỚP TAY")
                     .font(.caption.weight(.bold))
                 Spacer()
-                Text(liveManager.aiSpeaking ? "Tạm khóa khi Alina nói" : "Chọn một trục để kiểm tra")
+                Text(liveManager.aiSpeaking ? "Tạm khóa khi Alina nói" : "Tách từng khớp con để quan sát")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                ForEach([
-                    (1, "J77 +X"), (2, "J77 +Y"), (3, "J77 +Z"),
-                    (4, "J49 +X"), (5, "J49 +Y"), (6, "J49 +Z")
-                ], id: \.0) { step, label in
-                    Button(label) {
-                        axisTestStep = step
-                        axisTestRequestID += 1
-                    }
+            Button {
+                armChainTestRequestID += 1
+            } label: {
+                Label("Kiểm tra lần lượt khớp con hai tay", systemImage: "figure.arms.open")
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .buttonStyle(.bordered)
-                    .tint(axisTestStep == step ? activeTheme.accent : .gray)
-                    .disabled(liveManager.aiSpeaking)
-                }
+                    .padding(.vertical, 8)
             }
+            .buttonStyle(.bordered)
+            .tint(activeTheme.accent)
+            .disabled(liveManager.aiSpeaking)
         }
         .padding(10)
         .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
