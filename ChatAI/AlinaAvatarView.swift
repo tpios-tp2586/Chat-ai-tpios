@@ -297,6 +297,12 @@ private struct AlinaRealityView: UIViewRepresentable {
             let modelEntity = skin as? ModelEntity
             coordinator.rigEntity = modelEntity
             coordinator.bindPoseTransforms = modelEntity?.jointTransforms
+            if let modelEntity {
+                let transforms = modelEntity.jointTransforms
+                for index in [49, 77] where modelEntity.jointNames.indices.contains(index) && transforms.indices.contains(index) {
+                    logDeferred("[ALINA RIG AUDIT] arm joint index=\(index); path=\(modelEntity.jointNames[index]); bindRotation=\(transforms[index].rotation); bindTranslation=\(transforms[index].translation)")
+                }
+            }
             logDeferred("[ALINA RIG AUDIT] verified bind pose captured; imported TempMotion playback disabled")
             if isSpeaking, let rig = coordinator.rigEntity {
                 runSpeechGesture(on: rig, baselineTransforms: coordinator.bindPoseTransforms, coordinator: coordinator)
