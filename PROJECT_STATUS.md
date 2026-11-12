@@ -203,3 +203,12 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - **Fix on `main`:** Removed only the stray `private` before the comment. The `gestureConfig` declaration and all gesture behavior remain unchanged.
 - **Source commit:** `8c2845325b167372d5d0fcb496d829e4737c77e3`.
 - **Verification:** Fetched the updated source from `main` and confirmed the comment is now ordinary documentation and `gestureConfig` retains its single `private` modifier. No build, Codemagic run, GitHub Actions, or device test was performed.
+
+
+## AN-06 — discrete arm gesture rewrite (2026-11-12)
+- **User decision / axis mapping:** Both verified arm joints use the same local-axis meanings: X = move arm forward/back; Y = rotate the hand; Z = raise/lower. Joint 77 is the right arm and joint 49 is the left arm.
+- **Source change on main:** Replaced the continuous sine-wave bilateral arm oscillation with intermittent, eased gesture pulses. Each pulse selects one verified arm and one of its three user-defined axes; occasional pulses coordinate both arms with different amplitudes. Motion direction, amplitude, duration, and pause vary. Each pulse returns to the captured baseline before the next one. Speech end/interruption invalidates the display link and restores the full saved pose; all new gesture state is cleared.
+- **Preserved:** Imported TempMotion playback remains disabled; greeting action, axis-test path, bind-pose capture, Gemini Live, transcript/audio pipeline, Chibi, framing, zoom, rotation, position, and log copy/clear are unchanged.
+- **Source commits:** bc1a3f1 (discrete gesture controller) and 2480c59 (state reset and Swift interpolation correction). Latest source fetched from main at blob a4473e27be796d677f914a4fe40ada2dd7c6fae5; verified the old frequency-based gesture config is absent and the new X/Y/Z mapping is present.
+- **Validation:** Source inspection only. No local compile, Codemagic build, GitHub Actions, or device test was run. Naturalness is not yet accepted.
+- **Next test:** User runs one Codemagic build and observes several AI responses. Check that gestures are varied and intermittent (not a regular two-arm bob), and that both arms return to the saved resting pose when AI speech ends. Report visual result only; send [ALINA RIG AUDIT] lines only if a start/restore issue occurs.
