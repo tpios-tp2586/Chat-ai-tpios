@@ -427,9 +427,10 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.armChainTestOriginalTransforms = baseline
         coordinator.armChainTestCandidates = candidates
         coordinator.armChainTestStartTime = CACurrentMediaTime()
+        coordinator.armChainTestLastStep = -1
         coordinator.armChainTestLog = onLog
 
-        onLog("[ALINA RIG AUDIT] arm-chain test started; candidates=\(candidates.count); isolated local-Z pulse=8deg; step=0.72s")
+        onLog("[ALINA RIG AUDIT] arm-chain test started; candidates=\(candidates.count); isolated local-Z pulse=8deg; step=1.0s")
         for start in stride(from: 0, to: candidates.count, by: 4) {
             let end = min(start + 4, candidates.count)
             let entries = candidates[start..<end].map {
@@ -456,6 +457,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.armChainTestOriginalTransforms = nil
         coordinator.armChainTestCandidates.removeAll()
         coordinator.armChainTestStartTime = 0
+        coordinator.armChainTestLastStep = -1
         coordinator.armChainTestLog = nil
         if wasRunning {
             onLog("[ALINA RIG AUDIT] arm-chain test cancelled; original pose restored")
@@ -616,6 +618,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         var armChainTestOriginalTransforms: [Transform]?
         var armChainTestCandidates: [(index: Int, side: String, path: String)] = []
         var armChainTestStartTime: Double = 0
+        var armChainTestLastStep = -1
         var armChainTestLog: ((String) -> Void)?
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
@@ -638,7 +641,7 @@ private struct AlinaRealityView: UIViewRepresentable {
                 return
             }
 
-            let stepDuration = 0.72
+            let stepDuration = 1.0
             let elapsed = CACurrentMediaTime() - armChainTestStartTime
             let stepIndex = Int(elapsed / stepDuration)
             guard stepIndex < armChainTestCandidates.count else {
@@ -650,11 +653,16 @@ private struct AlinaRealityView: UIViewRepresentable {
                 armChainTestOriginalTransforms = nil
                 armChainTestCandidates.removeAll()
                 armChainTestStartTime = 0
+                armChainTestLastStep = -1
                 armChainTestLog = nil
                 return
             }
 
             let candidate = armChainTestCandidates[stepIndex]
+            if armChainTestLastStep != stepIndex {
+                armChainTestLastStep = stepIndex
+                armChainTestLog?("[ALINA RIG AUDIT] arm-chain active; index=\(candidate.index); side=\(candidate.side)")
+            }
             let progress = (elapsed - Double(stepIndex) * stepDuration) / stepDuration
             let pulse = Float(progress < 0.5 ? progress * 2 : (1 - progress) * 2)
             let eased = pulse * pulse * (3 - 2 * pulse)
