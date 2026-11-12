@@ -183,10 +183,10 @@ private struct AlinaRealityView: UIViewRepresentable {
             if context.coordinator.currentOffsetX != offsetX || context.coordinator.currentOffsetY != offsetY {
                 applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: context.coordinator)
             }
-            if armChainTestRequestID != context.coordinator.lastArmChainTestRequestID {
-                context.coordinator.lastArmChainTestRequestID = armChainTestRequestID
-                runArmChainTest(coordinator: context.coordinator)
-            }
+        }
+        if armChainTestRequestID != context.coordinator.lastArmChainTestRequestID {
+            context.coordinator.lastArmChainTestRequestID = armChainTestRequestID
+            runArmChainTest(coordinator: context.coordinator)
         }
     }
 
@@ -429,13 +429,13 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.armChainTestStartTime = CACurrentMediaTime()
         coordinator.armChainTestLog = onLog
 
-        onLog("[ALINA RIG AUDIT] arm-chain test started; candidates=\\(candidates.count); isolated local-Z pulse=8deg; step=0.72s")
+        onLog("[ALINA RIG AUDIT] arm-chain test started; candidates=\(candidates.count); isolated local-Z pulse=8deg; step=0.72s")
         for start in stride(from: 0, to: candidates.count, by: 4) {
             let end = min(start + 4, candidates.count)
             let entries = candidates[start..<end].map {
-                "\\($0.index):\\($0.side):\\($0.path)"
+                "\($0.index):\($0.side):\($0.path)"
             }.joined(separator: " | ")
-            onLog("[ALINA RIG AUDIT] arm-chain candidates \\(start + 1)-\\(end): \\(entries)")
+            onLog("[ALINA RIG AUDIT] arm-chain candidates \(start + 1)-\(end): \(entries)")
         }
 
         let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.armChainTestTick))
