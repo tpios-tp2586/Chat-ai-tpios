@@ -247,3 +247,12 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - The panel shows the currently active joint index and side in real time; the diagnostic log retains the matching path groups.
 - No new joint mapping is inferred by source code. User visual confirmation remains required.
 - Source-only follow-up. No compile or device test was run.
+
+
+## AN-06 — manual A/B arm-chain comparison (2026-11-12)
+- **Purpose:** replace the auto-advancing arm-chain pulse with a user-controlled comparison so subtle joint movement can be inspected without timing pressure.
+- **Controls:** select the next verified descendant joint; capture A at the original pose; transition one selected joint to B by 20° around the already-used local-Z test axis over 1.0s; capture B; compare the two RealityKit snapshots side-by-side; restore the complete original pose.
+- **Behavior:** no automatic joint advancement. B remains held until the user selects A, another joint, or Restore. Test controls remain disabled while Alina is speaking. Speech interruption restores the original full pose.
+- **Scope preserved:** no changes to Gemini Live, chat/transcript/audio, greeting, Chibi, avatar framing, zoom, rotation, position, or diagnostic-log copy/clear.
+- **Validation:** source-level inspection only. No Xcode compile, Codemagic build, GitHub Actions, or device test was run.
+- **Next action:** user runs one Codemagic/device build; select a joint, capture A, capture B, open Compare A/B, and report which visible arm segment changes.
