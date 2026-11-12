@@ -19,6 +19,7 @@ struct CompanionChatView: View {
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
     @State private var armChainTestRequestID = 0
+    @State private var armChainTestStatus = "Sẵn sàng kiểm tra"
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -39,7 +40,20 @@ struct CompanionChatView: View {
                             isSpeaking: liveManager.aiSpeaking,
                             greetingRequest: greetingRequest,
                             armChainTestRequestID: armChainTestRequestID,
-                            onLog: { addDiagnostic($0) },
+                            onLog: { line in
+                                addDiagnostic(line)
+                                if line.contains("arm-chain active;") {
+                                    armChainTestStatus = line
+                                } else if line.contains("arm-chain test finished") {
+                                    armChainTestStatus = "Hoàn tất — tư thế đã phục hồi"
+                                } else if line.contains("arm-chain test cancelled") {
+                                    armChainTestStatus = "Đã dừng — tư thế đã phục hồi"
+                                } else if line.contains("arm-chain test started") {
+                                    armChainTestStatus = "Đang kiểm tra từng khớp…"
+                                } else if line.contains("arm-chain test skipped") {
+                                    armChainTestStatus = "Không tìm thấy nhánh khớp phù hợp"
+                                }
+                            },
                             onTap: { toggleConversation() }
                         )
                         .frame(
@@ -175,6 +189,10 @@ struct CompanionChatView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            Text(armChainTestStatus)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
 
             Button {
                 armChainTestRequestID += 1
