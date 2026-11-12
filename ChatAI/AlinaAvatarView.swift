@@ -8,7 +8,9 @@ struct AlinaAvatarView: View {
     let isSpeaking: Bool
     let greetingRequest: Int
     let armChainTestRequestID: Int
+    let armChainTestAction: String
     let onLog: (String) -> Void
+    let onPoseSnapshot: (String, UIImage?) -> Void
     let onTap: () -> Void
 
     @StateObject private var loader = AlinaAvatarLoader()
@@ -46,11 +48,13 @@ struct AlinaAvatarView: View {
                     isSpeaking: isSpeaking,
                     greetingRequest: greetingRequest,
                     armChainTestRequestID: armChainTestRequestID,
+                    armChainTestAction: armChainTestAction,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
                     offsetY: Float(savedOffsetY),
                     onLog: onLog,
+                    onPoseSnapshot: onPoseSnapshot,
                     onMoveStarted: { isMovingAvatar = true },
                     onMoveEnded: { x, y in
                         savedOffsetX = Double(x)
@@ -128,11 +132,13 @@ private struct AlinaRealityView: UIViewRepresentable {
     let isSpeaking: Bool
     let greetingRequest: Int
     let armChainTestRequestID: Int
+    let armChainTestAction: String
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
     let offsetY: Float
     let onLog: (String) -> Void
+    let onPoseSnapshot: (String, UIImage?) -> Void
     let onMoveStarted: () -> Void
     let onMoveEnded: (Float, Float) -> Void
 
@@ -186,7 +192,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
         if armChainTestRequestID != context.coordinator.lastArmChainTestRequestID {
             context.coordinator.lastArmChainTestRequestID = armChainTestRequestID
-            runArmChainTest(coordinator: context.coordinator)
+            runArmChainTest(action: armChainTestAction, in: view, coordinator: context.coordinator)
         }
     }
 
@@ -391,64 +397,140 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.greetingWaveOriginalTransforms = nil
     }
 
-    private func runArmChainTest(coordinator: Coordinator) {
+    private func runArmChainTest(action: String, in view: ARView, coordinator: Coordinator) {
         guard !coordinator.lastIsSpeaking,
               let rig = coordinator.rigEntity,
               let baseline = coordinator.bindPoseTransforms,
               baseline.count == rig.jointNames.count,
               rig.jointNames.indices.contains(49),
               rig.jointNames.indices.contains(77) else {
-            onLog("[ALINA RIG AUDIT] arm-chain test skipped: rig or verified arm roots unavailable")
+            onLog("[ALINA RIG AUDIT] A/B test skipped: rig or verified arm roots unavailable")
             return
         }
 
-        cancelArmChainTest(coordinator: coordinator)
-
-        let leftRoot = rig.jointNames[49]
-        let rightRoot = rig.jointNames[77]
-        let candidates = rig.jointNames.indices.compactMap { index -> (index: Int, side: String, path: String)? in
-            guard index != 49, index != 77 else { return nil }
-            let path = rig.jointNames[index]
-            if path.hasPrefix(leftRoot + "/") {
-                return (index, "left", path)
+        if coordinator.armChainTestEntity !== rig || coordinator.armChainTestOriginalTransforms == nil {
+            let leftRoot = rig.jointNames[49]
+            let rightRoot = rig.jointNames[77]
+            let candidates = rig.jointNames.indices.compactMap { index -> (index: Int, side: String, path: String)? in
+                guard index != 49, index != 77 else { return nil }
+                let path = rig.jointNames[index]
+                if path.hasPrefix(leftRoot + "/") { return (index, "left", path) }
+                if path.hasPrefix(rightRoot + "/") { return (index, "right", path) }
+                return nil
             }
-            if path.hasPrefix(rightRoot + "/") {
-                return (index, "right", path)
+            guard !candidates.isEmpty else {
+                onLog("[ALINA RIG AUDIT] A/B test skipped: no child joints found below joints 49 and 77")
+                return
             }
-            return nil
+            coordinator.armChainTestEntity = rig
+            coordinator.armChainTestOriginalTransforms = baseline
+            coordinator.armChainTestCandidates = candidates
+            coordinator.armChainTestSelectedIndex = -1
         }
 
-        guard !candidates.isEmpty else {
-            onLog("[ALINA RIG AUDIT] arm-chain test skipped: no child joints found below joints 49 and 77")
-            return
-        }
-
-        coordinator.armChainTestEntity = rig
-        coordinator.armChainTestOriginalTransforms = baseline
-        coordinator.armChainTestCandidates = candidates
-        coordinator.armChainTestStartTime = CACurrentMediaTime()
-        coordinator.armChainTestLastStep = -1
         coordinator.armChainTestLog = onLog
-
-        onLog("[ALINA RIG AUDIT] arm-chain test started; candidates=\(candidates.count); isolated local-Z pulse=8deg; step=1.0s")
-        for start in stride(from: 0, to: candidates.count, by: 4) {
-            let end = min(start + 4, candidates.count)
-            let entries = candidates[start..<end].map {
-                "\($0.index):\($0.side):\($0.path)"
-            }.joined(separator: " | ")
-            onLog("[ALINA RIG AUDIT] arm-chain candidates \(start + 1)-\(end): \(entries)")
+        coordinator.armChainPoseCapture = { [onPoseSnapshot] label, image in
+            onPoseSnapshot(label, image)
         }
 
-        let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.armChainTestTick))
+        guard !coordinator.armChainTestCandidates.isEmpty else { return }
+
+        stopArmChainTransition(coordinator: coordinator)
+
+        switch action {
+        case "next":
+            rig.jointTransforms = baseline
+            let count = coordinator.armChainTestCandidates.count
+            coordinator.armChainTestSelectedIndex = (coordinator.armChainTestSelectedIndex + 1) % count
+            logSelectedArmJoint(coordinator: coordinator)
+        case "a", "b":
+            if !coordinator.armChainTestCandidates.indices.contains(coordinator.armChainTestSelectedIndex) {
+                coordinator.armChainTestSelectedIndex = 0
+                logSelectedArmJoint(coordinator: coordinator)
+            }
+            let candidate = coordinator.armChainTestCandidates[coordinator.armChainTestSelectedIndex]
+            var target = baseline[candidate.index]
+            let label: String
+            if action == "b" {
+                let delta = simd_quatf(angle: 20 * .pi / 180, axis: SIMD3<Float>(0, 0, 1))
+                target.rotation = simd_normalize(baseline[candidate.index].rotation * delta)
+                let dot = min(max(abs(simd_dot(baseline[candidate.index].rotation, target.rotation)), 0), 1)
+                let degrees = 2 * acos(dot) * 180 / .pi
+                label = "B"
+                onLog("[ALINA RIG AUDIT] A/B pose B; index=\(candidate.index); side=\(candidate.side); rotationDelta=\(String(format: "%.1f", degrees))deg; transition=1.0s; hold=manual")
+            } else {
+                label = "A"
+                onLog("[ALINA RIG AUDIT] A/B pose A; index=\(candidate.index); side=\(candidate.side); transition=1.0s")
+            }
+            animateArmJoint(
+                rig: rig,
+                index: candidate.index,
+                to: target,
+                coordinator: coordinator
+            ) { [weak coordinator] in
+                guard let coordinator else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    view.snapshot(saveToHDR: false) { image in
+                        DispatchQueue.main.async {
+                            guard let image else {
+                                coordinator.armChainTestLog?("[ALINA RIG AUDIT] A/B snapshot failed; pose=\(label)")
+                                return
+                            }
+                            coordinator.armChainPoseCapture?(label, image)
+                            coordinator.armChainTestLog?("[ALINA RIG AUDIT] A/B snapshot captured; pose=\(label)")
+                        }
+                    }
+                }
+            }
+        case "restore":
+            rig.jointTransforms = baseline
+            onLog("[ALINA RIG AUDIT] A/B pose restored to original")
+        default:
+            break
+        }
+    }
+
+    private func logSelectedArmJoint(coordinator: Coordinator) {
+        guard coordinator.armChainTestCandidates.indices.contains(coordinator.armChainTestSelectedIndex) else { return }
+        let candidate = coordinator.armChainTestCandidates[coordinator.armChainTestSelectedIndex]
+        onLog("[ALINA RIG AUDIT] A/B selected; index=\(candidate.index); side=\(candidate.side); path=\(candidate.path)")
+    }
+
+    private func animateArmJoint(
+        rig: ModelEntity,
+        index: Int,
+        to target: Transform,
+        coordinator: Coordinator,
+        completion: @escaping () -> Void
+    ) {
+        let transforms = rig.jointTransforms
+        guard transforms.indices.contains(index) else { return }
+        coordinator.armChainTransitionEntity = rig
+        coordinator.armChainTransitionJointIndex = index
+        coordinator.armChainTransitionFrom = transforms[index]
+        coordinator.armChainTransitionTo = target
+        coordinator.armChainTransitionStartTime = CACurrentMediaTime()
+        coordinator.armChainTransitionCompletion = completion
+        let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.armChainTransitionTick))
         displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
         displayLink.add(to: .main, forMode: .common)
-        coordinator.armChainTestDisplayLink = displayLink
+        coordinator.armChainTransitionDisplayLink = displayLink
+    }
+
+    private func stopArmChainTransition(coordinator: Coordinator) {
+        coordinator.armChainTransitionDisplayLink?.invalidate()
+        coordinator.armChainTransitionDisplayLink = nil
+        coordinator.armChainTransitionEntity = nil
+        coordinator.armChainTransitionJointIndex = nil
+        coordinator.armChainTransitionFrom = nil
+        coordinator.armChainTransitionTo = nil
+        coordinator.armChainTransitionStartTime = 0
+        coordinator.armChainTransitionCompletion = nil
     }
 
     private func cancelArmChainTest(coordinator: Coordinator) {
-        let wasRunning = coordinator.armChainTestDisplayLink != nil
-        coordinator.armChainTestDisplayLink?.invalidate()
-        coordinator.armChainTestDisplayLink = nil
+        let wasActive = coordinator.armChainTransitionDisplayLink != nil || coordinator.armChainTestEntity != nil
+        stopArmChainTransition(coordinator: coordinator)
         if let entity = coordinator.armChainTestEntity,
            let transforms = coordinator.armChainTestOriginalTransforms {
             entity.jointTransforms = transforms
@@ -456,11 +538,11 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.armChainTestEntity = nil
         coordinator.armChainTestOriginalTransforms = nil
         coordinator.armChainTestCandidates.removeAll()
-        coordinator.armChainTestStartTime = 0
-        coordinator.armChainTestLastStep = -1
+        coordinator.armChainTestSelectedIndex = -1
         coordinator.armChainTestLog = nil
-        if wasRunning {
-            onLog("[ALINA RIG AUDIT] arm-chain test cancelled; original pose restored")
+        coordinator.armChainPoseCapture = nil
+        if wasActive {
+            onLog("[ALINA RIG AUDIT] A/B test cancelled; original pose restored")
         }
     }
 
@@ -613,13 +695,19 @@ private struct AlinaRealityView: UIViewRepresentable {
         var lastGreetingRequest = 0
         var lastArmChainTestRequestID = 0
         var lastIsSpeaking = false
-        var armChainTestDisplayLink: CADisplayLink?
         weak var armChainTestEntity: ModelEntity?
         var armChainTestOriginalTransforms: [Transform]?
         var armChainTestCandidates: [(index: Int, side: String, path: String)] = []
-        var armChainTestStartTime: Double = 0
-        var armChainTestLastStep = -1
+        var armChainTestSelectedIndex = -1
         var armChainTestLog: ((String) -> Void)?
+        var armChainPoseCapture: ((String, UIImage?) -> Void)?
+        var armChainTransitionDisplayLink: CADisplayLink?
+        weak var armChainTransitionEntity: ModelEntity?
+        var armChainTransitionJointIndex: Int?
+        var armChainTransitionFrom: Transform?
+        var armChainTransitionTo: Transform?
+        var armChainTransitionStartTime: Double = 0
+        var armChainTransitionCompletion: (() -> Void)?
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
@@ -632,49 +720,46 @@ private struct AlinaRealityView: UIViewRepresentable {
         var didLogLayout = false
         var didLogUpdate = false
 
-        @objc func armChainTestTick() {
-            guard let entity = armChainTestEntity,
-                  let baseline = armChainTestOriginalTransforms,
-                  baseline.count == entity.jointNames.count else {
-                armChainTestDisplayLink?.invalidate()
-                armChainTestDisplayLink = nil
+        @objc func armChainTransitionTick() {
+            guard let entity = armChainTransitionEntity,
+                  let index = armChainTransitionJointIndex,
+                  let from = armChainTransitionFrom,
+                  let to = armChainTransitionTo else {
+                armChainTransitionDisplayLink?.invalidate()
+                armChainTransitionDisplayLink = nil
                 return
             }
 
-            let stepDuration = 1.0
-            let elapsed = CACurrentMediaTime() - armChainTestStartTime
-            let stepIndex = Int(elapsed / stepDuration)
-            guard stepIndex < armChainTestCandidates.count else {
-                entity.jointTransforms = baseline
-                armChainTestDisplayLink?.invalidate()
-                armChainTestDisplayLink = nil
-                armChainTestLog?("[ALINA RIG AUDIT] arm-chain test finished; all candidates isolated; original pose restored")
-                armChainTestEntity = nil
-                armChainTestOriginalTransforms = nil
-                armChainTestCandidates.removeAll()
-                armChainTestStartTime = 0
-                armChainTestLastStep = -1
-                armChainTestLog = nil
+            let progress = Float(min((CACurrentMediaTime() - armChainTransitionStartTime) / 1.0, 1))
+            let eased = progress * progress * (3 - 2 * progress)
+            var transform = from
+            transform.translation = from.translation + (to.translation - from.translation) * eased
+            transform.scale = from.scale + (to.scale - from.scale) * eased
+            transform.rotation = simd_slerp(from.rotation, to.rotation, eased)
+
+            var transforms = entity.jointTransforms
+            guard transforms.indices.contains(index) else {
+                armChainTransitionDisplayLink?.invalidate()
+                armChainTransitionDisplayLink = nil
                 return
             }
-
-            let candidate = armChainTestCandidates[stepIndex]
-            if armChainTestLastStep != stepIndex {
-                armChainTestLastStep = stepIndex
-                armChainTestLog?("[ALINA RIG AUDIT] arm-chain active; index=\(candidate.index); side=\(candidate.side)")
-            }
-            let progress = (elapsed - Double(stepIndex) * stepDuration) / stepDuration
-            let pulse = Float(progress < 0.5 ? progress * 2 : (1 - progress) * 2)
-            let eased = pulse * pulse * (3 - 2 * pulse)
-            var transforms = baseline
-            let rotation = simd_quatf(
-                angle: 8 * eased * .pi / 180,
-                axis: SIMD3<Float>(0, 0, 1)
-            )
-            transforms[candidate.index].rotation = simd_normalize(
-                baseline[candidate.index].rotation * rotation
-            )
+            transforms[index] = transform
             entity.jointTransforms = transforms
+
+            guard progress >= 1 else { return }
+            var finalTransforms = entity.jointTransforms
+            finalTransforms[index] = to
+            entity.jointTransforms = finalTransforms
+            armChainTransitionDisplayLink?.invalidate()
+            armChainTransitionDisplayLink = nil
+            armChainTransitionEntity = nil
+            armChainTransitionJointIndex = nil
+            armChainTransitionFrom = nil
+            armChainTransitionTo = nil
+            armChainTransitionStartTime = 0
+            let completion = armChainTransitionCompletion
+            armChainTransitionCompletion = nil
+            completion?()
         }
 
         private var moveStartPoint: CGPoint?
