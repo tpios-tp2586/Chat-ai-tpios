@@ -7,8 +7,7 @@ import UIKit
 struct AlinaAvatarView: View {
     let isSpeaking: Bool
     let greetingRequest: Int
-    let axisTestRequest: (Int, SIMD3<Float>, Float) // joint, axis, angle
-    let axisTestRequestID: Int
+    let armChainTestRequestID: Int
     let onLog: (String) -> Void
     let onTap: () -> Void
 
@@ -46,8 +45,7 @@ struct AlinaAvatarView: View {
                     entity: entity,
                     isSpeaking: isSpeaking,
                     greetingRequest: greetingRequest,
-                    axisTestRequest: axisTestRequest,
-                    axisTestRequestID: axisTestRequestID,
+                    armChainTestRequestID: armChainTestRequestID,
                     zoomScale: Float(savedZoomScale),
                     rotationY: rotationY,
                     offsetX: Float(savedOffsetX),
@@ -129,8 +127,7 @@ private struct AlinaRealityView: UIViewRepresentable {
     let entity: Entity
     let isSpeaking: Bool
     let greetingRequest: Int
-    let axisTestRequest: (Int, SIMD3<Float>, Float)
-    let axisTestRequestID: Int
+    let armChainTestRequestID: Int
     let zoomScale: Float
     let rotationY: Float
     let offsetX: Float
@@ -167,12 +164,8 @@ private struct AlinaRealityView: UIViewRepresentable {
             if context.coordinator.lastIsSpeaking != isSpeaking {
                 context.coordinator.lastIsSpeaking = isSpeaking
                 if isSpeaking {
+                    cancelArmChainTest(coordinator: context.coordinator)
                     restoreGreetingWave(coordinator: context.coordinator)
-                    if let rig = context.coordinator.rigEntity {
-                        runSpeechGesture(on: rig, baselineTransforms: context.coordinator.bindPoseTransforms, coordinator: context.coordinator)
-                    }
-                } else {
-                    restoreSpeechGesture(coordinator: context.coordinator)
                 }
             }
             if greetingRequest != context.coordinator.lastGreetingRequest {
@@ -190,11 +183,9 @@ private struct AlinaRealityView: UIViewRepresentable {
             if context.coordinator.currentOffsetX != offsetX || context.coordinator.currentOffsetY != offsetY {
                 applyPosition(offsetX: offsetX, offsetY: offsetY, coordinator: context.coordinator)
             }
-            if axisTestRequestID != context.coordinator.lastAxisTestRequestID {
-                context.coordinator.lastAxisTestRequestID = axisTestRequestID
-                if axisTestRequest.0 >= 0 {
-                    runAxisTest(jointIndex: axisTestRequest.0, axis: axisTestRequest.1, angle: axisTestRequest.2, coordinator: context.coordinator)
-                }
+            if armChainTestRequestID != context.coordinator.lastArmChainTestRequestID {
+                context.coordinator.lastArmChainTestRequestID = armChainTestRequestID
+                runArmChainTest(coordinator: context.coordinator)
             }
         }
     }
@@ -224,6 +215,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         to view: ARView,
         coordinator: Coordinator
     ) {
+        cancelArmChainTest(coordinator: coordinator)
         logDeferred("[ALINA DEBUG] attach entered; original root position=\(model.position), scale=\(model.scale), children=\(model.children.count), enabled=\(model.isEnabled)")
         var inspectedNodes = 0
         var meshNodes = 0
@@ -310,9 +302,7 @@ private struct AlinaRealityView: UIViewRepresentable {
                 }
             }
             logDeferred("[ALINA RIG AUDIT] verified bind pose captured; imported TempMotion playback disabled")
-            if isSpeaking, let rig = coordinator.rigEntity {
-                runSpeechGesture(on: rig, baselineTransforms: coordinator.bindPoseTransforms, coordinator: coordinator)
-            }
+            // Speech gestures stay disabled until the arm-chain mapping is verified.
         } else {
             logDeferred("[ALINA RIG AUDIT] skin0 entity not found; gesture control unavailable")
         }
@@ -401,53 +391,77 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.greetingWaveOriginalTransforms = nil
     }
 
-    // Discrete, eased speech gestures using the user-confirmed local axes:
-    // X = arm forward/back, Y = hand rotation, Z = arm raise/lower.
-    func runSpeechGesture(
-        on modelEntity: ModelEntity,
-        baselineTransforms: [Transform]?,
-        coordinator: Coordinator
-    ) {
-        guard coordinator.lastIsSpeaking,
-              let originalTransforms = baselineTransforms,
-              originalTransforms.count == modelEntity.jointNames.count,
-              originalTransforms.indices.contains(49),
-              originalTransforms.indices.contains(77) else { return }
+    private func runArmChainTest(coordinator: Coordinator) {
+        guard !coordinator.lastIsSpeaking,
+              let rig = coordinator.rigEntity,
+              let baseline = coordinator.bindPoseTransforms,
+              baseline.count == rig.jointNames.count,
+              rig.jointNames.indices.contains(49),
+              rig.jointNames.indices.contains(77) else {
+            onLog("[ALINA RIG AUDIT] arm-chain test skipped: rig or verified arm roots unavailable")
+            return
+        }
 
-        restoreSpeechGesture(coordinator: coordinator)
-        coordinator.speechGestureEntity = modelEntity
-        coordinator.speechGestureOriginalTransforms = originalTransforms
-        coordinator.speechStartTime = CACurrentMediaTime()
-        coordinator.speechGestureNextAt = coordinator.speechStartTime + Double.random(in: 0.4...0.9)
-        coordinator.speechGestureLastKey = nil
+        cancelArmChainTest(coordinator: coordinator)
 
-        let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.speechGestureTick))
+        let leftRoot = rig.jointNames[49]
+        let rightRoot = rig.jointNames[77]
+        let candidates = rig.jointNames.indices.compactMap { index -> (index: Int, side: String, path: String)? in
+            guard index != 49, index != 77 else { return nil }
+            let path = rig.jointNames[index]
+            if path.hasPrefix(leftRoot + "/") {
+                return (index, "left", path)
+            }
+            if path.hasPrefix(rightRoot + "/") {
+                return (index, "right", path)
+            }
+            return nil
+        }
+
+        guard !candidates.isEmpty else {
+            onLog("[ALINA RIG AUDIT] arm-chain test skipped: no child joints found below joints 49 and 77")
+            return
+        }
+
+        coordinator.armChainTestEntity = rig
+        coordinator.armChainTestOriginalTransforms = baseline
+        coordinator.armChainTestCandidates = candidates
+        coordinator.armChainTestStartTime = CACurrentMediaTime()
+        coordinator.armChainTestLog = onLog
+
+        onLog("[ALINA RIG AUDIT] arm-chain test started; candidates=\\(candidates.count); isolated local-Z pulse=8deg; step=0.72s")
+        for start in stride(from: 0, to: candidates.count, by: 4) {
+            let end = min(start + 4, candidates.count)
+            let entries = candidates[start..<end].map {
+                "\\($0.index):\\($0.side):\\($0.path)"
+            }.joined(separator: " | ")
+            onLog("[ALINA RIG AUDIT] arm-chain candidates \\(start + 1)-\\(end): \\(entries)")
+        }
+
+        let displayLink = CADisplayLink(target: coordinator, selector: #selector(Coordinator.armChainTestTick))
         displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
         displayLink.add(to: .main, forMode: .common)
-        coordinator.speechDisplayLink = displayLink
-        logDeferred("[ALINA RIG AUDIT] discrete speech gestures started")
+        coordinator.armChainTestDisplayLink = displayLink
     }
 
-    private func restoreSpeechGesture(coordinator: Coordinator) {
-        coordinator.speechDisplayLink?.invalidate()
-        coordinator.speechDisplayLink = nil
-        if let entity = coordinator.speechGestureEntity,
-           let transforms = coordinator.speechGestureOriginalTransforms {
-            if let me = entity as? ModelEntity {
-                me.jointTransforms = transforms
-            }
+    private func cancelArmChainTest(coordinator: Coordinator) {
+        let wasRunning = coordinator.armChainTestDisplayLink != nil
+        coordinator.armChainTestDisplayLink?.invalidate()
+        coordinator.armChainTestDisplayLink = nil
+        if let entity = coordinator.armChainTestEntity,
+           let transforms = coordinator.armChainTestOriginalTransforms {
+            entity.jointTransforms = transforms
         }
-        coordinator.speechGestureController?.stop()
-        coordinator.speechGestureController = nil
-        coordinator.speechGestureEntity = nil
-        coordinator.speechGestureOriginalTransforms = nil
-        coordinator.speechStartTime = 0
-        coordinator.speechGestureNextAt = 0
-        coordinator.speechGestureActionStart = 0
-        coordinator.speechGestureActionDuration = 0
-        coordinator.speechGestureMotions.removeAll()
-        coordinator.speechGestureLastKey = nil
+        coordinator.armChainTestEntity = nil
+        coordinator.armChainTestOriginalTransforms = nil
+        coordinator.armChainTestCandidates.removeAll()
+        coordinator.armChainTestStartTime = 0
+        coordinator.armChainTestLog = nil
+        if wasRunning {
+            onLog("[ALINA RIG AUDIT] arm-chain test cancelled; original pose restored")
+        }
     }
+
     private func logAnimationInventory(in root: Entity) {
         var ownerSummaries: [String] = []
         var clipSummaries: [String] = []
@@ -560,57 +574,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         }
     }
 
-    func runAxisTest(jointIndex: Int, axis: SIMD3<Float>, angle: Float, coordinator: Coordinator) {
-        guard !coordinator.lastIsSpeaking,
-              let rig = coordinator.rigEntity,
-              let baseline = coordinator.bindPoseTransforms,
-              jointIndex < baseline.count else {
-            onLog("[ALINA RIG AUDIT] axis test skipped: rig not ready")
-            return
-        }
-        // Stop any existing speech gesture
-        coordinator.speechGestureController?.stop()
-        coordinator.speechGestureEntity = nil
-
-        var target = baseline
-        let q = simd_quatf(angle: angle * .pi / 180, axis: simd_normalize(axis))
-        target[jointIndex].rotation = simd_normalize(baseline[jointIndex].rotation * q)
-
-        var def = FromToByAnimation<JointTransforms>()
-        def.jointNames = rig.jointNames
-        def.isScaleAnimated = false
-        def.isTranslationAnimated = false
-        def.isRotationAnimated = true
-        def.fromValue = JointTransforms(baseline)
-        def.toValue = JointTransforms(target)
-        def.duration = 0.8
-        def.timing = .easeInOut
-        def.repeatMode = .autoReverse
-        def.blendLayer = 120
-        def.fillMode = .none
-        def.bindTarget = .jointTransforms
-
-        guard let resource = try? AnimationResource.generate(with: def) else {
-            onLog("[ALINA RIG AUDIT] axis test resource failed")
-            return
-        }
-        coordinator.speechGestureEntity = rig
-        coordinator.speechGestureOriginalTransforms = baseline
-        coordinator.speechGestureController = rig.playAnimation(
-            resource, transitionDuration: 0.1,
-            blendLayerOffset: 0, separateAnimatedValue: true, startsPaused: false
-        )
-        onLog("[ALINA RIG AUDIT] axis test: joint=\(jointIndex) axis=(\(axis.x),\(axis.y),\(axis.z)) angle=\(angle)deg")
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak coordinator] in
-            coordinator?.speechGestureController?.stop()
-            rig.jointTransforms = baseline
-            coordinator?.speechGestureController = nil
-            coordinator?.speechGestureEntity = nil
-        }
-    }
-
-        private func findEntity(named name: String, in root: Entity) -> Entity? {
+    private func findEntity(named name: String, in root: Entity) -> Entity? {
         if root.name == name { return root }
         for child in root.children {
             if let match = findEntity(named: name, in: child) { return match }
@@ -642,14 +606,17 @@ private struct AlinaRealityView: UIViewRepresentable {
         weak var greetingWaveEntity: ModelEntity?
         var greetingWaveOriginalTransforms: [Transform]?
         var greetingWaveSequenceID = 0
-        var speechGestureController: AnimationPlaybackController?
-        weak var speechGestureEntity: ModelEntity?
-        var speechGestureOriginalTransforms: [Transform]?
         weak var rigEntity: ModelEntity?
         var bindPoseTransforms: [Transform]?
         var lastGreetingRequest = 0
-        var lastAxisTestRequestID = 0
+        var lastArmChainTestRequestID = 0
         var lastIsSpeaking = false
+        var armChainTestDisplayLink: CADisplayLink?
+        weak var armChainTestEntity: ModelEntity?
+        var armChainTestOriginalTransforms: [Transform]?
+        var armChainTestCandidates: [(index: Int, side: String, path: String)] = []
+        var armChainTestStartTime: Double = 0
+        var armChainTestLog: ((String) -> Void)?
         var rotationPivot: AnchorEntity?
         var zoomPivot: Entity?
         var baseScale = SIMD3<Float>(repeating: 1)
@@ -661,64 +628,44 @@ private struct AlinaRealityView: UIViewRepresentable {
         var currentOffsetY: Float = 0
         var didLogLayout = false
         var didLogUpdate = false
-        var speechDisplayLink: CADisplayLink?
-        var speechStartTime: Double = 0
-        var speechGestureNextAt: Double = 0
-        var speechGestureActionStart: Double = 0
-        var speechGestureActionDuration: Double = 0
-        var speechGestureMotions: [(jointIndex: Int, axis: SIMD3<Float>, amplitude: Float)] = []
-        var speechGestureLastKey: String?
 
-        @objc func speechGestureTick() {
-            guard let entity = speechGestureEntity,
-                  let baseline = speechGestureOriginalTransforms,
-                  baseline.count == entity.jointNames.count else { return }
-
-            let now = CACurrentMediaTime()
-            if now >= speechGestureNextAt {
-                let joint = Bool.random() ? 77 : 49
-                var axisIndex = Int.random(in: 0...2)
-                let key = "\(joint)-\(axisIndex)"
-                if key == speechGestureLastKey { axisIndex = (axisIndex + 1) % 3 }
-                speechGestureLastKey = "\(joint)-\(axisIndex)"
-
-                let axes: [SIMD3<Float>] = [
-                    SIMD3<Float>(1, 0, 0), // X: forward/back
-                    SIMD3<Float>(0, 1, 0), // Y: hand rotation
-                    SIMD3<Float>(0, 0, 1)  // Z: raise/lower
-                ]
-                func amplitude(for axis: Int) -> Float {
-                    let range: ClosedRange<Float> = axis == 1 ? 3...5 : (axis == 0 ? 4...7 : 5...8)
-                    return Float.random(in: range) * (Bool.random() ? 1 : -1)
-                }
-
-                speechGestureMotions = [(joint, axes[axisIndex], amplitude(for: axisIndex))]
-                if Double.random(in: 0...1) < 0.22 {
-                    let otherJoint = joint == 77 ? 49 : 77
-                    let otherAxis = Int.random(in: 0...2)
-                    speechGestureMotions.append((otherJoint, axes[otherAxis], amplitude(for: otherAxis) * 0.7))
-                }
-
-                speechGestureActionStart = now
-                speechGestureActionDuration = Double.random(in: 0.55...0.9)
-                speechGestureNextAt = now + speechGestureActionDuration + Double.random(in: 0.9...2.1)
+        @objc func armChainTestTick() {
+            guard let entity = armChainTestEntity,
+                  let baseline = armChainTestOriginalTransforms,
+                  baseline.count == entity.jointNames.count else {
+                armChainTestDisplayLink?.invalidate()
+                armChainTestDisplayLink = nil
+                return
             }
 
+            let stepDuration = 0.72
+            let elapsed = CACurrentMediaTime() - armChainTestStartTime
+            let stepIndex = Int(elapsed / stepDuration)
+            guard stepIndex < armChainTestCandidates.count else {
+                entity.jointTransforms = baseline
+                armChainTestDisplayLink?.invalidate()
+                armChainTestDisplayLink = nil
+                armChainTestLog?("[ALINA RIG AUDIT] arm-chain test finished; all candidates isolated; original pose restored")
+                armChainTestEntity = nil
+                armChainTestOriginalTransforms = nil
+                armChainTestCandidates.removeAll()
+                armChainTestStartTime = 0
+                armChainTestLog = nil
+                return
+            }
+
+            let candidate = armChainTestCandidates[stepIndex]
+            let progress = (elapsed - Double(stepIndex) * stepDuration) / stepDuration
+            let pulse = Float(progress < 0.5 ? progress * 2 : (1 - progress) * 2)
+            let eased = pulse * pulse * (3 - 2 * pulse)
             var transforms = baseline
-            let progress = min(max((now - speechGestureActionStart) / max(speechGestureActionDuration, 0.001), 0), 1)
-            if !speechGestureMotions.isEmpty && progress < 1 {
-                let halfProgress = Float(progress < 0.5 ? progress * 2 : (1 - progress) * 2)
-                let eased = halfProgress * halfProgress * (3 - 2 * halfProgress)
-                for motion in speechGestureMotions where baseline.indices.contains(motion.jointIndex) {
-                    let angle = motion.amplitude * eased * .pi / 180
-                    let rotation = simd_quatf(angle: angle, axis: motion.axis)
-                    transforms[motion.jointIndex].rotation = simd_normalize(
-                        baseline[motion.jointIndex].rotation * rotation
-                    )
-                }
-            } else if progress >= 1 {
-                speechGestureMotions.removeAll()
-            }
+            let rotation = simd_quatf(
+                angle: 8 * eased * .pi / 180,
+                axis: SIMD3<Float>(0, 0, 1)
+            )
+            transforms[candidate.index].rotation = simd_normalize(
+                baseline[candidate.index].rotation * rotation
+            )
             entity.jointTransforms = transforms
         }
 
