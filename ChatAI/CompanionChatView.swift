@@ -18,7 +18,8 @@ struct CompanionChatView: View {
 
     @State private var emotion: CompanionEmotion = .idle
     @State private var greetingRequest = 0
-    @State private var axisTestStep = 0  // 0=off, 1=j77X, 2=j77Y, 3=j77Z, 4=j49X, 5=j49Y, 6=j49Z
+    @State private var axisTestStep = 0
+    @State private var axisTestRequestID = 0
     @State private var message: String?
     @State private var typedMessage = ""
     @State private var showDiagnosticLog = false
@@ -47,35 +48,27 @@ struct CompanionChatView: View {
 
                 GeometryReader { proxy in
                     VStack(spacing: 0) {
-                        ZStack {
-                            AlinaAvatarView(
-                                isSpeaking: liveManager.aiSpeaking,
-                                greetingRequest: greetingRequest,
-                                axisTestRequest: axisTestParams,
-                                onLog: { log in
-                                addDiagnostic(log)
-                            }, onTap: {
-                                toggleConversation()
-                            })
-
-                        }
+                        AlinaAvatarView(
+                            isSpeaking: liveManager.aiSpeaking,
+                            greetingRequest: greetingRequest,
+                            axisTestRequest: axisTestParams,
+                            axisTestRequestID: axisTestRequestID,
+                            onLog: { addDiagnostic($0) },
+                            onTap: { toggleConversation() }
+                        )
                         .frame(
                             width: min(proxy.size.width - 12, 410),
-                            height: min(proxy.size.height * 0.72, 450)
+                            height: min(proxy.size.height * 0.62, 420)
                         )
 
-                        Spacer(minLength: 6)
+                        rigTestPanel
 
                         VStack(alignment: .leading, spacing: 7) {
                             Label(statusText, systemImage: statusIcon)
                                 .font(.caption.weight(.semibold))
-
-                            Text(
-                                message
-                                ?? "Chào anh! Mình trò chuyện nhé."
-                            )
-                            .font(.subheadline)
-                            .lineLimit(2)
+                            Text(message ?? "Chào anh! Mình trò chuyện nhé.")
+                                .font(.subheadline)
+                                .lineLimit(2)
                         }
                         .foregroundStyle(.white)
                         .padding(13)
@@ -186,6 +179,44 @@ struct CompanionChatView: View {
         .padding(.bottom, 8)
     }
 
+    private var rigTestPanel: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("KIỂM TRA KHỚP")
+                    .font(.caption.weight(.bold))
+                Spacer()
+                Text(liveManager.aiSpeaking ? "Tạm khóa khi Alina nói" : "Chọn một trục để kiểm tra")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach([
+                    (1, "J77 +X"), (2, "J77 +Y"), (3, "J77 +Z"),
+                    (4, "J49 +X"), (5, "J49 +Y"), (6, "J49 +Z")
+                ], id: \.0) { step, label in
+                    Button(label) {
+                        axisTestStep = step
+                        axisTestRequestID += 1
+                    }
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .buttonStyle(.bordered)
+                    .tint(axisTestStep == step ? activeTheme.accent : .gray)
+                    .disabled(liveManager.aiSpeaking)
+                }
+            }
+        }
+        .padding(10)
+        .background(activeTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(activeTheme.accent.opacity(0.18), lineWidth: 1)
+        }
+        .padding(.horizontal, 16)
+    }
+
     private var diagnosticLogText: String {
         diagnosticLogs.joined(separator: "\n")
     }
@@ -227,25 +258,6 @@ struct CompanionChatView: View {
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
                     }
                     .buttonStyle(.bordered)
-                }
-                // Axis test buttons
-                Text("Test axis (joint 77 = tay phải, joint 49 = tay trái)")
-                    .font(.caption).foregroundStyle(.secondary)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach([
-                        (1, "J77 +X", 77, SIMD3<Float>(1,0,0), Float(25)),
-                        (2, "J77 +Y", 77, SIMD3<Float>(0,1,0), Float(25)),
-                        (3, "J77 +Z", 77, SIMD3<Float>(0,0,1), Float(25)),
-                        (4, "J49 +X", 49, SIMD3<Float>(1,0,0), Float(25)),
-                        (5, "J49 +Y", 49, SIMD3<Float>(0,1,0), Float(25)),
-                        (6, "J49 +Z", 49, SIMD3<Float>(0,0,1), Float(25)),
-                    ], id: \.0) { step, label, joint, axis, angle in
-                        Button(label) {
-                            axisTestStep = step
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(axisTestStep == step ? .blue : .gray)
-                    }
                 }
             }.padding()
                 .navigationTitle("Log Chat Voice")
