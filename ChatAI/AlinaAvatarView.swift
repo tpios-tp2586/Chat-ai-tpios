@@ -389,7 +389,7 @@ private struct AlinaRealityView: UIViewRepresentable {
         coordinator.greetingWaveOriginalTransforms = nil
     }
 
-    private // Procedural noise-driven speech gestures
+    // Procedural noise-driven speech gestures
     // Each joint oscillates with sin/cos at different frequencies and phases
     // so movement is continuous, asymmetric, and natural-looking
 
