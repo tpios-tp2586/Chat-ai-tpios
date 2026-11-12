@@ -229,3 +229,14 @@ Append a concise entry after each new test. Do not overwrite prior evidence.
 - Preserved: diagnostic log display, Copy All, Copy Selected, Clear, Alina rendering, voice/chat pipeline, greeting, framing, zoom, rotation, position, Chibi, and all existing avatar behavior outside the one-shot test trigger.
 - Validation: source inspection and targeted string-level consistency checks only. No Xcode compile, Codemagic build, GitHub Actions, or device test was run.
 - Next action: user runs one Codemagic build, checks that the test panel is outside the avatar area and Alina remains visible while selecting each axis; send only the visual result and any [ALINA RIG AUDIT] axis test line. Do not request full logs.
+
+
+## AN-06 — targeted arm-chain mapping probe (2026-11-12)
+- **Purpose:** identify which child joints under the already-verified left/right arm roots (49 and 77) control individual arm segments. This is not the previous six-axis test and does not repeat the completed 101-joint sweep.
+- **Test design:** derive candidate indices from the existing runtime jointNames paths by selecting descendants of the exact verified paths at indices 49 and 77. Exclude the two already-confirmed roots. Pulse one candidate at a time with a small eased 8° local-Z rotation for a 0.72s step; every frame starts from the captured full pose so only one candidate is active. Log compact index/side/path groups.
+- **Rejected behavior removed:** deleted the random-axis speech gesture loop. Speech gestures remain disabled until the arm-chain mapping and neutral pose are verified; the greeting action remains unchanged.
+- **Safety / restoration:** run only while idle. If AI speech begins, cancel the test, invalidate its display link, and restore the captured full pose before speech handling continues. Restore the full pose again at normal completion.
+- **UI:** replace the six old X/Y/Z buttons with one dedicated arm-chain test button below Alina. Keep the diagnostic log sheet and copy/clear controls unchanged.
+- **Validation:** source changes only. No Xcode compile, Codemagic build, GitHub Actions, or device test was run.
+- **User test:** run one build, tap the arm-chain test once, and observe which arm segment moves at each pulse. Report the visible segment sequence; send only [ALINA RIG AUDIT] arm-chain lines if the sequence does not start, stop, or restore correctly.
+- **Acceptance:** each candidate joint produces one localized, distinguishable movement; no simultaneous/random motion; the original pose is restored at completion or interruption. Do not mark mapped until the user identifies the visible segments.
