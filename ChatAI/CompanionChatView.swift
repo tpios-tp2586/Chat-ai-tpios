@@ -179,7 +179,7 @@ struct CompanionChatView: View {
             Button {
                 armChainTestRequestID += 1
             } label: {
-                Label("Kiểm tra lần lượt khớp con hai tay", systemImage: "figure.arms.open")
+                Label("Kiểm tra lần lượt khớp con hai tay", systemImage: "hand.raised")
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
